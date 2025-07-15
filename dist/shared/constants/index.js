@@ -65,7 +65,9 @@ exports.GAME_CONFIG = {
             ACCURACY: 1.0,
             RANGE: 150,
             HITSCAN: false,
-            PROJECTILE_SPEED: 200,
+            PROJECTILE_SPEED: 200, // Legacy - not used with new system
+            BASE_THROW_SPEED: 2, // Base speed for grenades (8 px/s at charge 1)
+            CHARGE_SPEED_BONUS: 6, // Speed added per charge level (results in 8-32 px/s)
             EXPLOSION_RADIUS: 40,
             CHARGE_LEVELS: 5,
             CHARGE_MULTIPLIER: 1.5
@@ -133,6 +135,8 @@ exports.EVENTS = {
     PLAYER_KILLED: 'player:killed',
     WALL_DESTROYED: 'wall:destroyed',
     PROJECTILE_CREATED: 'projectile:created',
+    PROJECTILE_UPDATED: 'projectile:updated',
+    PROJECTILE_EXPLODED: 'projectile:exploded',
     PROJECTILE_DESTROYED: 'projectile:destroyed',
     EXPLOSION_CREATED: 'explosion:created'
 };

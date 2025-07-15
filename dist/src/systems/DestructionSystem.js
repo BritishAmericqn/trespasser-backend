@@ -1,11 +1,18 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DestructionSystem = void 0;
 const constants_1 = require("../../shared/constants");
+const matter_js_1 = __importDefault(require("matter-js"));
 class DestructionSystem {
+    physics;
     walls = new Map();
+    wallBodies = new Map();
     wallIdCounter = 0;
-    constructor() {
+    constructor(physics) {
+        this.physics = physics;
         console.log('DestructionSystem initialized');
         this.initializeTestWalls();
     }
@@ -61,7 +68,36 @@ class DestructionSystem {
             height: 15,
             material: 'glass'
         });
-        console.log(`🧱 Initialized ${this.walls.size} test walls`);
+        // Create boundary walls for physics collisions
+        // Top boundary
+        this.createWall({
+            position: { x: 0, y: -10 },
+            width: constants_1.GAME_CONFIG.GAME_WIDTH,
+            height: 10,
+            material: 'concrete'
+        });
+        // Bottom boundary
+        this.createWall({
+            position: { x: 0, y: constants_1.GAME_CONFIG.GAME_HEIGHT },
+            width: constants_1.GAME_CONFIG.GAME_WIDTH,
+            height: 10,
+            material: 'concrete'
+        });
+        // Left boundary
+        this.createWall({
+            position: { x: -10, y: 0 },
+            width: 10,
+            height: constants_1.GAME_CONFIG.GAME_HEIGHT,
+            material: 'concrete'
+        });
+        // Right boundary
+        this.createWall({
+            position: { x: constants_1.GAME_CONFIG.GAME_WIDTH, y: 0 },
+            width: 10,
+            height: constants_1.GAME_CONFIG.GAME_HEIGHT,
+            material: 'concrete'
+        });
+        console.log(`🧱 Initialized ${this.walls.size} walls (including boundaries)`);
     }
     // Create a new wall
     createWall(params) {
@@ -82,6 +118,19 @@ class DestructionSystem {
         // Initialize destruction mask (0 = intact, 1 = destroyed)
         wall.destructionMask.fill(0);
         this.walls.set(wallId, wall);
+        // Create physics body for the wall if physics system is available
+        if (this.physics) {
+            const body = matter_js_1.default.Bodies.rectangle(params.position.x + params.width / 2, params.position.y + params.height / 2, params.width, params.height, {
+                isStatic: true,
+                friction: 0.8,
+                restitution: 0.5,
+                label: `wall:${wallId}`,
+                render: { visible: false }
+            });
+            this.physics.addBody(body);
+            this.wallBodies.set(wallId, body);
+            console.log(`🧱 Created physics body for wall ${wallId}`);
+        }
         return wall;
     }
     // Apply damage to a wall slice
@@ -165,6 +214,14 @@ class DestructionSystem {
     }
     // Remove a wall completely
     removeWall(wallId) {
+        // Remove physics body if it exists
+        if (this.physics) {
+            const body = this.wallBodies.get(wallId);
+            if (body) {
+                this.physics.removeBody(body);
+                this.wallBodies.delete(wallId);
+            }
+        }
         return this.walls.delete(wallId);
     }
     // Get all walls

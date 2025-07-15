@@ -116,6 +116,7 @@ export interface WeaponFireEvent {
   isADS: boolean;
   timestamp: number;
   sequence: number;
+  chargeLevel?: number; // For grenades: 1-5
 }
 
 export interface WeaponHitEvent {

@@ -17,12 +17,13 @@ export class GameStateSystem {
   private lastInputSequence: Map<string, number> = new Map();
   private pendingWallDamageEvents: any[] = [];
   private pendingReloadCompleteEvents: any[] = [];
+  private pendingProjectileEvents: any[] = [];
   
   constructor(physics: PhysicsSystem) {
     this.physics = physics;
     this.weaponSystem = new WeaponSystem();
     this.projectileSystem = new ProjectileSystem(physics, this.weaponSystem);
-    this.destructionSystem = new DestructionSystem();
+    this.destructionSystem = new DestructionSystem(physics);
     
     // Set up reload complete callback
     this.weaponSystem.setReloadCompleteCallback((playerId: string, weapon: WeaponState) => {
@@ -351,20 +352,57 @@ export class GameStateSystem {
       }
     } else {
       // Handle projectile weapons (grenade, rocket)
-      const velocity = this.calculateProjectileVelocity(event.direction, weaponConfig.PROJECTILE_SPEED);
+      let velocity: Vector2;
+      let projectileOptions: any = {
+        range: weapon.range,
+        explosionRadius: weaponConfig.EXPLOSION_RADIUS
+      };
+      
+      if (weapon.type === 'grenade') {
+        console.log(`🎯 Grenade fire event - chargeLevel: ${event.chargeLevel}`);
+        if (event.chargeLevel) {
+          // Use new grenade velocity system with charge levels
+          const baseSpeed = GAME_CONFIG.WEAPONS.GRENADE.BASE_THROW_SPEED;
+          const chargeBonus = GAME_CONFIG.WEAPONS.GRENADE.CHARGE_SPEED_BONUS;
+          const speed = baseSpeed + (event.chargeLevel * chargeBonus); // 8-32 px/s range
+          velocity = this.calculateProjectileVelocity(event.direction, speed);
+          
+          // Apply charge multiplier to range
+          const chargeMultiplier = 1 + ((event.chargeLevel - 1) * 0.5);
+          projectileOptions.range = weapon.range * chargeMultiplier;
+          projectileOptions.chargeLevel = event.chargeLevel;
+          
+          console.log(`💣 Grenade throw: charge=${event.chargeLevel}, speed=${speed}, range=${projectileOptions.range}`);
+        } else {
+          // Fallback to default speed if no charge level
+          console.log('⚠️  No charge level provided, using default speed');
+          velocity = this.calculateProjectileVelocity(event.direction, weaponConfig.PROJECTILE_SPEED);
+        }
+      } else {
+        // Regular projectile (rocket)
+        velocity = this.calculateProjectileVelocity(event.direction, weaponConfig.PROJECTILE_SPEED);
+      }
+      
       const projectile = this.projectileSystem.createProjectile(
         weapon.type as 'bullet' | 'rocket' | 'grenade',
         event.position,
         velocity,
         event.playerId,
         weapon.damage,
-        {
-          range: weapon.range,
-          explosionRadius: weaponConfig.EXPLOSION_RADIUS
-        }
+        projectileOptions
       );
       
-      events.push({ type: EVENTS.PROJECTILE_CREATED, data: projectile });
+      events.push({ 
+        type: EVENTS.PROJECTILE_CREATED, 
+        data: {
+          id: projectile.id,
+          type: projectile.type,
+          playerId: projectile.ownerId,
+          position: { x: projectile.position.x, y: projectile.position.y },
+          velocity: { x: projectile.velocity.x, y: projectile.velocity.y },
+          timestamp: projectile.timestamp
+        }
+      });
     }
     
     // Add weapon fired event
@@ -450,12 +488,15 @@ export class GameStateSystem {
     }
     
     const weapon = throwResult.weapon!;
-    const velocity = this.calculateProjectileVelocity(event.direction, GAME_CONFIG.WEAPONS.GRENADE.PROJECTILE_SPEED);
     
-    // Apply charge level to velocity
-    const chargeMultiplier = 1 + ((event.chargeLevel - 1) * 0.5); // 50% increase per charge level
-    velocity.x *= chargeMultiplier;
-    velocity.y *= chargeMultiplier;
+    // Use new grenade velocity system with charge levels
+    const baseSpeed = GAME_CONFIG.WEAPONS.GRENADE.BASE_THROW_SPEED;
+    const chargeBonus = GAME_CONFIG.WEAPONS.GRENADE.CHARGE_SPEED_BONUS;
+    const speed = baseSpeed + (event.chargeLevel * chargeBonus); // 8-32 px/s range
+    const velocity = this.calculateProjectileVelocity(event.direction, speed);
+    
+    // Apply charge multiplier to range only (velocity already includes charge)
+    const chargeMultiplier = 1 + ((event.chargeLevel - 1) * 0.5);
     
     const projectile = this.projectileSystem.createProjectile(
       'grenade',
@@ -627,7 +668,17 @@ export class GameStateSystem {
     this.lastUpdateTime = now;
     
     // Update projectile system - now with wall collision checking
-    this.projectileSystem.update(deltaTime, this.destructionSystem.getWalls());
+    const projectileEvents = this.projectileSystem.update(deltaTime, this.destructionSystem.getWalls());
+    
+    // Queue projectile update events
+    for (const updateEvent of projectileEvents.updateEvents) {
+      this.pendingProjectileEvents.push({ type: EVENTS.PROJECTILE_UPDATED, data: updateEvent });
+    }
+    
+    // Queue projectile explode events
+    for (const explodeEvent of projectileEvents.explodeEvents) {
+      this.pendingProjectileEvents.push({ type: EVENTS.PROJECTILE_EXPLODED, data: explodeEvent });
+    }
     
     // Check projectile collisions
     this.checkProjectileCollisions();
@@ -676,9 +727,15 @@ export class GameStateSystem {
         }
       }
       
-      // Check wall collisions
+      // Check wall collisions (grenades are now handled in update loop, so this is mainly for rockets)
       const wallCollision = this.projectileSystem.checkWallCollision(projectile, this.destructionSystem.getWalls());
       if (wallCollision.hit && wallCollision.wall && wallCollision.sliceIndex !== undefined) {
+        // Skip grenades as they're handled immediately in the update loop
+        // Note: This should rarely happen now since grenades bounce in the update loop
+        if (projectile.type === ('grenade' as any)) {
+          continue;
+        }
+        
         const projectileDamageEvent = this.projectileSystem.handleWallCollision(projectile, wallCollision.wall, wallCollision.sliceIndex);
         if (projectileDamageEvent) {
           const wallDamageResult = this.destructionSystem.applyDamage(wallCollision.wall.id, wallCollision.sliceIndex, projectileDamageEvent.damage);
@@ -744,10 +801,12 @@ export class GameStateSystem {
   getPendingEvents(): any[] {
     const events = [
       ...this.pendingWallDamageEvents,
-      ...this.pendingReloadCompleteEvents
+      ...this.pendingReloadCompleteEvents,
+      ...this.pendingProjectileEvents
     ];
     this.pendingWallDamageEvents = [];
     this.pendingReloadCompleteEvents = [];
+    this.pendingProjectileEvents = [];
     return events;
   }
   

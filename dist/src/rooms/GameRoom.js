@@ -69,7 +69,8 @@ class GameRoom {
                 direction: player.transform.rotation, // Use server rotation, not client!
                 isADS: event.isADS,
                 timestamp: event.timestamp,
-                sequence: event.sequence
+                sequence: event.sequence,
+                chargeLevel: event.chargeLevel // Pass through charge level for grenades
             };
             const result = this.gameState.handleWeaponFire(weaponFireEvent);
             if (result.success) {
@@ -135,6 +136,10 @@ class GameRoom {
             const stats = this.gameState.getDestructionSystem().getDestructionStats();
             console.log('📊 Destruction stats:', stats);
             socket.emit('debug:destruction_stats', stats);
+        });
+        socket.on('debug:clear_projectiles', () => {
+            this.gameState.getProjectileSystem().clear();
+            console.log('🧹 All projectiles cleared');
         });
         // Listen for any events for debugging
         socket.onAny((eventName, data) => {
