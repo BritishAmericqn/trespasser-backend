@@ -66,6 +66,16 @@ const deltaY = input.mouse.y - player.transform.position.y;
 const angle = Math.atan2(deltaY, deltaX);
 ```
 
+### 8. **Firing Angle While Moving** ✅
+```typescript
+// GameRoom.ts - Line 67
+// CRITICAL FIX: Use server's calculated rotation, not client's direction
+const weaponFireEvent: WeaponFireEvent = {
+  direction: player.transform.rotation,  // Server rotation updates as player moves
+  // NOT: direction: event.direction    // Client's static angle
+};
+```
+
 ## 🚨 Critical Frontend Issues Discovered
 
 ### 1. **Weapon Direction Mismatch** 🔴

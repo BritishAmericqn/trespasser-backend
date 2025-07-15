@@ -51,12 +51,22 @@ class GameRoom {
                 console.log(`   Server has:  (${serverPos.x.toFixed(2)}, ${serverPos.y.toFixed(2)})`);
                 console.log(`   Offset:      (${offsetX.toFixed(2)}, ${offsetY.toFixed(2)})`);
             }
+            // Debug: Log angle mismatch
+            if (event.direction !== undefined) {
+                const clientAngle = event.direction * 180 / Math.PI;
+                const serverAngle = player.transform.rotation * 180 / Math.PI;
+                const angleDiff = Math.abs(clientAngle - serverAngle);
+                console.log(`🎯 ANGLE CHECK:`);
+                console.log(`   Client sent: ${clientAngle.toFixed(1)}°`);
+                console.log(`   Server has:  ${serverAngle.toFixed(1)}°`);
+                console.log(`   Difference:  ${angleDiff.toFixed(1)}°`);
+            }
             // Use server position, not client position
             const weaponFireEvent = {
                 playerId: socket.id,
                 weaponType: event.weaponType,
                 position: { ...player.transform.position }, // Use server position
-                direction: event.direction,
+                direction: player.transform.rotation, // Use server rotation, not client!
                 isADS: event.isADS,
                 timestamp: event.timestamp,
                 sequence: event.sequence
