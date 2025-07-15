@@ -354,16 +354,41 @@ export class WeaponSystem {
       bottom: wall.position.y + wall.height
     };
     
-    // Check intersection with wall bounds
-    const tMin = Math.max(
-      (wallBounds.left - start.x) / direction.x,
-      (wallBounds.top - start.y) / direction.y
-    );
+    // Handle division by zero for ray-AABB intersection
+    let tMinX = -Infinity;
+    let tMaxX = Infinity;
+    let tMinY = -Infinity;
+    let tMaxY = Infinity;
     
-    const tMax = Math.min(
-      (wallBounds.right - start.x) / direction.x,
-      (wallBounds.bottom - start.y) / direction.y
-    );
+    // X-axis intersection
+    if (Math.abs(direction.x) > 0.0001) {
+      const t1 = (wallBounds.left - start.x) / direction.x;
+      const t2 = (wallBounds.right - start.x) / direction.x;
+      tMinX = Math.min(t1, t2);
+      tMaxX = Math.max(t1, t2);
+    } else {
+      // Ray is parallel to X-axis
+      if (start.x < wallBounds.left || start.x > wallBounds.right) {
+        return null; // Ray misses the wall
+      }
+    }
+    
+    // Y-axis intersection
+    if (Math.abs(direction.y) > 0.0001) {
+      const t1 = (wallBounds.top - start.y) / direction.y;
+      const t2 = (wallBounds.bottom - start.y) / direction.y;
+      tMinY = Math.min(t1, t2);
+      tMaxY = Math.max(t1, t2);
+    } else {
+      // Ray is parallel to Y-axis
+      if (start.y < wallBounds.top || start.y > wallBounds.bottom) {
+        return null; // Ray misses the wall
+      }
+    }
+    
+    // Find intersection
+    const tMin = Math.max(tMinX, tMinY);
+    const tMax = Math.min(tMaxX, tMaxY);
     
     if (tMin <= tMax && tMin >= 0 && tMin <= maxDistance) {
       const hitPoint = {

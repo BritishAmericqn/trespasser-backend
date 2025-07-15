@@ -300,6 +300,9 @@ export class GameStateSystem {
         this.players
       );
       
+      // Debug logging
+      console.log(`🎯 HITSCAN from (${event.position.x.toFixed(1)}, ${event.position.y.toFixed(1)}) dir: ${(event.direction * 180 / Math.PI).toFixed(1)}° - Result: ${hitscanResult.hit ? `HIT ${hitscanResult.targetType} at (${hitscanResult.hitPoint.x.toFixed(1)}, ${hitscanResult.hitPoint.y.toFixed(1)})` : 'MISS'}`);
+      
       if (hitscanResult.hit) {
         if (hitscanResult.targetType === 'player' && hitscanResult.targetId) {
           // Player hit
@@ -316,6 +319,7 @@ export class GameStateSystem {
           }
         } else if (hitscanResult.targetType === 'wall' && hitscanResult.targetId && hitscanResult.wallSliceIndex !== undefined) {
           // Wall hit
+          console.log(`🧱 WALL HIT: ${hitscanResult.targetId} slice ${hitscanResult.wallSliceIndex}`);
           const wall = this.destructionSystem.getWall(hitscanResult.targetId);
           if (wall) {
             const damage = this.weaponSystem.calculateDamage(weapon, hitscanResult.distance);
@@ -323,6 +327,7 @@ export class GameStateSystem {
             
             if (damageEvent) {
               events.push({ type: EVENTS.WALL_DAMAGED, data: damageEvent });
+              console.log(`💥 WALL DAMAGED: ${damageEvent.wallId} slice ${damageEvent.sliceIndex} - new health: ${damageEvent.newHealth}`);
               
               if (damageEvent.isDestroyed) {
                 events.push({ type: EVENTS.WALL_DESTROYED, data: damageEvent });
@@ -621,8 +626,8 @@ export class GameStateSystem {
     const deltaTime = now - this.lastUpdateTime;
     this.lastUpdateTime = now;
     
-    // Update projectile system
-    this.projectileSystem.update(deltaTime);
+    // Update projectile system - now with wall collision checking
+    this.projectileSystem.update(deltaTime, this.destructionSystem.getWalls());
     
     // Check projectile collisions
     this.checkProjectileCollisions();

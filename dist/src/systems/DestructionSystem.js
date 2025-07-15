@@ -26,13 +26,13 @@ class DestructionSystem {
         });
         this.createWall({
             position: { x: 300, y: 150 },
-            width: 30,
+            width: 60, // Changed from 30 to match frontend
             height: 15,
             material: 'metal'
         });
         this.createWall({
             position: { x: 150, y: 50 },
-            width: 75,
+            width: 60, // Changed from 75 to match frontend
             height: 15,
             material: 'glass'
         });

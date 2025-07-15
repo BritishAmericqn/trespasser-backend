@@ -144,7 +144,11 @@ class GameRoom {
             this.gameState.update(1000 / constants_1.GAME_CONFIG.TICK_RATE);
             // CRITICAL FIX: Broadcast pending wall damage events from projectiles/explosions
             const pendingEvents = this.gameState.getPendingEvents();
+            if (pendingEvents.length > 0) {
+                console.log(`📤 Broadcasting ${pendingEvents.length} pending events`);
+            }
             for (const event of pendingEvents) {
+                console.log(`📤 Emitting ${event.type}:`, event.data);
                 this.io.emit(event.type, event.data);
             }
         }, 1000 / constants_1.GAME_CONFIG.TICK_RATE);

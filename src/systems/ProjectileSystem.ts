@@ -10,6 +10,7 @@ export class ProjectileSystem {
   private physics: PhysicsSystem;
   private weaponSystem: WeaponSystem;
   private explosionQueue: ExplosionEvent[] = [];
+  private previousPositions: Map<string, Vector2> = new Map();
   
   constructor(physics: PhysicsSystem, weaponSystem: WeaponSystem) {
     this.physics = physics;
@@ -47,10 +48,19 @@ export class ProjectileSystem {
       chargeLevel: options.chargeLevel
     };
     
+    // Debug: Log rocket creation
+    if (type === 'rocket') {
+      console.log(`🚀 ROCKET CREATED:`);
+      console.log(`   ID: ${projectileId.substring(0, 8)}`);
+      console.log(`   Position: (${position.x.toFixed(1)}, ${position.y.toFixed(1)})`);
+      console.log(`   Velocity: (${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}) = ${Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y).toFixed(1)} px/s`);
+      console.log(`   Range: ${projectile.range}`);
+    }
+    
     this.projectiles.set(projectileId, projectile);
     
     // Create physics body for projectile
-    if (type !== 'bullet') { // Bullets use hitscan, don't need physics bodies
+    if (type === 'grenade') { // Only grenades need physics for bouncing
       const body = this.createProjectileBody(projectile);
       this.projectileBodies.set(projectileId, body);
     }
@@ -118,10 +128,18 @@ export class ProjectileSystem {
   }
   
   // Update all projectiles
-  update(deltaTime: number): void {
+  update(deltaTime: number, walls?: Map<string, WallState>): void {
     const projectilesToRemove: string[] = [];
     
-    for (const [projectileId, projectile] of this.projectiles) {
+    // Debug: Log walls once
+    if (walls && Math.random() < 0.01) { // 1% chance
+      console.log(`🧱 Walls available for collision: ${Array.from(walls.keys()).join(', ')}`);
+    }
+    
+    projectileLoop: for (const [projectileId, projectile] of this.projectiles) {
+      // Store previous position before updating
+      this.previousPositions.set(projectileId, { ...projectile.position });
+      
       const body = this.projectileBodies.get(projectileId);
       
       if (body) {
@@ -136,9 +154,48 @@ export class ProjectileSystem {
         projectile.position.y += projectile.velocity.y * (deltaTime / 1000);
       }
       
+      // CRITICAL: Check wall collisions FIRST (before range/boundary checks)
+      if (walls && projectile.type !== 'bullet') { // Bullets use hitscan
+        // For fast projectiles, subdivide the path
+        const steps = projectile.type === 'rocket' ? 5 : 1; // More steps for rockets
+        const prevPos = this.previousPositions.get(projectile.id) || projectile.position;
+        
+        for (let step = 1; step <= steps; step++) {
+          const t = step / steps;
+          const checkPos = {
+            x: prevPos.x + (projectile.position.x - prevPos.x) * t,
+            y: prevPos.y + (projectile.position.y - prevPos.y) * t
+          };
+          
+          // Check collision at this interpolated position
+          const tempProjectile = { ...projectile, position: checkPos };
+          const wallCollision = this.checkWallCollision(tempProjectile, walls);
+          
+          if (wallCollision.hit && wallCollision.wall) {
+            console.log(`🚀 Projectile ${projectileId} hit wall ${wallCollision.wall.id} at step ${step}/${steps}!`);
+            // Update projectile position to collision point
+            projectile.position = checkPos;
+            
+            // Handle collision based on projectile type
+            if (projectile.type === 'rocket') {
+              this.explodeProjectile(projectile);
+              projectilesToRemove.push(projectileId);
+              continue projectileLoop; // Skip other checks
+            } else if (projectile.type === 'grenade') {
+              // Grenades bounce - handled elsewhere
+            }
+          }
+        }
+      }
+      
       // Update traveled distance
       const speed = Math.sqrt(projectile.velocity.x * projectile.velocity.x + projectile.velocity.y * projectile.velocity.y);
       projectile.traveledDistance += speed * (deltaTime / 1000);
+      
+      // Debug: Log rocket position updates
+      if (projectile.type === 'rocket' && Math.random() < 0.2) { // 20% sample rate
+        console.log(`🚀 Rocket update: pos(${projectile.position.x.toFixed(1)}, ${projectile.position.y.toFixed(1)}) vel(${projectile.velocity.x.toFixed(1)}, ${projectile.velocity.y.toFixed(1)}) dist:${projectile.traveledDistance.toFixed(1)}/${projectile.range}`);
+      }
       
       // Check if projectile has exceeded its range
       if (projectile.traveledDistance >= projectile.range) {
@@ -220,16 +277,25 @@ export class ProjectileSystem {
   
   // Check collision with walls
   checkWallCollision(projectile: ProjectileState, walls: Map<string, WallState>): { hit: boolean; wall?: WallState; sliceIndex?: number } {
-    // For fast-moving projectiles, check the line segment from previous to current position
-    const previousPosition = {
-      x: projectile.position.x - projectile.velocity.x * 0.016, // Assume 60Hz update
-      y: projectile.position.y - projectile.velocity.y * 0.016
-    };
+    // Get the stored previous position from before the update
+    const previousPosition = this.previousPositions.get(projectile.id) || projectile.position;
+    
+    // Debug: Log rocket positions
+    if (projectile.type === 'rocket') {
+      console.log(`🚀 Rocket ${projectile.id.substring(0, 8)} checking collision:`);
+      console.log(`   Previous: (${previousPosition.x.toFixed(1)}, ${previousPosition.y.toFixed(1)})`);
+      console.log(`   Current:  (${projectile.position.x.toFixed(1)}, ${projectile.position.y.toFixed(1)})`);
+      console.log(`   Distance: ${Math.sqrt(Math.pow(projectile.position.x - previousPosition.x, 2) + Math.pow(projectile.position.y - previousPosition.y, 2)).toFixed(1)}`);
+    }
     
     for (const [wallId, wall] of walls) {
       // Check if projectile path intersects with wall
       const collision = this.checkLineWallCollision(previousPosition, projectile.position, wall);
       if (collision.hit) {
+        // Debug: Log collision detection
+        if (projectile.type === 'rocket') {
+          console.log(`   💥 HIT WALL ${wallId} at slice ${collision.sliceIndex}`);
+        }
         return {
           hit: true,
           wall,
@@ -260,23 +326,63 @@ export class ProjectileSystem {
   
   // Check if a line segment intersects with a wall
   private checkLineWallCollision(start: Vector2, end: Vector2, wall: WallState): { hit: boolean; sliceIndex?: number } {
-    // Simple AABB line intersection for now
     const wallLeft = wall.position.x;
     const wallRight = wall.position.x + wall.width;
     const wallTop = wall.position.y;
     const wallBottom = wall.position.y + wall.height;
     
-    // Check if line crosses wall boundaries
-    if ((start.x < wallLeft && end.x < wallLeft) || (start.x > wallRight && end.x > wallRight) ||
-        (start.y < wallTop && end.y < wallTop) || (start.y > wallBottom && end.y > wallBottom)) {
-      return { hit: false };
+    // Use parametric line equation for robust collision detection
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    
+    // Calculate t values for intersection with each wall boundary
+    let tMin = 0;
+    let tMax = 1;
+    
+    // Check X boundaries
+    if (Math.abs(dx) > 0.0001) {
+      const t1 = (wallLeft - start.x) / dx;
+      const t2 = (wallRight - start.x) / dx;
+      
+      const tMinX = Math.min(t1, t2);
+      const tMaxX = Math.max(t1, t2);
+      
+      tMin = Math.max(tMin, tMinX);
+      tMax = Math.min(tMax, tMaxX);
+    } else {
+      // Line is vertical - check if it's within wall X bounds
+      if (start.x < wallLeft || start.x > wallRight) {
+        return { hit: false };
+      }
     }
     
-    // If we get here, there might be an intersection
-    // For now, use simple endpoint check (can be improved with proper line-AABB intersection)
-    if (end.x >= wallLeft && end.x <= wallRight && end.y >= wallTop && end.y <= wallBottom) {
+    // Check Y boundaries
+    if (Math.abs(dy) > 0.0001) {
+      const t1 = (wallTop - start.y) / dy;
+      const t2 = (wallBottom - start.y) / dy;
+      
+      const tMinY = Math.min(t1, t2);
+      const tMaxY = Math.max(t1, t2);
+      
+      tMin = Math.max(tMin, tMinY);
+      tMax = Math.min(tMax, tMaxY);
+    } else {
+      // Line is horizontal - check if it's within wall Y bounds
+      if (start.y < wallTop || start.y > wallBottom) {
+        return { hit: false };
+      }
+    }
+    
+    // Check if there's a valid intersection
+    if (tMin <= tMax && tMax >= 0 && tMin <= 1) {
+      // Calculate hit point using the entry point (tMin)
+      const hitX = start.x + dx * Math.max(0, tMin);
+      const hitY = start.y + dy * Math.max(0, tMin);
+      
+      // Calculate which slice was hit
       const sliceWidth = wall.width / GAME_CONFIG.DESTRUCTION.WALL_SLICES;
-      const sliceIndex = Math.floor((end.x - wall.position.x) / sliceWidth);
+      const sliceIndex = Math.floor((hitX - wall.position.x) / sliceWidth);
+      
       return {
         hit: true,
         sliceIndex: Math.max(0, Math.min(GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, sliceIndex))
@@ -490,8 +596,8 @@ export class ProjectileSystem {
       this.physics.removeBody(body);
       this.projectileBodies.delete(projectileId);
     }
-    
     this.projectiles.delete(projectileId);
+    this.previousPositions.delete(projectileId);
   }
   
   // Get all projectiles
