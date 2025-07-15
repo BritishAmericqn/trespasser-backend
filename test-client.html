@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trespasser Backend Test Client</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .connected { background: #0f5132; }
+        .disconnected { background: #842029; }
+        .game-area {
+            width: 480px;
+            height: 270px;
+            border: 2px solid #333;
+            position: relative;
+            margin: 20px auto;
+            background: #2a2a2a;
+            cursor: crosshair;
+        }
+        .player {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #ff6b6b;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.1s linear;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+        .key {
+            padding: 10px;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .key.active {
+            background: #007bff;
+            color: white;
+        }
+        .info {
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .log {
+            background: #222;
+            padding: 10px;
+            border-radius: 5px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log div {
+            margin: 2px 0;
+            padding: 2px;
+        }
+        .log .input { color: #4CAF50; }
+        .log .state { color: #2196F3; }
+        .log .error { color: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>🎮 Trespasser Backend Test Client</h1>
+    
+    <div id="status" class="status disconnected">
+        ❌ Disconnected from server
+    </div>
+    
+    <div class="info">
+        <strong>Instructions:</strong><br>
+        • Use WASD keys to move<br>
+        • Hold Shift to run<br>
+        • Hold Ctrl to sneak<br>
+        • Move mouse to rotate player<br>
+        • Watch the log for real-time updates
+    </div>
+    
+    <div class="game-area" id="gameArea">
+        <div class="player" id="player"></div>
+    </div>
+    
+    <div class="controls">
+        <div></div>
+        <div class="key" id="key-w">W</div>
+        <div></div>
+        <div class="key" id="key-a">A</div>
+        <div class="key" id="key-s">S</div>
+        <div class="key" id="key-d">D</div>
+        <div class="key" id="key-shift">Shift</div>
+        <div class="key" id="key-ctrl">Ctrl</div>
+        <div></div>
+    </div>
+    
+    <div class="info">
+        <div><strong>Player State:</strong></div>
+        <div id="playerInfo">Position: (0, 0) | Rotation: 0° | Speed: idle</div>
+    </div>
+    
+    <div class="log" id="log"></div>
+    
+    <script>
+        const socket = io('http://localhost:3000');
+        const gameArea = document.getElementById('gameArea');
+        const player = document.getElementById('player');
+        const status = document.getElementById('status');
+        const log = document.getElementById('log');
+        const playerInfo = document.getElementById('playerInfo');
+        
+        let inputSequence = 0;
+        let localPlayer = null;
+        let keys = {
+            w: false,
+            a: false,
+            s: false,
+            d: false,
+            shift: false,
+            ctrl: false
+        };
+        let mouse = { x: 240, y: 135, buttons: 0 };
+        
+        // Socket events
+        socket.on('connect', () => {
+            status.className = 'status connected';
+            status.innerHTML = '✅ Connected to server';
+            addLog('Connected to server', 'state');
+        });
+        
+        socket.on('disconnect', () => {
+            status.className = 'status disconnected';
+            status.innerHTML = '❌ Disconnected from server';
+            addLog('Disconnected from server', 'error');
+        });
+        
+        socket.on('game:state', (gameState) => {
+            // Update player positions
+            if (gameState.players && typeof gameState.players === 'object') {
+                for (const [playerId, playerState] of Object.entries(gameState.players)) {
+                    if (playerId === socket.id) {
+                        localPlayer = playerState;
+                        updatePlayerVisual(playerState);
+                        updatePlayerInfo(playerState);
+                    }
+                }
+            }
+        });
+        
+        socket.on('player:joined', (playerState) => {
+            addLog(`Player joined: ${playerState.id}`, 'state');
+        });
+        
+        socket.on('player:left', (data) => {
+            addLog(`Player left: ${data.playerId}`, 'state');
+        });
+        
+        // Input handling
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (keys.hasOwnProperty(key)) {
+                keys[key] = true;
+                document.getElementById(`key-${key}`).classList.add('active');
+                sendInput();
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            if (keys.hasOwnProperty(key)) {
+                keys[key] = false;
+                document.getElementById(`key-${key}`).classList.remove('active');
+                sendInput();
+            }
+        });
+        
+        gameArea.addEventListener('mousemove', (e) => {
+            const rect = gameArea.getBoundingClientRect();
+            mouse.x = (e.clientX - rect.left) * 4; // Scale to game coordinates
+            mouse.y = (e.clientY - rect.top) * 4;
+            sendInput();
+        });
+        
+        gameArea.addEventListener('mousedown', (e) => {
+            mouse.buttons |= (1 << e.button);
+            sendInput();
+        });
+        
+        gameArea.addEventListener('mouseup', (e) => {
+            mouse.buttons &= ~(1 << e.button);
+            sendInput();
+        });
+        
+        function sendInput() {
+            if (socket.connected) {
+                const input = {
+                    keys: { ...keys },
+                    mouse: { ...mouse },
+                    sequence: ++inputSequence,
+                    timestamp: Date.now()
+                };
+                
+                socket.emit('player:input', input);
+                addLog(`Input sent: ${getInputString(input)}`, 'input');
+            }
+        }
+        
+        function getInputString(input) {
+            const pressedKeys = Object.keys(input.keys).filter(k => input.keys[k]);
+            const keyStr = pressedKeys.length > 0 ? pressedKeys.join('+') : 'none';
+            return `keys=${keyStr} mouse=(${Math.round(input.mouse.x)}, ${Math.round(input.mouse.y)}) seq=${input.sequence}`;
+        }
+        
+        function updatePlayerVisual(playerState) {
+            const x = (playerState.transform.position.x / 4); // Scale to display coordinates
+            const y = (playerState.transform.position.y / 4);
+            const rotation = playerState.transform.rotation;
+            
+            player.style.left = `${x}px`;
+            player.style.top = `${y}px`;
+            player.style.transform = `translate(-50%, -50%) rotate(${rotation}rad)`;
+            
+            // Change color based on movement state
+            switch (playerState.movementState) {
+                case 'running':
+                    player.style.background = '#ff4444';
+                    break;
+                case 'walking':
+                    player.style.background = '#4444ff';
+                    break;
+                case 'sneaking':
+                    player.style.background = '#44ff44';
+                    break;
+                default:
+                    player.style.background = '#666';
+            }
+        }
+        
+        function updatePlayerInfo(playerState) {
+            const pos = playerState.transform.position;
+            const rot = (playerState.transform.rotation * 180 / Math.PI).toFixed(1);
+            const vel = Math.sqrt(playerState.velocity.x * playerState.velocity.x + playerState.velocity.y * playerState.velocity.y).toFixed(1);
+            
+            playerInfo.innerHTML = `Position: (${Math.round(pos.x)}, ${Math.round(pos.y)}) | Rotation: ${rot}° | Speed: ${playerState.movementState} (${vel})`;
+        }
+        
+        function addLog(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+            
+            // Keep only last 100 messages
+            while (log.children.length > 100) {
+                log.removeChild(log.firstChild);
+            }
+        }
+        
+        // Initial setup
+        gameArea.focus();
+        addLog('Test client initialized', 'state');
+    </script>
+</body>
+</html> 
