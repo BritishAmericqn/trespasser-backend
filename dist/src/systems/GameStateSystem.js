@@ -61,6 +61,18 @@ class GameStateSystem {
             kills: 0,
             deaths: 0
         };
+        // Ensure player doesn't spawn inside a wall
+        let spawnAttempts = 0;
+        while (spawnAttempts < 10 && !this.canPlayerMoveTo(id, player.transform.position)) {
+            // Try different spawn positions
+            player.transform.position.x = 50 + Math.random() * (constants_1.GAME_CONFIG.GAME_WIDTH - 100);
+            player.transform.position.y = 50 + Math.random() * (constants_1.GAME_CONFIG.GAME_HEIGHT - 100);
+            spawnAttempts++;
+            console.log(`🔄 SPAWN ATTEMPT ${spawnAttempts} for ${id}: (${player.transform.position.x.toFixed(1)}, ${player.transform.position.y.toFixed(1)})`);
+        }
+        if (spawnAttempts >= 10) {
+            console.warn(`⚠️ Could not find valid spawn position for ${id} after 10 attempts!`);
+        }
         // Create physics body for the player
         const body = matter_js_1.default.Bodies.circle(player.transform.position.x, player.transform.position.y, constants_1.GAME_CONFIG.PLAYER_SIZE / 2, {
             friction: 0.1,
@@ -216,8 +228,32 @@ class GameStateSystem {
                 console.log(`   Delta: time=${deltaTime}ms, seconds=${deltaSeconds}`);
                 console.log(`   Position delta: (${positionDelta.x.toFixed(4)}, ${positionDelta.y.toFixed(4)})`);
             }
-            player.transform.position.x += positionDelta.x;
-            player.transform.position.y += positionDelta.y;
+            // Calculate intended position
+            const intendedPosition = {
+                x: player.transform.position.x + positionDelta.x,
+                y: player.transform.position.y + positionDelta.y
+            };
+            // Check if player can move to intended position
+            if (this.canPlayerMoveTo(playerId, intendedPosition)) {
+                player.transform.position = intendedPosition;
+            }
+            else {
+                // Try sliding along walls
+                const slidePosition = this.calculateSlidePosition(player.transform.position, intendedPosition);
+                if (slidePosition) {
+                    player.transform.position = slidePosition;
+                    // Debug collision
+                    if (Math.random() < 0.1) { // 10% chance
+                        console.log(`🧱 WALL SLIDE ${playerId.substring(0, 8)}: intended(${intendedPosition.x.toFixed(1)}, ${intendedPosition.y.toFixed(1)}) → slide(${slidePosition.x.toFixed(1)}, ${slidePosition.y.toFixed(1)})`);
+                    }
+                }
+                else {
+                    // Can't move at all - log collision
+                    if (Math.random() < 0.1) { // 10% chance
+                        console.log(`🚫 BLOCKED ${playerId.substring(0, 8)}: at (${player.transform.position.x.toFixed(1)}, ${player.transform.position.y.toFixed(1)})`);
+                    }
+                }
+            }
             // Update player velocity in state
             player.velocity = targetVelocity;
         }
@@ -537,6 +573,57 @@ class GameStateSystem {
         }
         player.transform.rotation = angle;
     }
+    // Check if a player can move to a new position (no wall collision)
+    canPlayerMoveTo(playerId, newPosition) {
+        const playerRadius = constants_1.GAME_CONFIG.PLAYER_SIZE / 2;
+        const walls = this.destructionSystem.getWalls();
+        // Check each wall for collision
+        for (const [wallId, wall] of walls) {
+            // Skip boundary walls for now (they're outside the game area)
+            if (wall.position.x < 0 || wall.position.y < 0 ||
+                wall.position.x >= constants_1.GAME_CONFIG.GAME_WIDTH ||
+                wall.position.y >= constants_1.GAME_CONFIG.GAME_HEIGHT) {
+                continue;
+            }
+            // Check if player circle overlaps with wall rectangle
+            const closestX = Math.max(wall.position.x, Math.min(newPosition.x, wall.position.x + wall.width));
+            const closestY = Math.max(wall.position.y, Math.min(newPosition.y, wall.position.y + wall.height));
+            const distanceX = newPosition.x - closestX;
+            const distanceY = newPosition.y - closestY;
+            const distanceSquared = distanceX * distanceX + distanceY * distanceY;
+            if (distanceSquared < playerRadius * playerRadius) {
+                // Check if any slice in this wall is intact
+                for (let i = 0; i < constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES; i++) {
+                    if (wall.destructionMask[i] === 0) { // Slice is intact
+                        // Check if collision point is within this slice
+                        const sliceWidth = wall.width / constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES;
+                        const sliceLeft = wall.position.x + (i * sliceWidth);
+                        const sliceRight = sliceLeft + sliceWidth;
+                        if (closestX >= sliceLeft && closestX <= sliceRight) {
+                            return false; // Collision detected
+                        }
+                    }
+                }
+            }
+        }
+        return true; // No collision
+    }
+    // Calculate slide position when hitting a wall
+    calculateSlidePosition(currentPos, intendedPos) {
+        const deltaX = intendedPos.x - currentPos.x;
+        const deltaY = intendedPos.y - currentPos.y;
+        // Try sliding along X axis
+        const slideX = { x: intendedPos.x, y: currentPos.y };
+        if (this.canPlayerMoveTo('', slideX)) {
+            return slideX;
+        }
+        // Try sliding along Y axis
+        const slideY = { x: currentPos.x, y: intendedPos.y };
+        if (this.canPlayerMoveTo('', slideY)) {
+            return slideY;
+        }
+        return null; // Can't slide
+    }
     // Legacy shoot handler (keeping for compatibility)
     handlePlayerShoot(playerId, data) {
         const player = this.players.get(playerId);
@@ -565,7 +652,7 @@ class GameStateSystem {
         this.checkProjectileCollisions();
         // Process explosions
         this.processExplosions();
-        // TEMPORARILY BYPASS PHYSICS - Apply boundary clamping directly to player state
+        // Update player positions and sync with physics bodies
         for (const [playerId, player] of this.players) {
             // Apply boundary clamping to player state
             const clampedX = Math.max(constants_1.GAME_CONFIG.PLAYER_SIZE / 2, Math.min(constants_1.GAME_CONFIG.GAME_WIDTH - constants_1.GAME_CONFIG.PLAYER_SIZE / 2, player.transform.position.x));
@@ -573,6 +660,14 @@ class GameStateSystem {
             if (player.transform.position.x !== clampedX || player.transform.position.y !== clampedY) {
                 player.transform.position.x = clampedX;
                 player.transform.position.y = clampedY;
+            }
+            // Sync Matter.js body with player position
+            const body = this.playerBodies.get(playerId);
+            if (body) {
+                matter_js_1.default.Body.setPosition(body, {
+                    x: player.transform.position.x,
+                    y: player.transform.position.y
+                });
             }
             // Update movement state based on velocity
             const speed = Math.sqrt(player.velocity.x * player.velocity.x + player.velocity.y * player.velocity.y);

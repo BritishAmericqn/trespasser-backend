@@ -8,11 +8,13 @@ const constants_1 = require("../../shared/constants");
 const matter_js_1 = __importDefault(require("matter-js"));
 class ProjectileSystem {
     projectiles = new Map();
+    projectileCounter = 0;
     projectileBodies = new Map();
     physics;
     weaponSystem;
     explosionQueue = [];
     previousPositions = new Map();
+    recentCollisions = new Map(); // Track recent wall collisions
     // Constants
     GRENADE_RADIUS = 2;
     constructor(physics, weaponSystem) {
@@ -46,6 +48,7 @@ class ProjectileSystem {
             console.log(`   Range: ${projectile.range}`);
         }
         this.projectiles.set(projectileId, projectile);
+        this.recentCollisions.set(projectileId, new Map());
         // Create physics body for projectile
         if (type === 'grenade') { // Only grenades need physics for bouncing
             const body = this.createProjectileBody(projectile);
@@ -129,6 +132,35 @@ class ProjectileSystem {
                     position: { x: projectile.position.x, y: projectile.position.y }
                 });
             }
+            // Check for grenade timer explosion (MOVED UP before collision checks)
+            if (projectile.type === 'grenade') {
+                const fuseTime = 3000; // 3 seconds
+                const timeAlive = Date.now() - projectile.timestamp;
+                if (timeAlive >= fuseTime) {
+                    console.log(`💥 Grenade ${projectileId} exploding after ${timeAlive}ms`);
+                    this.explodeProjectile(projectile);
+                    explodeEvents.push({
+                        id: projectile.id,
+                        position: { x: projectile.position.x, y: projectile.position.y },
+                        radius: projectile.explosionRadius || 40
+                    });
+                    projectilesToRemove.push(projectileId);
+                    continue;
+                }
+                // Remove grenades that are moving too slowly (effectively stuck)
+                const velocityMagnitude = Math.sqrt(projectile.velocity.x ** 2 + projectile.velocity.y ** 2);
+                if (velocityMagnitude < 0.1) { // Less than 0.1 px/s
+                    console.log(`💥 Grenade ${projectileId} stuck (vel: ${velocityMagnitude}), exploding`);
+                    this.explodeProjectile(projectile);
+                    explodeEvents.push({
+                        id: projectile.id,
+                        position: { x: projectile.position.x, y: projectile.position.y },
+                        radius: projectile.explosionRadius || 40
+                    });
+                    projectilesToRemove.push(projectileId);
+                    continue;
+                }
+            }
             // CRITICAL: Check wall collisions FIRST (before range/boundary checks)
             if (walls && projectile.type !== 'bullet') { // Bullets use hitscan
                 // For fast projectiles, subdivide the path
@@ -146,9 +178,21 @@ class ProjectileSystem {
                     const tempProjectile = { ...projectile, position: checkPos };
                     const wallCollision = this.checkWallCollision(tempProjectile, walls);
                     if (wallCollision.hit && wallCollision.wall) {
+                        // Check if we recently collided with this wall
+                        const collisionHistory = this.recentCollisions.get(projectileId);
+                        const lastCollisionTime = collisionHistory?.get(wallCollision.wall.id) || 0;
+                        const now = Date.now();
+                        // Skip if we collided with this wall in the last 100ms
+                        if (now - lastCollisionTime < 100) {
+                            continue;
+                        }
                         console.log(`🚀 Projectile ${projectileId} hit wall ${wallCollision.wall.id} at step ${step}/${steps}!`);
                         // Update projectile position to collision point
                         projectile.position = checkPos;
+                        // Record this collision
+                        if (collisionHistory) {
+                            collisionHistory.set(wallCollision.wall.id, now);
+                        }
                         // Handle collision based on projectile type
                         if (projectile.type === 'rocket') {
                             this.explodeProjectile(projectile);
@@ -169,7 +213,7 @@ class ProjectileSystem {
                                 matter_js_1.default.Body.setVelocity(body, projectile.velocity);
                             }
                             console.log(`🎾 Grenade ${projectileId} bounced off wall ${wallCollision.wall.id}!`);
-                            continue projectileLoop; // Skip other checks for this frame
+                            // Don't continue - we need to check timer and other conditions
                         }
                     }
                 }
@@ -194,21 +238,6 @@ class ProjectileSystem {
                 projectilesToRemove.push(projectileId);
                 continue;
             }
-            // Check for grenade timer explosion
-            if (projectile.type === 'grenade') {
-                const fuseTime = 3000; // 3 seconds
-                const timeAlive = Date.now() - projectile.timestamp;
-                if (timeAlive >= fuseTime) {
-                    this.explodeProjectile(projectile);
-                    explodeEvents.push({
-                        id: projectile.id,
-                        position: { x: projectile.position.x, y: projectile.position.y },
-                        radius: projectile.explosionRadius || 40
-                    });
-                    projectilesToRemove.push(projectileId);
-                    continue;
-                }
-            }
             // Check for boundary collisions (grenades handled by Matter.js boundary walls)
             if (this.checkBoundaryCollision(projectile) && projectile.type !== 'grenade') {
                 // Rockets explode on boundary hit
@@ -220,6 +249,12 @@ class ProjectileSystem {
                         radius: projectile.explosionRadius || 50
                     });
                 }
+                projectilesToRemove.push(projectileId);
+            }
+            // Remove projectiles that are extremely far out of bounds (stuck projectiles)
+            const maxBounds = 1000; // Well outside the 480x270 game area
+            if (Math.abs(projectile.position.x) > maxBounds || Math.abs(projectile.position.y) > maxBounds) {
+                console.log(`🧹 Removing stuck projectile ${projectileId} at extreme position (${projectile.position.x}, ${projectile.position.y})`);
                 projectilesToRemove.push(projectileId);
             }
         }
@@ -397,16 +432,44 @@ class ProjectileSystem {
     // Handle projectile bouncing off wall
     handleWallBounce(projectile, wall) {
         const body = this.projectileBodies.get(projectile.id);
-        // Simple bounce logic - reverse velocity component
-        // TODO: Implement proper collision normal calculation
-        if (projectile.position.x < wall.position.x || projectile.position.x > wall.position.x + wall.width) {
-            projectile.velocity.x = -projectile.velocity.x * 0.6;
+        // Calculate which side of the wall we hit
+        const grenadeRadius = 2; // Small radius for grenade
+        const wallLeft = wall.position.x;
+        const wallRight = wall.position.x + wall.width;
+        const wallTop = wall.position.y;
+        const wallBottom = wall.position.y + wall.height;
+        // Find closest point on wall to grenade center
+        const closestX = Math.max(wallLeft, Math.min(projectile.position.x, wallRight));
+        const closestY = Math.max(wallTop, Math.min(projectile.position.y, wallBottom));
+        // Calculate collision normal
+        let normalX = projectile.position.x - closestX;
+        let normalY = projectile.position.y - closestY;
+        // Normalize
+        const length = Math.sqrt(normalX * normalX + normalY * normalY);
+        if (length > 0) {
+            normalX /= length;
+            normalY /= length;
         }
-        if (projectile.position.y < wall.position.y || projectile.position.y > wall.position.y + wall.height) {
-            projectile.velocity.y = -projectile.velocity.y * 0.6;
+        else {
+            // Edge case: grenade is exactly at wall corner
+            normalX = 1;
+            normalY = 0;
         }
+        // Reflect velocity using the normal
+        const dotProduct = projectile.velocity.x * normalX + projectile.velocity.y * normalY;
+        const bounceFactor = 0.6;
+        projectile.velocity.x = (projectile.velocity.x - 2 * dotProduct * normalX) * bounceFactor;
+        projectile.velocity.y = (projectile.velocity.y - 2 * dotProduct * normalY) * bounceFactor;
+        // Push grenade away from wall to prevent re-collision
+        const pushDistance = grenadeRadius + 5; // Increased from 2 to 5 for better separation
+        projectile.position.x = closestX + normalX * pushDistance;
+        projectile.position.y = closestY + normalY * pushDistance;
+        // Ensure we're within game bounds
+        projectile.position.x = Math.max(5, Math.min(constants_1.GAME_CONFIG.GAME_WIDTH - 5, projectile.position.x));
+        projectile.position.y = Math.max(5, Math.min(constants_1.GAME_CONFIG.GAME_HEIGHT - 5, projectile.position.y));
         // Update physics body
         if (body) {
+            matter_js_1.default.Body.setPosition(body, projectile.position);
             matter_js_1.default.Body.setVelocity(body, projectile.velocity);
         }
     }
@@ -530,6 +593,7 @@ class ProjectileSystem {
         }
         this.projectiles.delete(projectileId);
         this.previousPositions.delete(projectileId);
+        this.recentCollisions.delete(projectileId);
     }
     // Get all projectiles
     getProjectiles() {
