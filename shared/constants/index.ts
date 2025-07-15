@@ -25,7 +25,85 @@ export const GAME_CONFIG = {
   WEAPON_ROCKET_RADIUS: 30,
   AUDIO_FALLOFF_DISTANCE: 200,
   AUDIO_WALL_MUFFLE_FACTOR: 0.5,
-  PHYSICS_STEP: 1000 / 60
+  PHYSICS_STEP: 1000 / 60,
+  
+  // Weapon configurations
+  WEAPONS: {
+    RIFLE: {
+      TYPE: 'rifle',
+      DAMAGE: 25,
+      MAX_AMMO: 30,
+      MAX_RESERVE: 90,
+      FIRE_RATE: 600, // rounds per minute
+      RELOAD_TIME: 2000, // milliseconds
+      ACCURACY: 0.9,
+      RANGE: 300,
+      HITSCAN: true,
+      PROJECTILE_SPEED: 0 // instant
+    },
+    PISTOL: {
+      TYPE: 'pistol',
+      DAMAGE: 35,
+      MAX_AMMO: 12,
+      MAX_RESERVE: 60,
+      FIRE_RATE: 300,
+      RELOAD_TIME: 1500,
+      ACCURACY: 0.8,
+      RANGE: 200,
+      HITSCAN: true,
+      PROJECTILE_SPEED: 0
+    },
+    GRENADE: {
+      TYPE: 'grenade',
+      DAMAGE: 100,
+      MAX_AMMO: 1,
+      MAX_RESERVE: 3,
+      FIRE_RATE: 60,
+      RELOAD_TIME: 1000,
+      ACCURACY: 1.0,
+      RANGE: 150,
+      HITSCAN: false,
+      PROJECTILE_SPEED: 200,
+      EXPLOSION_RADIUS: 40,
+      CHARGE_LEVELS: 5,
+      CHARGE_MULTIPLIER: 1.5
+    },
+    ROCKET: {
+      TYPE: 'rocket',
+      DAMAGE: 150,
+      MAX_AMMO: 1,
+      MAX_RESERVE: 4,
+      FIRE_RATE: 30,
+      RELOAD_TIME: 3000,
+      ACCURACY: 0.95,
+      RANGE: 400,
+      HITSCAN: false,
+      PROJECTILE_SPEED: 300,
+      EXPLOSION_RADIUS: 50
+    }
+  },
+  
+  // Destruction system
+  DESTRUCTION: {
+    WALL_SLICES: 5,
+    SLICE_HEALTH: 100,
+    MATERIAL_MULTIPLIERS: {
+      CONCRETE: 1.5,
+      WOOD: 0.8,
+      METAL: 2.0,
+      GLASS: 0.3
+    }
+  },
+  
+  // Combat system
+  COMBAT: {
+    DAMAGE_FALLOFF_START: 0.7, // 70% of weapon range
+    DAMAGE_FALLOFF_MIN: 0.3, // minimum 30% damage
+    HEADSHOT_MULTIPLIER: 2.0,
+    ADS_ACCURACY_BONUS: 0.2,
+    MOVEMENT_ACCURACY_PENALTY: 0.3,
+    EXPLOSION_FALLOFF_POWER: 2.0
+  }
 } as const;
 
 export const EVENTS = {
@@ -39,5 +117,24 @@ export const EVENTS = {
   PROJECTILE_FIRED: 'projectile:fired',
   PROJECTILE_HIT: 'projectile:hit',
   SOUND_PLAY: 'sound:play',
-  SOUND_STOP: 'sound:stop'
+  SOUND_STOP: 'sound:stop',
+  
+  // Extended weapon events
+  WEAPON_FIRE: 'weapon:fire',
+  WEAPON_FIRED: 'weapon:fired', // confirmation
+  WEAPON_HIT: 'weapon:hit',
+  WEAPON_MISS: 'weapon:miss',
+  WEAPON_RELOAD: 'weapon:reload',
+  WEAPON_RELOADED: 'weapon:reloaded',
+  WEAPON_SWITCH: 'weapon:switch',
+  WEAPON_SWITCHED: 'weapon:switched',
+  GRENADE_THROW: 'grenade:throw',
+  GRENADE_THROWN: 'grenade:thrown',
+  GRENADE_EXPLODED: 'grenade:exploded',
+  PLAYER_DAMAGED: 'player:damaged',
+  PLAYER_KILLED: 'player:killed',
+  WALL_DESTROYED: 'wall:destroyed',
+  PROJECTILE_CREATED: 'projectile:created',
+  PROJECTILE_DESTROYED: 'projectile:destroyed',
+  EXPLOSION_CREATED: 'explosion:created'
 } as const;
