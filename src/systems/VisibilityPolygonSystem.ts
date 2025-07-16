@@ -574,10 +574,28 @@ export class VisibilityPolygonSystem {
         );
         
         if (dist < closestDistance) {
-          // Check if ray passes through destroyed slice
-          if (!this.rayPassesThroughDestroyedSlice(wall, viewerPos, intersection)) {
+          // Check which slice the ray hits
+          const sliceWidth = wall.width / 5;
+          const relativeX = intersection.x - wall.position.x;
+          const hitSliceIndex = Math.floor(relativeX / sliceWidth);
+          const clampedSliceIndex = Math.max(0, Math.min(4, hitSliceIndex));
+          
+          // Check if the hit slice is destroyed
+          const sliceDestroyed = (wall.destroyedSlices & (1 << clampedSliceIndex)) !== 0;
+          
+          if (!sliceDestroyed) {
+            // Hit an intact slice - this is our intersection
             closestIntersection = intersection;
             closestDistance = dist;
+          } else {
+            // Hit a destroyed slice - check for slice boundaries
+            // Cast ray through the wall to find where it would exit or hit an intact slice
+            const sliceBoundaryHit = this.checkSliceBoundaries(wall, viewerPos, { x: dx, y: dy }, intersection);
+            
+            if (sliceBoundaryHit && sliceBoundaryHit.distance < closestDistance) {
+              closestIntersection = sliceBoundaryHit.point;
+              closestDistance = sliceBoundaryHit.distance;
+            }
           }
         }
       }
@@ -632,33 +650,104 @@ export class VisibilityPolygonSystem {
   }
 
   /**
-   * Check if ray passes through a destroyed slice
+   * Check for slice boundaries when ray enters through a destroyed slice
    */
-  private rayPassesThroughDestroyedSlice(
+  private checkSliceBoundaries(
     wall: Wall,
     rayStart: Vector2,
-    intersection: Vector2
-  ): boolean {
-    // Wall slices are always vertical divisions (5 slices across width)
-    const relativeX = intersection.x - wall.position.x;
+    rayDir: Vector2,
+    entryPoint: Vector2
+  ): { point: Vector2; distance: number } | null {
     const sliceWidth = wall.width / 5;
-    const sliceIndex = Math.floor(relativeX / sliceWidth);
+    let closestHit: { point: Vector2; distance: number } | null = null;
     
-    // Clamp to valid slice indices
-    const clampedIndex = Math.max(0, Math.min(4, sliceIndex));
+    // Calculate which slice we entered through
+    const entryRelativeX = entryPoint.x - wall.position.x;
+    const entrySliceIndex = Math.floor(entryRelativeX / sliceWidth);
     
-    // Check if the intersection point is within the wall bounds
-    if (intersection.x >= wall.position.x && 
-        intersection.x <= wall.position.x + wall.width &&
-        intersection.y >= wall.position.y && 
-        intersection.y <= wall.position.y + wall.height) {
+    // Check all slice boundaries for potential hits
+    for (let sliceIndex = 0; sliceIndex <= 5; sliceIndex++) {
+      // Check if this boundary is between destroyed and intact slices
+      const leftSlice = sliceIndex - 1;
+      const rightSlice = sliceIndex;
       
-      // Check if this slice is destroyed
-      return (wall.destroyedSlices & (1 << clampedIndex)) !== 0;
+      const leftDestroyed = leftSlice >= 0 && leftSlice < 5 ? 
+        (wall.destroyedSlices & (1 << leftSlice)) !== 0 : true;
+      const rightDestroyed = rightSlice >= 0 && rightSlice < 5 ? 
+        (wall.destroyedSlices & (1 << rightSlice)) !== 0 : true;
+      
+      // Skip if both sides are the same (both destroyed or both intact)
+      if (leftDestroyed === rightDestroyed) continue;
+      
+      // Calculate boundary position
+      const boundaryX = wall.position.x + sliceIndex * sliceWidth;
+      
+      // Check if ray intersects this vertical boundary
+      if (Math.abs(rayDir.x) > 0.0001) {
+        const t = (boundaryX - entryPoint.x) / rayDir.x;
+        
+        // Only consider forward intersections
+        if (t > 0) {
+          const intersectY = entryPoint.y + rayDir.y * t;
+          
+          // Check if intersection is within wall bounds
+          if (intersectY >= wall.position.y && intersectY <= wall.position.y + wall.height) {
+            const hitPoint = { x: boundaryX, y: intersectY };
+            const distance = Math.hypot(hitPoint.x - rayStart.x, hitPoint.y - rayStart.y);
+            
+            // Update closest hit if this is nearer
+            if (!closestHit || distance < closestHit.distance) {
+              // Only count as hit if we're moving from destroyed to intact
+              const movingRight = rayDir.x > 0;
+              const hittingIntact = movingRight ? !rightDestroyed : !leftDestroyed;
+              
+              if (hittingIntact) {
+                closestHit = { point: hitPoint, distance: distance };
+              }
+            }
+          }
+        }
+      }
     }
     
-    // If intersection is outside wall bounds, ray doesn't hit wall
-    return true;
+    // Also check if ray exits the wall through an intact slice
+    // Calculate exit point from wall
+    const tExitX = rayDir.x > 0 ? 
+      (wall.position.x + wall.width - entryPoint.x) / rayDir.x :
+      (wall.position.x - entryPoint.x) / rayDir.x;
+    const tExitY = rayDir.y > 0 ?
+      (wall.position.y + wall.height - entryPoint.y) / rayDir.y :
+      (wall.position.y - entryPoint.y) / rayDir.y;
+    
+    const tExit = Math.min(Math.abs(tExitX), Math.abs(tExitY));
+    
+    if (tExit > 0) {
+      const exitX = entryPoint.x + rayDir.x * tExit;
+      const exitY = entryPoint.y + rayDir.y * tExit;
+      
+      // Clamp to wall bounds
+      const clampedExitX = Math.max(wall.position.x, Math.min(wall.position.x + wall.width, exitX));
+      const clampedExitY = Math.max(wall.position.y, Math.min(wall.position.y + wall.height, exitY));
+      
+      // Check which slice we're exiting through
+      const exitRelativeX = clampedExitX - wall.position.x;
+      const exitSliceIndex = Math.floor(exitRelativeX / sliceWidth);
+      const clampedExitSlice = Math.max(0, Math.min(4, exitSliceIndex));
+      
+      const exitSliceDestroyed = (wall.destroyedSlices & (1 << clampedExitSlice)) !== 0;
+      
+      if (!exitSliceDestroyed) {
+        // Exiting through intact slice
+        const hitPoint = { x: clampedExitX, y: clampedExitY };
+        const distance = Math.hypot(hitPoint.x - rayStart.x, hitPoint.y - rayStart.y);
+        
+        if (!closestHit || distance < closestHit.distance) {
+          closestHit = { point: hitPoint, distance: distance };
+        }
+      }
+    }
+    
+    return closestHit;
   }
 
   /**

@@ -269,6 +269,103 @@ export class WeaponSystem {
       targetType: 'none'
     };
     
+    // Collect all wall hits along the ray path
+    const wallHits: Array<{
+      wallId: string;
+      wall: any;
+      hitPoint: Vector2;
+      distance: number;
+      sliceIndex: number;
+    }> = [];
+    
+    // First, find all walls the ray intersects
+    for (const [wallId, wall] of walls) {
+      const wallHit = this.checkWallHit(start, direction, distance, wall);
+      if (wallHit) {
+        wallHits.push({
+          wallId,
+          wall,
+          hitPoint: wallHit.hitPoint,
+          distance: wallHit.distance,
+          sliceIndex: wallHit.sliceIndex
+        });
+      }
+    }
+    
+    // Sort wall hits by distance
+    wallHits.sort((a, b) => a.distance - b.distance);
+    
+    // Process wall hits in order
+    for (const hit of wallHits) {
+      // Check if this hit is closer than our current closest hit
+      if (hit.distance >= closestHit.distance) continue;
+      
+      // Check if the slice is destroyed
+      if (hit.wall.destructionMask && hit.wall.destructionMask[hit.sliceIndex] === 1) {
+        // This slice is destroyed - check for intact slices within this wall
+        const sliceWidth = hit.wall.width / GAME_CONFIG.DESTRUCTION.WALL_SLICES;
+        let foundIntactSlice = false;
+        
+        // Step through the wall to find intact slices
+        const rayStep = 0.5;
+        const maxSteps = Math.min(100, hit.wall.width / rayStep);
+        
+        for (let step = 1; step <= maxSteps; step++) {
+          const checkDist = hit.distance + (step * rayStep);
+          if (checkDist >= distance || checkDist >= closestHit.distance) break;
+          
+          const checkPoint = {
+            x: start.x + direction.x * checkDist,
+            y: start.y + direction.y * checkDist
+          };
+          
+          // Check if we're still inside the wall
+          if (checkPoint.y >= hit.wall.position.y && 
+              checkPoint.y <= hit.wall.position.y + hit.wall.height &&
+              checkPoint.x >= hit.wall.position.x && 
+              checkPoint.x <= hit.wall.position.x + hit.wall.width) {
+            
+            // Calculate which slice we're in
+            const currentSliceIndex = Math.floor((checkPoint.x - hit.wall.position.x) / sliceWidth);
+            const clampedIndex = Math.max(0, Math.min(GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, currentSliceIndex));
+            
+            // If we hit an intact slice, record it
+            if (hit.wall.destructionMask[clampedIndex] === 0) {
+              closestHit = {
+                hit: true,
+                targetType: 'wall',
+                targetId: hit.wallId,
+                hitPoint: checkPoint,
+                distance: checkDist,
+                wallSliceIndex: clampedIndex
+              };
+              foundIntactSlice = true;
+              break;
+            }
+          } else {
+            // We've exited the wall without hitting an intact slice
+            break;
+          }
+        }
+        
+        // If we found an intact slice in this wall, stop processing
+        if (foundIntactSlice) break;
+        
+        // Otherwise, continue to check walls behind this one
+      } else {
+        // Hit an intact slice - this is our final hit
+        closestHit = {
+          hit: true,
+          targetType: 'wall',
+          targetId: hit.wallId,
+          hitPoint: hit.hitPoint,
+          distance: hit.distance,
+          wallSliceIndex: hit.sliceIndex
+        };
+        break; // Stop checking further walls
+      }
+    }
+    
     // Check player collisions
     for (const [playerId, player] of players) {
       if (playerId === shooterId || !player.isAlive) continue;
@@ -281,21 +378,6 @@ export class WeaponSystem {
           distance: playerHit.distance,
           targetType: 'player',
           targetId: playerId
-        };
-      }
-    }
-    
-    // Check wall collisions
-    for (const [wallId, wall] of walls) {
-      const wallHit = this.checkWallHit(start, direction, distance, wall);
-      if (wallHit && wallHit.distance < closestHit.distance) {
-        closestHit = {
-          hit: true,
-          hitPoint: wallHit.hitPoint,
-          distance: wallHit.distance,
-          targetType: 'wall',
-          targetId: wallId,
-          wallSliceIndex: wallHit.sliceIndex
         };
       }
     }
@@ -401,12 +483,8 @@ export class WeaponSystem {
       const sliceIndex = Math.floor((hitPoint.x - wall.position.x) / sliceWidth);
       const clampedSliceIndex = Math.max(0, Math.min(GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, sliceIndex));
       
-      // Check if this slice is already destroyed
-      if (wall.destructionMask && wall.destructionMask[clampedSliceIndex] === 1) {
-        // This slice is destroyed, don't count it as a hit
-        return null;
-      }
-      
+      // Always return the hit info, even for destroyed slices
+      // The performHitscan method will handle checking for intact slices
       return {
         hitPoint,
         distance: tMin,
