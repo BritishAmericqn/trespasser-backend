@@ -63,38 +63,13 @@ export class GameRoom {
     
     // Weapon events
     socket.on(EVENTS.WEAPON_FIRE, (event: any) => {
-      // console.log(`🔍 Received event: weapon:fire`, event);
       // Get the server's authoritative player position
       const player = this.gameState.getPlayer(socket.id);
       if (!player) {
-        // console.warn(`❌ No player found for socket ${socket.id}`);
         return;
       }
       
-      // Debug: Log position mismatch
-      if (event.position) {
-        const clientPos = event.position;
-        const serverPos = player.transform.position;
-        const offsetX = serverPos.x - clientPos.x;
-        const offsetY = serverPos.y - clientPos.y;
-        // console.log(`🎯 POSITION CHECK for ${socket.id.substring(0, 8)}:`);
-        // console.log(`   Client sent: (${clientPos.x.toFixed(2)}, ${clientPos.y.toFixed(2)})`);
-        // console.log(`   Server has:  (${serverPos.x.toFixed(2)}, ${serverPos.y.toFixed(2)})`);
-        // console.log(`   Offset:      (${offsetX.toFixed(2)}, ${offsetY.toFixed(2)})`);
-      }
-      
-      // Debug: Log angle mismatch
-      if (event.direction !== undefined) {
-        const clientAngle = event.direction * 180 / Math.PI;
-        const serverAngle = player.transform.rotation * 180 / Math.PI;
-        const angleDiff = Math.abs(clientAngle - serverAngle);
-        // console.log(`🎯 ANGLE CHECK:`);
-        // console.log(`   Client sent: ${clientAngle.toFixed(1)}°`);
-        // console.log(`   Server has:  ${serverAngle.toFixed(1)}°`);
-        // console.log(`   Difference:  ${angleDiff.toFixed(1)}°`);
-      }
-      
-      // Use server position, not client position
+      // Use server position and rotation, not client position
       const weaponFireEvent: WeaponFireEvent = {
         playerId: socket.id,
         weaponType: event.weaponType,
@@ -188,9 +163,11 @@ export class GameRoom {
     });
     
     // Listen for any events for debugging
-    socket.onAny((eventName, data) => {
-      if (!eventName.startsWith('debug:') && eventName !== EVENTS.PLAYER_INPUT) {
-        // console.log(`🔍 Received event: ${eventName}`, data);
+    socket.onAny((eventName: string, ...args: any[]) => {
+      if (!eventName.includes('player:input') && 
+          !eventName.includes('ping') && 
+          !eventName.includes('pong')) {
+        // Removed debug logging
       }
     });
   }

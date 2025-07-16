@@ -15,7 +15,6 @@ interface ProcessedWall {
   width: number;
   height: number;
   material: 'concrete' | 'wood' | 'metal' | 'glass';
-  activeSlices: number;
 }
 
 export class MapLoader {
@@ -53,9 +52,7 @@ export class MapLoader {
     const mapPath = `./maps/${filename}.png`;
     
     try {
-      console.log(`📍 Loading map: ${mapPath}`);
-      
-      // Load the 480x270 PNG
+      // Load the image
       const image = await Jimp.read(mapPath);
       
       if (image.bitmap.width !== 480 || image.bitmap.height !== 270) {
@@ -69,16 +66,7 @@ export class MapLoader {
       this.imageToGrid(scaledImage);
       
       // Process grid into walls
-      const walls = this.processGrid();
-      
-      // Create walls in game
-      this.createWalls(walls);
-      
-      // Log results
-      console.log(`✅ Map loaded successfully:`);
-      console.log(`   - Walls: ${walls.length}`);
-      console.log(`   - Spawns: ${this.spawns.length} (Red: ${this.spawns.filter((_, i) => this.grid[Math.floor(i / 48)][i % 48].color === '#ff0000').length}, Blue: ${this.spawns.filter((_, i) => this.grid[Math.floor(i / 48)][i % 48].color === '#0000ff').length})`);
-      console.log(`   - Lights: ${this.lights.length} (placeholders for future)`);
+      this.processGridToWalls();
       
     } catch (error) {
       console.error(`❌ Failed to load map ${filename}:`, error);
@@ -126,7 +114,7 @@ export class MapLoader {
     }
   }
   
-  private processGrid(): ProcessedWall[] {
+  private processGridToWalls(): void {
     const walls: ProcessedWall[] = [];
     const visited = new Set<string>();
     
@@ -144,12 +132,17 @@ export class MapLoader {
         while (endX < 48 && 
                this.grid[y][endX].type === 'wall' && 
                this.grid[y][endX].material === cell.material) {
-          visited.add(`${endX},${y}`);
           endX++;
         }
         
         const length = endX - x;
-        if (length > 0) {
+        // Only process runs of 2+ cells horizontally
+        // Single cells will be handled as vertical walls (pillars) in the next pass
+        if (length > 1) {
+          // Mark cells as visited only if we're creating a wall
+          for (let visitX = x; visitX < endX; visitX++) {
+            visited.add(`${visitX},${y}`);
+          }
           walls.push({
             position: { 
               x: x * MapLoader.GRID_SIZE, 
@@ -157,8 +150,7 @@ export class MapLoader {
             },
             width: length * MapLoader.GRID_SIZE,
             height: MapLoader.GRID_SIZE,
-            material: cell.material as any,
-            activeSlices: this.calculateActiveSlices(length * MapLoader.GRID_SIZE)
+            material: cell.material as any
           });
         }
       }
@@ -184,7 +176,7 @@ export class MapLoader {
         }
         
         const length = endY - y;
-        if (length > 1) { // Only create vertical walls if more than 1 cell
+        if (length > 0) { // Allow single cells as vertical walls (pillars)
           walls.push({
             position: { 
               x: x * MapLoader.GRID_SIZE, 
@@ -192,18 +184,14 @@ export class MapLoader {
             },
             width: MapLoader.GRID_SIZE,
             height: length * MapLoader.GRID_SIZE,
-            material: cell.material as any,
-            activeSlices: this.calculateActiveSlices(length * MapLoader.GRID_SIZE)
+            material: cell.material as any
           });
         }
       }
     }
     
-    return walls;
-  }
-  
-  private createWalls(walls: ProcessedWall[]): void {
-    for (const wall of walls) {
+    // Create walls in the destruction system
+    walls.forEach(wall => {
       const createdWall = this.destructionSystem.createWall({
         position: wall.position,
         width: wall.width,
@@ -211,26 +199,10 @@ export class MapLoader {
         material: wall.material
       });
       
-      // Set active slices using the destruction mask trick
-      if (wall.activeSlices < 5) {
-        for (let i = 0; i < wall.activeSlices; i++) {
-          createdWall.destructionMask[i] = 0; // Active
-        }
-        for (let i = wall.activeSlices; i < 5; i++) {
-          createdWall.destructionMask[i] = 1; // Non-existent
-        }
-      }
-    }
-  }
-  
-  private calculateActiveSlices(pixelLength: number): number {
-    // Each slice represents roughly 10 pixels
-    // But we cap at 5 slices max
-    if (pixelLength <= 10) return 1;
-    if (pixelLength <= 20) return 2;
-    if (pixelLength <= 30) return 3;
-    if (pixelLength <= 40) return 4;
-    return 5;
+      // Don't mark any slices as destroyed - let all walls be fully intact
+      // The previous code was marking bottom slices of vertical walls as destroyed,
+      // causing collision to only work at the top of the wall
+    });
   }
   
   private rgbToHex(r: number, g: number, b: number): string {

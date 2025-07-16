@@ -69,12 +69,22 @@ export class ProjectileSystem {
       chargeLevel: options.chargeLevel
     };
     
+    // Debug rocket creation
+    if (type === 'rocket') {
+      const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+      console.log(`🚀 ROCKET CREATED:`);
+      console.log(`   ID: ${projectileId}`);
+      console.log(`   Position: (${position.x.toFixed(1)}, ${position.y.toFixed(1)})`);
+      console.log(`   Velocity: (${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}) = ${speed.toFixed(1)} px/s`);
+      console.log(`   Range: ${projectile.range}`);
+    }
+    
     this.projectiles.set(projectileId, projectile);
     this.recentCollisions.set(projectileId, new Map());
     
-    // Only create physics bodies for non-grenade projectiles
-    // Grenades use manual physics for predictable behavior
-    if (type === 'rocket') {
+    // Only create physics bodies for grenades
+    // Rockets and bullets use manual physics for reliable collision detection
+    if (type === 'grenade') {
       const body = this.createProjectileBody(projectile);
       this.projectileBodies.set(projectileId, body);
       this.physics.addActiveBody(projectileId);
@@ -152,21 +162,21 @@ export class ProjectileSystem {
       // Store previous position before updating
       this.previousPositions.set(projectileId, { ...projectile.position });
       
-      // Get physics body if it exists (only for rockets now)
+      // Get physics body if it exists (only for grenades now)
       const body = this.projectileBodies.get(projectileId);
       
       // Update position based on projectile type
       if (projectile.type === 'grenade') {
-        // Manual physics for grenades
+        // Manual physics for grenades with bouncing
         this.updateGrenade(projectile, deltaTime, walls);
       } else if (body) {
-        // Sync position from Matter.js physics body (rockets)
+        // Sync position from Matter.js physics body (grenades only)
         projectile.position.x = body.position.x;
         projectile.position.y = body.position.y;
         projectile.velocity.x = body.velocity.x;
         projectile.velocity.y = body.velocity.y;
       } else {
-        // Manual position update for bullets and other projectiles
+        // Manual position update for bullets and rockets
         projectile.position.x += projectile.velocity.x * (deltaTime / 1000);
         projectile.position.y += projectile.velocity.y * (deltaTime / 1000);
       }
@@ -212,13 +222,17 @@ export class ProjectileSystem {
       if (walls && projectile.type === 'rocket') {
         const wallCollision = this.checkWallCollision(projectile, walls);
         if (wallCollision.hit) {
-          this.explodeProjectile(projectile);
-          explodeEvents.push({
-            id: projectile.id,
-            position: { x: projectile.position.x, y: projectile.position.y },
-            radius: projectile.explosionRadius || 50
-          });
-          projectilesToRemove.push(projectileId);
+          // Don't remove rocket yet - let GameStateSystem handle wall damage
+          // Just mark it as exploded and create the explosion event
+          if (!projectile.isExploded) {
+            this.explodeProjectile(projectile);
+            explodeEvents.push({
+              id: projectile.id,
+              position: { x: projectile.position.x, y: projectile.position.y },
+              radius: projectile.explosionRadius || 50
+            });
+          }
+          // Skip further processing but don't remove yet
           continue;
         }
       }
@@ -257,6 +271,11 @@ export class ProjectileSystem {
       // Remove projectiles that are extremely far out of bounds
       const maxBounds = 1000;
       if (Math.abs(projectile.position.x) > maxBounds || Math.abs(projectile.position.y) > maxBounds) {
+        projectilesToRemove.push(projectileId);
+      }
+      
+      // Remove exploded projectiles (after GameStateSystem has processed them)
+      if (projectile.isExploded && projectile.type !== 'grenade') {
         projectilesToRemove.push(projectileId);
       }
     }
@@ -501,29 +520,44 @@ export class ProjectileSystem {
     // Get the stored previous position from before the update
     const previousPosition = this.previousPositions.get(projectile.id) || projectile.position;
     
-    // Debug: Log rocket positions
-    if (projectile.type === 'rocket') {
-      // console.log(`🚀 Rocket ${projectile.id.substring(0, 8)} checking collision:`);
-      // console.log(`   Previous: (${previousPosition.x.toFixed(1)}, ${previousPosition.y.toFixed(1)})`);
-      // console.log(`   Current:  (${projectile.position.x.toFixed(1)}, ${projectile.position.y.toFixed(1)})`);
-      // console.log(`   Distance: ${Math.sqrt(Math.pow(projectile.position.x - previousPosition.x, 2) + Math.pow(projectile.position.y - previousPosition.y, 2)).toFixed(1)}`);
-    }
+    // Calculate movement distance
+    const dx = projectile.position.x - previousPosition.x;
+    const dy = projectile.position.y - previousPosition.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // For rockets, subdivide the path to catch fast movement through thin walls
+    const steps = projectile.type === 'rocket' && distance > 2 ? Math.ceil(distance / 2) : 1;
     
     for (const [wallId, wall] of walls) {
-      // Check if projectile path intersects with wall
-      // Pass grenade radius for proper edge collision detection
-      const projectileRadius = projectile.type === 'grenade' ? this.GRENADE_RADIUS : 0;
-      const collision = this.checkLineWallCollision(previousPosition, projectile.position, wall, projectileRadius);
-      if (collision.hit) {
-        // Debug: Log collision detection
-        if (projectile.type === 'rocket') {
-          // console.log(`   💥 HIT WALL ${wallId} at slice ${collision.sliceIndex}`);
-        }
-        return {
-          hit: true,
-          wall,
-          sliceIndex: collision.sliceIndex
+      // Check multiple points along the path for rockets
+      for (let step = 0; step < steps; step++) {
+        const t = step / steps;
+        const t2 = (step + 1) / steps;
+        
+        const checkStart = {
+          x: previousPosition.x + dx * t,
+          y: previousPosition.y + dy * t
         };
+        const checkEnd = {
+          x: previousPosition.x + dx * t2,
+          y: previousPosition.y + dy * t2
+        };
+        
+        // Pass appropriate radius for collision detection
+        const projectileRadius = projectile.type === 'grenade' ? this.GRENADE_RADIUS : 0;
+        const collision = this.checkLineWallCollision(checkStart, checkEnd, wall, projectileRadius);
+        
+        if (collision.hit) {
+          // Debug: Log collision detection
+          if (projectile.type === 'rocket') {
+            console.log(`🚀 Rocket hit wall ${wallId} at step ${step}/${steps}, slice ${collision.sliceIndex}`);
+          }
+          return {
+            hit: true,
+            wall,
+            sliceIndex: collision.sliceIndex
+          };
+        }
       }
     }
     

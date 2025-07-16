@@ -39,10 +39,10 @@ export class GameStateSystem {
     // Choose vision system based on toggle
     if (this.usePolygonVision) {
       this.visionSystem = new VisibilityPolygonSystem();
-      console.log('Using VisibilityPolygonSystem for sharp, clean sight lines');
+      // Removed verbose logging
     } else {
       this.visionSystem = new TileVisionSystem(GAME_CONFIG.GAME_WIDTH, GAME_CONFIG.GAME_HEIGHT);
-      console.log('Using TileVisionSystem');
+      // Removed verbose logging
     }
     
     // Don't initialize walls here - will be done in initialize()

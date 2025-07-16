@@ -26,17 +26,12 @@ class DestructionSystem {
     async initializeWalls() {
         // Check if we should load a map file
         const mapFile = process.env.MAP_FILE || process.env.LOAD_MAP;
-        console.log('🔍 Map loading debug:');
-        console.log('   MAP_FILE env:', process.env.MAP_FILE);
-        console.log('   LOAD_MAP env:', process.env.LOAD_MAP);
-        console.log('   Final mapFile:', mapFile);
         if (mapFile) {
             try {
                 const mapLoader = new MapLoader_1.MapLoader(this);
                 await mapLoader.loadMapFromFile(mapFile);
                 // Store spawn positions from the map
                 this.spawnPositions = mapLoader.getSpawnPositions();
-                console.log(`🗺️  Loaded map from: ${mapFile}.png`);
             }
             catch (error) {
                 console.error(`Failed to load map file, falling back to test walls:`, error);

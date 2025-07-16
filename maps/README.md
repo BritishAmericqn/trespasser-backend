@@ -48,9 +48,11 @@ npm start
 ## Tips
 
 - Keep walls aligned to the 10x10 grid for best results
-- Horizontal walls are preferred over single vertical cells
-- Corners will be assigned to whichever direction has more adjacent walls
-- Walls can be 1-5 slices long (10-50 pixels)
+- **Single cells (10x10) become vertical pillars** with 5 slices (2 pixels per slice)
+- Horizontal walls require at least 2 connected cells
+- For better slice dimensions, use walls that are 2+ cells long
+- Horizontal walls are preferred for runs of cells
+- Single isolated cells automatically become vertical walls (pillars)
 - The game automatically adds boundary walls, so you don't need to draw them
 
 ## Example Layout

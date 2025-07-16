@@ -20,7 +20,7 @@ export const GAME_CONFIG = {
   HOLE_VISION_ANGLE: 15,
   WEAPON_BULLET_SPEED: 500,
   WEAPON_BULLET_DAMAGE: 25,
-  WEAPON_ROCKET_SPEED: 300,
+  WEAPON_ROCKET_SPEED: 200,
   WEAPON_ROCKET_DAMAGE: 150,
   WEAPON_ROCKET_RADIUS: 30,
   AUDIO_FALLOFF_DISTANCE: 200,
@@ -72,15 +72,15 @@ export const GAME_CONFIG = {
     },
     ROCKET: {
       TYPE: 'rocket',
-      DAMAGE: 150,
-      MAX_AMMO: 1,
-      MAX_RESERVE: 4,
-      FIRE_RATE: 30,
+      DAMAGE: 100,
+      FIRE_RATE: 60, // 1 per second
       RELOAD_TIME: 3000,
+      MAX_AMMO: 1,
+      MAX_RESERVE: 10,
       ACCURACY: 0.95,
       RANGE: 400,
       HITSCAN: false,
-      PROJECTILE_SPEED: 300,
+      PROJECTILE_SPEED: 200,  // Reduced from 300 for better collision detection
       EXPLOSION_RADIUS: 50
     }
   },

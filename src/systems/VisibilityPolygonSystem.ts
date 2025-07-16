@@ -150,11 +150,11 @@ export class VisibilityPolygonSystem {
     // Debug: Check if any angles are outside normal range
     const abnormalAngles = uniqueAngles.filter(a => a < -Math.PI || a > Math.PI);
     if (abnormalAngles.length > 0) {
-      console.log(`[AngleDebug] Found angles outside [-π, π] range:`);
-      abnormalAngles.forEach(a => {
-        console.log(`  - ${(a * 180 / Math.PI).toFixed(1)}° (${a.toFixed(3)} rad)`);
-      });
-      console.log(`  - This suggests a normalization issue`);
+      // console.log(`[AngleDebug] Found angles outside [-π, π] range:`);
+      // abnormalAngles.forEach(a => {
+      //   console.log(`  - ${(a * 180 / Math.PI).toFixed(1)}° (${a.toFixed(3)} rad)`);
+      // });
+      // console.log(`  - This suggests a normalization issue`);
     }
     
     // Step 4: Build the visibility polygon
@@ -225,7 +225,7 @@ export class VisibilityPolygonSystem {
     // Debug: Log basic info about the polygon (temporarily increased for testing)
     if (finalPoints.length > 10) { // Log more frequently for testing
       const arcPointCount = pointsOnArc.filter(p => p).length;
-      console.log(`[VisibilityPolygon] Created polygon with ${finalPoints.length} points (${arcPointCount} original arc points), direction: ${(viewDirection * 180 / Math.PI).toFixed(1)}°`);
+      // console.log(`[VisibilityPolygon] Created polygon with ${finalPoints.length} points (${arcPointCount} original arc points), direction: ${(viewDirection * 180 / Math.PI).toFixed(1)}°`);
     }
     
     return finalPoints;
@@ -394,14 +394,14 @@ export class VisibilityPolygonSystem {
     
     // Debug output when we have many corners or arc intersections
     if (validCorners.length > 0) { // Always log for testing
-      console.log(`[CornerDebug] Visibility calculation:`);
-      console.log(`  - Walls processed: ${wallsProcessed}`);
-      console.log(`  - Total corners found: ${totalCornersFound}`);
-      console.log(`  - Arc intersections found: ${arcIntersectionsFound}`);
-      console.log(`  - Filtered by distance: ${cornersFilteredByDistance}`);
-      console.log(`  - Filtered by FOV: ${cornersFilteredByFOV}`);
-      console.log(`  - Final corners: ${validCorners.length}`);
-      console.log(`  - Viewer at: (${viewerPos.x.toFixed(0)}, ${viewerPos.y.toFixed(0)}), looking ${(viewDirection * 180 / Math.PI).toFixed(1)}°`);
+      // console.log(`[CornerDebug] Visibility calculation:`);
+      // console.log(`  - Walls processed: ${wallsProcessed}`);
+      // console.log(`  - Total corners found: ${totalCornersFound}`);
+      // console.log(`  - Arc intersections found: ${arcIntersectionsFound}`);
+      // console.log(`  - Filtered by distance: ${cornersFilteredByDistance}`);
+      // console.log(`  - Filtered by FOV: ${cornersFilteredByFOV}`);
+      // console.log(`  - Final corners: ${validCorners.length}`);
+      // console.log(`  - Viewer at: (${viewerPos.x.toFixed(0)}, ${viewerPos.y.toFixed(0)}), looking ${(viewDirection * 180 / Math.PI).toFixed(1)}°`);
     }
     
     return validCorners;
