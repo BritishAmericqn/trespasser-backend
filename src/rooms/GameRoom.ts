@@ -29,7 +29,10 @@ export class GameRoom {
     socket.join(this.id);
     
     const playerState = this.gameState.createPlayer(socket.id);
-    socket.emit(EVENTS.GAME_STATE, this.gameState.getState());
+    
+    // Send initial filtered state to the joining player
+    const filteredState = this.gameState.getFilteredGameState(socket.id);
+    socket.emit(EVENTS.GAME_STATE, filteredState);
     socket.broadcast.emit(EVENTS.PLAYER_JOINED, playerState);
     
     // Player input handling
@@ -194,8 +197,11 @@ export class GameRoom {
     }, 1000 / GAME_CONFIG.TICK_RATE);
     
     this.networkInterval = setInterval(() => {
-      const state = this.gameState.getState();
-      this.io.to(this.id).emit(EVENTS.GAME_STATE, state);
+      // Send filtered game state to each player based on their vision
+      for (const [playerId, socket] of this.players) {
+        const filteredState = this.gameState.getFilteredGameState(playerId);
+        socket.emit(EVENTS.GAME_STATE, filteredState);
+      }
     }, 1000 / GAME_CONFIG.NETWORK_RATE);
   }
   

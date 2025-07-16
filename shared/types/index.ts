@@ -76,6 +76,11 @@ export interface GameState {
   projectiles: ProjectileState[];
   timestamp: number;
   tickRate: number;
+  vision?: {
+    visibleTiles: number[];  // Array of tile indices (y * 30 + x)
+    viewAngle: number;
+    position: Vector2;
+  };
 }
 
 // Extended input types for weapons

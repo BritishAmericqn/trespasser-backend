@@ -9,6 +9,7 @@ class PhysicsSystem {
     engine;
     world;
     collisionCallbacks = new Map();
+    activeBodies = new Set(); // Track bodies that need physics
     constructor() {
         this.engine = matter_js_1.default.Engine.create();
         this.world = this.engine.world;
@@ -51,7 +52,20 @@ class PhysicsSystem {
         this.collisionCallbacks.delete(id);
     }
     update(delta) {
-        matter_js_1.default.Engine.update(this.engine, delta);
+        // CRITICAL PERFORMANCE: Only run physics if bodies are actually moving
+        if (this.activeBodies.size > 0) {
+            matter_js_1.default.Engine.update(this.engine, delta);
+        }
+    }
+    // Track bodies that need physics updates
+    addActiveBody(id) {
+        this.activeBodies.add(id);
+    }
+    removeActiveBody(id) {
+        this.activeBodies.delete(id);
+    }
+    getActiveBodiesCount() {
+        return this.activeBodies.size;
     }
     addBody(body) {
         matter_js_1.default.World.add(this.world, body);

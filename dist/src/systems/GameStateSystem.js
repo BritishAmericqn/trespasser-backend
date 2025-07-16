@@ -8,6 +8,7 @@ const constants_1 = require("../../shared/constants");
 const WeaponSystem_1 = require("./WeaponSystem");
 const ProjectileSystem_1 = require("./ProjectileSystem");
 const DestructionSystem_1 = require("./DestructionSystem");
+const TileVisionSystem_1 = require("./TileVisionSystem");
 const matter_js_1 = __importDefault(require("matter-js"));
 class GameStateSystem {
     players = new Map();
@@ -17,15 +18,22 @@ class GameStateSystem {
     weaponSystem;
     projectileSystem;
     destructionSystem;
+    visionSystem;
     lastInputSequence = new Map();
     pendingWallDamageEvents = [];
     pendingReloadCompleteEvents = [];
     pendingProjectileEvents = [];
+    playerVisionTiles = new Map();
+    wallsUpdatedThisTick = false;
+    visionUpdateCounter = 0;
     constructor(physics) {
         this.physics = physics;
         this.weaponSystem = new WeaponSystem_1.WeaponSystem();
         this.projectileSystem = new ProjectileSystem_1.ProjectileSystem(physics, this.weaponSystem);
         this.destructionSystem = new DestructionSystem_1.DestructionSystem(physics);
+        this.visionSystem = new TileVisionSystem_1.TileVisionSystem(constants_1.GAME_CONFIG.GAME_WIDTH, constants_1.GAME_CONFIG.GAME_HEIGHT);
+        // Initialize vision system with walls
+        this.initializeVisionWalls();
         // Set up reload complete callback
         this.weaponSystem.setReloadCompleteCallback((playerId, weapon) => {
             this.pendingReloadCompleteEvents.push({
@@ -38,7 +46,18 @@ class GameStateSystem {
                 }
             });
         });
-        console.log('GameStateSystem initialized with weapon systems');
+        console.log('GameStateSystem initialized with weapon and vision systems');
+    }
+    initializeVisionWalls() {
+        // Get walls from destruction system and pass to vision system
+        const walls = this.destructionSystem.getWalls();
+        const wallData = Array.from(walls.values()).map(wall => ({
+            x: wall.position.x,
+            y: wall.position.y,
+            width: wall.width,
+            height: wall.height
+        }));
+        this.visionSystem.initializeWalls(wallData);
     }
     createPlayer(id) {
         const player = {
@@ -81,21 +100,22 @@ class GameStateSystem {
             label: `player:${id}`,
             render: { visible: false }
         });
-        console.log(`🔧 CREATING PLAYER BODY at position: (${player.transform.position.x}, ${player.transform.position.y})`);
-        console.log(`🎮 PLAYER SPAWNED: ${id} at (${player.transform.position.x}, ${player.transform.position.y})`);
+        // Debug logs disabled for performance
+        // console.log(`🔧 CREATING PLAYER BODY at position: (${player.transform.position.x}, ${player.transform.position.y})`);
+        // console.log(`🎮 PLAYER SPAWNED: ${id} at (${player.transform.position.x}, ${player.transform.position.y})`);
         this.physics.addBody(body);
         this.playerBodies.set(id, body);
-        console.log(`🔧 PHYSICS BODY CREATED at: (${body.position.x}, ${body.position.y})`);
-        console.log(`🔧 PHYSICS BODY AFTER ADDING TO WORLD: (${body.position.x}, ${body.position.y})`);
+        // console.log(`🔧 PHYSICS BODY CREATED at: (${body.position.x}, ${body.position.y})`);
+        // console.log(`🔧 PHYSICS BODY AFTER ADDING TO WORLD: (${body.position.x}, ${body.position.y})`);
         this.players.set(id, player);
         this.lastInputSequence.set(id, 0);
-        // Debug: Set up periodic position logging for this player
-        setInterval(() => {
-            const currentPlayer = this.players.get(id);
-            if (currentPlayer && currentPlayer.isAlive) {
-                console.log(`📍 POSITION CHECK ${id.substring(0, 8)}: (${currentPlayer.transform.position.x.toFixed(2)}, ${currentPlayer.transform.position.y.toFixed(2)}) | vel: (${currentPlayer.velocity.x.toFixed(2)}, ${currentPlayer.velocity.y.toFixed(2)}) | state: ${currentPlayer.movementState}`);
-            }
-        }, 1000);
+        // Debug: DISABLED FOR PERFORMANCE - this was creating intervals for every player!
+        // setInterval(() => {
+        //   const currentPlayer = this.players.get(id);
+        //   if (currentPlayer && currentPlayer.isAlive) {
+        //     console.log(`📍 POSITION CHECK ${id.substring(0, 8)}: (${currentPlayer.transform.position.x.toFixed(2)}, ${currentPlayer.transform.position.y.toFixed(2)}) | vel: (${currentPlayer.velocity.x.toFixed(2)}, ${currentPlayer.velocity.y.toFixed(2)}) | state: ${currentPlayer.movementState}`);
+        //   }
+        // }, 1000);
         return player;
     }
     getPlayer(id) {
@@ -109,6 +129,13 @@ class GameStateSystem {
         }
         this.players.delete(id);
         this.lastInputSequence.delete(id);
+        // Clean up vision state
+        this.playerVisionTiles.delete(id);
+        this.visionSystem.removePlayer(id);
+        // Clean up weapon system - only if method exists
+        // this.weaponSystem.cleanupPlayer(id);
+        // Clean up projectiles owned by this player - only if method exists
+        // this.projectileSystem.removePlayerProjectiles(id);
     }
     handlePlayerInput(playerId, input) {
         const player = this.players.get(playerId);
@@ -136,10 +163,10 @@ class GameStateSystem {
         }
         // Handle rotation based on mouse position
         this.updatePlayerRotation(player, input);
-        // Debug: Log position change
-        if (beforePos.x !== player.transform.position.x || beforePos.y !== player.transform.position.y) {
-            console.log(`🎮 INPUT ${playerId.substring(0, 8)} seq:${input.sequence} | before: (${beforePos.x.toFixed(2)}, ${beforePos.y.toFixed(2)}) → after: (${player.transform.position.x.toFixed(2)}, ${player.transform.position.y.toFixed(2)}) | keys: ${Object.entries(input.keys).filter(([k, v]) => v).map(([k]) => k).join(',')}`);
-        }
+        // Debug: DISABLED FOR PERFORMANCE
+        // if (beforePos.x !== player.transform.position.x || beforePos.y !== player.transform.position.y) {
+        //   console.log(`🎮 INPUT ${playerId.substring(0, 8)} seq:${input.sequence} | before: (${beforePos.x.toFixed(2)}, ${beforePos.y.toFixed(2)}) → after: (${player.transform.position.x.toFixed(2)}, ${player.transform.position.y.toFixed(2)}) | keys: ${Object.entries(input.keys).filter(([k, v]) => v).map(([k]) => k).join(',')}`);
+        // }
     }
     handleWeaponInputs(playerId, input) {
         const player = this.players.get(playerId);
@@ -219,15 +246,15 @@ class GameStateSystem {
                 x: targetVelocity.x * deltaSeconds,
                 y: targetVelocity.y * deltaSeconds
             };
-            // Debug: Log movement calculation
-            if (Math.random() < 0.05) { // Log 5% of movements to avoid spam
-                console.log(`🏃 MOVEMENT CALC ${playerId.substring(0, 8)}:`);
-                console.log(`   Input: ${Object.entries(input.keys).filter(([k, v]) => v && ['w', 'a', 's', 'd', 'shift', 'ctrl'].includes(k)).map(([k]) => k).join(',')}`);
-                console.log(`   Movement vector: (${movementVector.x}, ${movementVector.y})`);
-                console.log(`   Speed: base=${baseSpeed}, modifier=${speedModifier}, final=${finalSpeed}`);
-                console.log(`   Delta: time=${deltaTime}ms, seconds=${deltaSeconds}`);
-                console.log(`   Position delta: (${positionDelta.x.toFixed(4)}, ${positionDelta.y.toFixed(4)})`);
-            }
+            // Debug: DISABLED FOR PERFORMANCE
+            // if (Math.random() < 0.05) { // Log 5% of movements to avoid spam
+            //   console.log(`🏃 MOVEMENT CALC ${playerId.substring(0, 8)}:`);
+            //   console.log(`   Input: ${Object.entries(input.keys).filter(([k, v]) => v && ['w','a','s','d','shift','ctrl'].includes(k)).map(([k]) => k).join(',')}`);
+            //   console.log(`   Movement vector: (${movementVector.x}, ${movementVector.y})`);
+            //   console.log(`   Speed: base=${baseSpeed}, modifier=${speedModifier}, final=${finalSpeed}`);
+            //   console.log(`   Delta: time=${deltaTime}ms, seconds=${deltaSeconds}`);
+            //   console.log(`   Position delta: (${positionDelta.x.toFixed(4)}, ${positionDelta.y.toFixed(4)})`);
+            // }
             // Calculate intended position
             const intendedPosition = {
                 x: player.transform.position.x + positionDelta.x,
@@ -567,10 +594,10 @@ class GameStateSystem {
         const deltaY = input.mouse.y - player.transform.position.y;
         // Calculate angle in radians
         const angle = Math.atan2(deltaY, deltaX);
-        // Debug: Log rotation calculation occasionally
-        if (Math.random() < 0.01) { // 1% chance to avoid spam
-            console.log(`🎯 ROTATION ${player.id.substring(0, 8)}: mouse(${input.mouse.x.toFixed(1)}, ${input.mouse.y.toFixed(1)}) - player(${player.transform.position.x.toFixed(1)}, ${player.transform.position.y.toFixed(1)}) = angle ${(angle * 180 / Math.PI).toFixed(1)}°`);
-        }
+        // Debug: DISABLED FOR PERFORMANCE
+        // if (Math.random() < 0.01) { // 1% chance to avoid spam
+        //   console.log(`🎯 ROTATION ${player.id.substring(0, 8)}: mouse(${input.mouse.x.toFixed(1)}, ${input.mouse.y.toFixed(1)}) - player(${player.transform.position.x.toFixed(1)}, ${player.transform.position.y.toFixed(1)}) = angle ${(angle * 180 / Math.PI).toFixed(1)}°`);
+        // }
         player.transform.rotation = angle;
     }
     // Check if a player can move to a new position (no wall collision)
@@ -638,6 +665,8 @@ class GameStateSystem {
         const now = Date.now();
         const deltaTime = now - this.lastUpdateTime;
         this.lastUpdateTime = now;
+        // Reset wall update flag
+        this.wallsUpdatedThisTick = false;
         // Update projectile system - now with wall collision checking
         const projectileEvents = this.projectileSystem.update(deltaTime, this.destructionSystem.getWalls());
         // Queue projectile update events
@@ -650,7 +679,7 @@ class GameStateSystem {
         }
         // Check projectile collisions
         this.checkProjectileCollisions();
-        // Process explosions
+        // Process explosions and queue damage events
         this.processExplosions();
         // Update player positions and sync with physics bodies
         for (const [playerId, player] of this.players) {
@@ -675,6 +704,16 @@ class GameStateSystem {
                 player.movementState = 'idle';
             }
             // console.log(`🔍 FINAL PLAYER POSITION for ${playerId}: (${player.transform.position.x.toFixed(2)}, ${player.transform.position.y.toFixed(2)}) | velocity=(${player.velocity.x.toFixed(2)}, ${player.velocity.y.toFixed(2)})`);
+        }
+        // Update vision with new tile-based system
+        for (const [playerId, player] of this.players) {
+            if (!player.isAlive)
+                continue;
+            // Update vision (includes temporal coherence optimization)
+            const visibleTileIndices = this.visionSystem.updatePlayerVision(player);
+            if (visibleTileIndices) {
+                this.playerVisionTiles.set(playerId, visibleTileIndices);
+            }
         }
     }
     // Check projectile collisions
@@ -709,6 +748,10 @@ class GameStateSystem {
                         if (wallDamageResult.isDestroyed) {
                             wallDamageEvents.push({ type: constants_1.EVENTS.WALL_DESTROYED, data: wallDamageResult });
                         }
+                        // Notify vision system of wall destruction
+                        this.visionSystem.onWallDestroyed(wallDamageResult.position.x, wallDamageResult.position.y, wallDamageResult.sliceIndex);
+                        // Mark that walls were updated this tick
+                        this.wallsUpdatedThisTick = true;
                     }
                 }
                 // Remove projectile if not a grenade
@@ -720,34 +763,25 @@ class GameStateSystem {
         // Store events for later broadcasting
         this.pendingWallDamageEvents = wallDamageEvents;
     }
-    // Process explosions
+    // Process explosions and queue damage events
     processExplosions() {
         const explosionResults = this.projectileSystem.processExplosions(this.players, this.destructionSystem.getWalls());
-        const explosionWallDamageEvents = [];
-        // Apply player damage from explosions
+        // Queue player damage events
         for (const damageEvent of explosionResults.playerDamageEvents) {
-            const player = this.players.get(damageEvent.playerId);
-            if (player) {
-                this.applyPlayerDamage(player, damageEvent.damage, damageEvent.damageType, damageEvent.sourcePlayerId, damageEvent.position);
-            }
+            this.applyPlayerDamage(this.players.get(damageEvent.playerId), damageEvent.damage, damageEvent.damageType, damageEvent.sourcePlayerId, damageEvent.position);
         }
-        // Apply wall damage from explosions
-        for (const damageEvent of explosionResults.wallDamageEvents) {
-            const wallDamageResult = this.destructionSystem.applyDamage(damageEvent.wallId, damageEvent.sliceIndex, damageEvent.damage);
-            // CRITICAL FIX: Collect explosion wall damage events
-            if (wallDamageResult) {
-                explosionWallDamageEvents.push({ type: constants_1.EVENTS.WALL_DAMAGED, data: wallDamageResult });
-                if (wallDamageResult.isDestroyed) {
-                    explosionWallDamageEvents.push({ type: constants_1.EVENTS.WALL_DESTROYED, data: wallDamageResult });
-                }
-            }
+        // Queue wall damage events
+        for (const wallDamageEvent of explosionResults.wallDamageEvents) {
+            this.pendingWallDamageEvents.push({ type: constants_1.EVENTS.WALL_DAMAGED, data: wallDamageEvent });
+            // Notify vision system of wall destruction
+            this.visionSystem.onWallDestroyed(wallDamageEvent.position.x, wallDamageEvent.position.y, wallDamageEvent.sliceIndex);
+            // Mark that walls were updated
+            this.wallsUpdatedThisTick = true;
         }
-        // Broadcast explosion events
+        // Queue explosion events
         for (const explosion of explosionResults.explosions) {
-            explosionWallDamageEvents.push({ type: constants_1.EVENTS.EXPLOSION_CREATED, data: explosion });
+            this.pendingProjectileEvents.push({ type: constants_1.EVENTS.EXPLOSION_CREATED, data: explosion });
         }
-        // Merge with pending events
-        this.pendingWallDamageEvents.push(...explosionWallDamageEvents);
     }
     // Get pending events that need to be broadcast
     getPendingEvents() {
@@ -806,6 +840,69 @@ class GameStateSystem {
     // Get destruction system (for external access)
     getDestructionSystem() {
         return this.destructionSystem;
+    }
+    // Get vision tiles for a player
+    getPlayerVisionTiles(playerId) {
+        return this.playerVisionTiles.get(playerId);
+    }
+    // Get filtered game state for a specific player based on vision
+    getFilteredGameState(playerId) {
+        // TEMP: Vision disabled - return all game state
+        const player = this.players.get(playerId);
+        if (!player) {
+            // Return minimal state if no player
+            return {
+                players: {},
+                projectiles: [],
+                walls: {},
+                timestamp: Date.now(),
+                tickRate: constants_1.GAME_CONFIG.TICK_RATE
+            };
+        }
+        // TEMP: Return all players since vision is disabled
+        const visiblePlayersObject = {};
+        // Include all alive players
+        for (const [pid, p] of this.players) {
+            if (!p.isAlive)
+                continue;
+            const weaponsObject = {};
+            for (const [weaponId, weapon] of p.weapons) {
+                weaponsObject[weaponId] = weapon;
+            }
+            visiblePlayersObject[pid] = {
+                ...p,
+                weapons: weaponsObject,
+                lastProcessedInput: p.lastProcessedInput || 0
+            };
+        }
+        // TEMP: Return all projectiles since vision is disabled
+        const allProjectiles = this.projectileSystem.getProjectiles();
+        const visibleProjectiles = allProjectiles;
+        // Get all walls (client will handle vision masking) - convert to plain object
+        const wallsObject = {};
+        for (const [wallId, wall] of this.destructionSystem.getWalls()) {
+            wallsObject[wallId] = {
+                ...wall,
+                destructionMask: Array.from(wall.destructionMask)
+            };
+        }
+        return {
+            players: visiblePlayersObject,
+            projectiles: visibleProjectiles,
+            walls: wallsObject,
+            timestamp: Date.now(),
+            tickRate: constants_1.GAME_CONFIG.TICK_RATE,
+            // Include vision data (sending tiles, not pixels!)
+            vision: player ? {
+                visibleTiles: Array.from(this.playerVisionTiles.get(playerId) || []),
+                viewAngle: constants_1.GAME_CONFIG.VISION_ANGLE,
+                position: player.transform.position
+            } : undefined
+        };
+    }
+    // Get full game state (for spectators or debugging)
+    getFullGameState() {
+        return this.getState();
     }
 }
 exports.GameStateSystem = GameStateSystem;

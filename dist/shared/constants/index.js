@@ -17,7 +17,7 @@ exports.GAME_CONFIG = {
     WALL_SLICE_WIDTH: 3,
     WALL_SLICES_PER_TILE: 5,
     WALL_HEALTH_PER_SLICE: 100,
-    VISION_RANGE: 100,
+    VISION_RANGE: 60, // Reduced from 100 for performance
     VISION_ANGLE: 90,
     VISION_RAYS: 45,
     HOLE_VISION_ANGLE: 15,

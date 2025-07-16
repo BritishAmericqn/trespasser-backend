@@ -53,6 +53,8 @@ class ProjectileSystem {
         if (type === 'grenade') { // Only grenades need physics for bouncing
             const body = this.createProjectileBody(projectile);
             this.projectileBodies.set(projectileId, body);
+            // Track this body as active for physics
+            this.physics.addActiveBody(projectileId);
             // Register collision callback for grenades
             this.physics.registerCollisionCallback(projectileId, (event) => {
                 // Grenade collision handled by Matter.js physics engine
@@ -102,13 +104,13 @@ class ProjectileSystem {
     }
     // Update all projectiles
     update(deltaTime, walls) {
+        // CRITICAL PERFORMANCE: Skip everything if no projectiles
+        if (this.projectiles.size === 0) {
+            return { updateEvents: [], explodeEvents: [] };
+        }
         const projectilesToRemove = [];
         const updateEvents = [];
         const explodeEvents = [];
-        // Debug: Log walls once
-        if (walls && Math.random() < 0.01) { // 1% chance
-            console.log(`🧱 Walls available for collision: ${Array.from(walls.keys()).join(', ')}`);
-        }
         projectileLoop: for (const [projectileId, projectile] of this.projectiles) {
             // Store previous position before updating
             this.previousPositions.set(projectileId, { ...projectile.position });
@@ -588,6 +590,8 @@ class ProjectileSystem {
         if (body) {
             this.physics.removeBody(body);
             this.projectileBodies.delete(projectileId);
+            // Stop tracking this body for physics
+            this.physics.removeActiveBody(projectileId);
             // Unregister collision callback if it was a grenade
             this.physics.unregisterCollisionCallback(projectileId);
         }
