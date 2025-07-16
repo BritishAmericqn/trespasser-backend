@@ -7,15 +7,46 @@ exports.DestructionSystem = void 0;
 const constants_1 = require("../../shared/constants");
 const matter_js_1 = __importDefault(require("matter-js"));
 const wallSliceHelpers_1 = require("../utils/wallSliceHelpers");
+const MapLoader_1 = require("../utils/MapLoader");
 class DestructionSystem {
     physics;
     walls = new Map();
     wallBodies = new Map();
     wallIdCounter = 0;
+    spawnPositions = [];
     constructor(physics) {
         this.physics = physics;
-        // console.log('DestructionSystem initialized');
-        this.initializeTestWalls();
+        // Don't initialize in constructor - will be called separately
+    }
+    // Initialize walls - must be called after construction
+    async initialize() {
+        await this.initializeWalls();
+    }
+    // Initialize walls - either from map file or test walls
+    async initializeWalls() {
+        // Check if we should load a map file
+        const mapFile = process.env.MAP_FILE || process.env.LOAD_MAP;
+        console.log('🔍 Map loading debug:');
+        console.log('   MAP_FILE env:', process.env.MAP_FILE);
+        console.log('   LOAD_MAP env:', process.env.LOAD_MAP);
+        console.log('   Final mapFile:', mapFile);
+        if (mapFile) {
+            try {
+                const mapLoader = new MapLoader_1.MapLoader(this);
+                await mapLoader.loadMapFromFile(mapFile);
+                // Store spawn positions from the map
+                this.spawnPositions = mapLoader.getSpawnPositions();
+                console.log(`🗺️  Loaded map from: ${mapFile}.png`);
+            }
+            catch (error) {
+                console.error(`Failed to load map file, falling back to test walls:`, error);
+                this.initializeTestWalls();
+            }
+        }
+        else {
+            console.log('📍 No map file specified, using test walls');
+            this.initializeTestWalls();
+        }
     }
     // Initialize test walls for development
     initializeTestWalls() {
@@ -416,6 +447,10 @@ class DestructionSystem {
         for (const wall of this.walls.values()) {
             this.repairWall(wall.id);
         }
+    }
+    // Get spawn positions from loaded map
+    getSpawnPositions() {
+        return [...this.spawnPositions];
     }
 }
 exports.DestructionSystem = DestructionSystem;

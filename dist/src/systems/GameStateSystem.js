@@ -29,6 +29,7 @@ class GameStateSystem {
     playerVisionTiles = new Map();
     wallsUpdatedThisTick = false;
     visionUpdateCounter = 0;
+    spawnPositions = { red: [], blue: [] };
     constructor(physics) {
         this.physics = physics;
         // Initialize systems
@@ -44,7 +45,7 @@ class GameStateSystem {
             this.visionSystem = new TileVisionSystem_1.TileVisionSystem(constants_1.GAME_CONFIG.GAME_WIDTH, constants_1.GAME_CONFIG.GAME_HEIGHT);
             console.log('Using TileVisionSystem');
         }
-        this.initializeWalls();
+        // Don't initialize walls here - will be done in initialize()
         // Set up reload complete callback
         this.weaponSystem.setReloadCompleteCallback((playerId, weapon) => {
             this.pendingReloadCompleteEvents.push({
@@ -59,6 +60,12 @@ class GameStateSystem {
         });
         // console.log('GameStateSystem initialized with weapon and vision systems');
     }
+    async initialize() {
+        // Initialize destruction system (loads map if specified)
+        await this.destructionSystem.initialize();
+        // Now initialize walls in vision system
+        this.initializeWalls();
+    }
     initializeWalls() {
         // Get walls from destruction system and pass to vision system
         const walls = this.destructionSystem.getWalls();
@@ -70,6 +77,26 @@ class GameStateSystem {
             height: wall.height
         }));
         this.visionSystem.initializeWalls(wallData);
+        // Get spawn positions from destruction system (if loaded from map)
+        const spawns = this.destructionSystem.getSpawnPositions();
+        if (spawns.length > 0) {
+            this.setSpawnPositions(spawns);
+        }
+    }
+    setSpawnPositions(spawns) {
+        // Reset spawn arrays
+        this.spawnPositions.red = [];
+        this.spawnPositions.blue = [];
+        // Alternate between red and blue teams
+        spawns.forEach((spawn, index) => {
+            if (index % 2 === 0) {
+                this.spawnPositions.red.push(spawn);
+            }
+            else {
+                this.spawnPositions.blue.push(spawn);
+            }
+        });
+        console.log(`📍 Set spawn positions - Red: ${this.spawnPositions.red.length}, Blue: ${this.spawnPositions.blue.length}`);
     }
     createPlayer(id) {
         const player = {
@@ -92,17 +119,26 @@ class GameStateSystem {
             kills: 0,
             deaths: 0
         };
-        // Ensure player doesn't spawn inside a wall
-        let spawnAttempts = 0;
-        while (spawnAttempts < 10 && !this.canPlayerMoveTo(id, player.transform.position)) {
-            // Try different spawn positions
-            player.transform.position.x = 50 + Math.random() * (constants_1.GAME_CONFIG.GAME_WIDTH - 100);
-            player.transform.position.y = 50 + Math.random() * (constants_1.GAME_CONFIG.GAME_HEIGHT - 100);
-            spawnAttempts++;
-            // console.log(`🔄 SPAWN ATTEMPT ${spawnAttempts} for ${id}: (${player.transform.position.x.toFixed(1)}, ${player.transform.position.y.toFixed(1)})`);
+        // Try to use spawn positions from map if available
+        const teamSpawns = this.spawnPositions[player.team];
+        if (teamSpawns && teamSpawns.length > 0) {
+            // Pick a random spawn from team spawns
+            const spawn = teamSpawns[Math.floor(Math.random() * teamSpawns.length)];
+            player.transform.position = { ...spawn };
+            console.log(`🎯 Spawning ${id} at team ${player.team} spawn: (${spawn.x}, ${spawn.y})`);
         }
-        if (spawnAttempts >= 10) {
-            console.warn(`⚠️ Could not find valid spawn position for ${id} after 10 attempts!`);
+        else {
+            // Fall back to finding a safe spawn position
+            let spawnAttempts = 0;
+            while (spawnAttempts < 10 && !this.canPlayerMoveTo(id, player.transform.position)) {
+                // Try different spawn positions
+                player.transform.position.x = 50 + Math.random() * (constants_1.GAME_CONFIG.GAME_WIDTH - 100);
+                player.transform.position.y = 50 + Math.random() * (constants_1.GAME_CONFIG.GAME_HEIGHT - 100);
+                spawnAttempts++;
+            }
+            if (spawnAttempts >= 10) {
+                console.warn(`⚠️ Could not find valid spawn position for ${id} after 10 attempts!`);
+            }
         }
         // Create physics body for the player
         const body = matter_js_1.default.Bodies.circle(player.transform.position.x, player.transform.position.y, constants_1.GAME_CONFIG.PLAYER_SIZE / 2, {

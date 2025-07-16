@@ -12,14 +12,33 @@ class GameRoom {
     gameState;
     gameLoopInterval;
     networkInterval;
+    initialized = false;
     constructor(id, io) {
         this.id = id;
         this.io = io;
         this.physics = new PhysicsSystem_1.PhysicsSystem();
         this.gameState = new GameStateSystem_1.GameStateSystem(this.physics);
-        this.startGameLoop();
+        // Initialize asynchronously
+        this.initialize();
+    }
+    async initialize() {
+        try {
+            // Wait for destruction system to load map
+            await this.gameState.initialize();
+            this.initialized = true;
+            console.log('✅ GameRoom initialized with map loaded');
+            this.startGameLoop();
+        }
+        catch (error) {
+            console.error('❌ Failed to initialize GameRoom:', error);
+        }
     }
     addPlayer(socket) {
+        if (!this.initialized) {
+            console.warn('⚠️ GameRoom not yet initialized, player connection delayed');
+            setTimeout(() => this.addPlayer(socket), 100);
+            return;
+        }
         // console.log(`🎮 Player ${socket.id} joined the game`);
         this.players.set(socket.id, socket);
         // CRITICAL: Join the socket to this room so they receive broadcasts

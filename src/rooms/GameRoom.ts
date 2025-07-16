@@ -12,16 +12,37 @@ export class GameRoom {
   private gameState: GameStateSystem;
   private gameLoopInterval?: NodeJS.Timeout;
   private networkInterval?: NodeJS.Timeout;
+  private initialized: boolean = false;
   
   constructor(id: string, io: Server) {
     this.id = id;
     this.io = io;
     this.physics = new PhysicsSystem();
-            this.gameState = new GameStateSystem(this.physics);
-    this.startGameLoop();
+    this.gameState = new GameStateSystem(this.physics);
+    
+    // Initialize asynchronously
+    this.initialize();
+  }
+  
+  private async initialize(): Promise<void> {
+    try {
+      // Wait for destruction system to load map
+      await this.gameState.initialize();
+      this.initialized = true;
+      console.log('✅ GameRoom initialized with map loaded');
+      this.startGameLoop();
+    } catch (error) {
+      console.error('❌ Failed to initialize GameRoom:', error);
+    }
   }
   
   addPlayer(socket: Socket): void {
+    if (!this.initialized) {
+      console.warn('⚠️ GameRoom not yet initialized, player connection delayed');
+      setTimeout(() => this.addPlayer(socket), 100);
+      return;
+    }
+    
     // console.log(`🎮 Player ${socket.id} joined the game`);
     this.players.set(socket.id, socket);
     

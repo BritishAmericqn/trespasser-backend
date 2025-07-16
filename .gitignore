@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+
+# Map files
+maps/*.png
+# But keep the README
+!maps/README.md 
