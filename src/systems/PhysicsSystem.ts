@@ -22,7 +22,7 @@ export class PhysicsSystem {
       this.handleCollisionStart(event);
     });
     
-    console.log('PhysicsSystem initialized with collision detection');
+    // console.log('PhysicsSystem initialized with collision detection');
   }
   
   private handleCollisionStart(event: Matter.IEventCollision<Matter.Engine>): void {
@@ -48,7 +48,7 @@ export class PhysicsSystem {
           callback(event);
         }
         
-        console.log(`💥 Grenade ${grenadeId} collided with wall ${wallId}`);
+        // console.log(`💥 Grenade ${grenadeId} collided with wall ${wallId}`);
       }
     }
   }

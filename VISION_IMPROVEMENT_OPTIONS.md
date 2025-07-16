@@ -1,121 +1,145 @@
 # Vision System Improvement Options
 
-## Current Issues
+## Current State
+- **Raycasting**: 60 rays across 120° cone
+- **Tile-based**: 8×8 pixel tiles (60×34 grid)
+- **Slice-aware**: Vision only passes through destroyed wall slices
+- **Performance**: ~1-3ms for 8 players
 
-1. **Blocky appearance** - 16x16 tiles are too coarse
-2. **Can't see through thin gaps** - Binary tile blocking
-3. **Destroyed walls still block** - Requires 100% destruction to see through
+## Potential Improvements
 
-## ✅ Quick Fix Applied (Already Done)
-
-### 1. Reduced Tile Size: 16x16 → 8x8 pixels
-- **4x better resolution** (60×34 grid instead of 30×17)
-- **Minimal performance impact** (2,040 tiles vs 510)
-- **Frontend needs update** - See `BINARY_VISION_FRONTEND_UPDATE.md`
-
-### 2. Partial Destruction Vision
-- **Now allows vision through 60% destroyed walls** (3+ slices)
-- **More realistic** - Can peek through heavily damaged walls
-
-## 🚀 Additional Improvement Options
-
-### Option A: Edge Smoothing (2-3 hours)
-
-Add sub-tile resolution for edge tiles only:
-
+### 1. 🎯 Smooth Edge Anti-Aliasing (Low Cost)
+**Concept**: Soften harsh tile boundaries at vision edges
 ```typescript
-// For tiles at vision boundary, check 2x2 sub-grid
-if (isBoundaryTile(tileIndex)) {
-    const subVisibility = checkSubTiles(tileIndex, 2); // 4x4 pixel chunks
-    // Return partial visibility mask
+// For edge tiles, calculate partial visibility
+const distanceFromCenter = Math.sqrt(dx*dx + dy*dy);
+const fadeStart = MAX_VISION_TILES - 3;
+if (distanceFromCenter > fadeStart) {
+  const opacity = 1 - ((distanceFromCenter - fadeStart) / 3);
+  // Send opacity value to frontend for smooth edges
 }
 ```
+- **Performance**: +0.5ms (only processes edge tiles)
+- **Visual**: Much smoother fog edges
+- **Implementation**: 1-2 hours
 
-**Pros**: Smoother edges, better gap detection
-**Cons**: 4x more checks for boundary tiles only
-
-### Option B: Raycast Vision (4-6 hours)
-
-Replace tile scanning with ray casting:
-
+### 2. 🌟 Dynamic Ray Count (Adaptive Quality)
+**Concept**: More rays when stationary, fewer when moving
 ```typescript
-// Cast ~60 rays in vision cone
-for (let angle = -60; angle <= 60; angle += 2) {
-    const visibleTiles = castRay(player.pos, player.rotation + angle);
-    // Mark tiles along ray as visible
+const rayCount = player.isMoving ? 30 : 90;
+const qualityMode = player.velocity < 10 ? 'high' : 'low';
+```
+- **Performance**: 0-2ms (adaptive)
+- **Visual**: Higher quality when it matters
+- **Implementation**: 2-3 hours
+
+### 3. 🔦 Flashlight Mode (Directional Focus)
+**Concept**: Concentrate rays in mouse direction
+```typescript
+// 50% of rays in ±30° of mouse direction
+// 50% spread across remaining FOV
+const focusedRays = totalRays * 0.5;
+const spreadRays = totalRays * 0.5;
+```
+- **Performance**: Same as current (just redistributed)
+- **Visual**: Better long-range visibility
+- **Gameplay**: Rewards precise aiming
+
+### 4. 📐 Sub-Tile Precision (Medium Cost)
+**Concept**: 4×4 sub-tiles for critical areas only
+```typescript
+// Only subdivide tiles that:
+// 1. Contain walls
+// 2. Are at vision edges
+// 3. Have partial destruction
+if (needsPrecision(tile)) {
+  checkSubTiles(tile, 4); // 16 checks instead of 1
 }
 ```
+- **Performance**: +2-4ms
+- **Visual**: Smoother wall edges, better gaps
+- **Implementation**: 4-5 hours
 
-**Pros**: 
-- Perfect gap detection
-- Natural vision falloff
-- Actually faster than checking all tiles
-
-**Cons**: 
-- More complex implementation
-- Different visibility artifacts
-
-### Option C: Hybrid Pixel Edges (6-8 hours)
-
-Use tiles for interior, pixels for edges:
-
+### 5. 🌊 Vision Caching with Interpolation
+**Concept**: Cache and interpolate between updates
 ```typescript
-class HybridVision {
-    // Tile-based for core visibility
-    coreTiles: Set<number>;
-    
-    // Pixel-based for edges (only ~200 pixels)
-    edgePixels: Set<string>;
-}
+// Update vision every 100ms (10Hz)
+// Interpolate on frontend at 60fps
+const oldVision = cache.get(playerId);
+const newVision = calculateVision(player);
+// Send only differences
+const delta = visionDiff(oldVision, newVision);
 ```
+- **Performance**: Major reduction (10Hz vs 20Hz)
+- **Network**: 50% less data
+- **Visual**: Smooth with interpolation
 
-**Pros**: Best quality, perfect edges
-**Cons**: More complex, two systems to maintain
-
-### Option D: Pre-computed Vision Templates (2-4 hours)
-
-Cache common visibility patterns:
-
+### 6. 💡 Light Sources & Shadow Casting
+**Concept**: Add point lights that cast shadows
 ```typescript
-// Pre-compute visibility for common scenarios
-const VISION_PATTERNS = {
-    'open_area': [/* visible tiles */],
-    'corner_nw': [/* tiles visible around NW corner */],
-    'narrow_gap': [/* tiles visible through 1-tile gap */]
-};
+// Each light source casts shadows
+// Reuse raycasting logic
+lights.forEach(light => {
+  const lightVision = castRaysFrom(light.position, 360);
+  combineWithPlayerVision(lightVision);
+});
 ```
+- **Performance**: +1-2ms per light
+- **Visual**: Dramatic atmosphere
+- **Gameplay**: Tactical light placement
 
-**Pros**: Very fast, consistent results
-**Cons**: Less dynamic, more memory usage
+### 7. 🎨 Distance-Based LOD
+**Concept**: Less precision at distance
+```typescript
+// Near: Check every tile
+// Medium: Check every 2nd tile  
+// Far: Check every 4th tile
+const lodLevel = distance < 30 ? 1 : distance < 60 ? 2 : 4;
+```
+- **Performance**: 30-50% reduction
+- **Visual**: Unnoticeable at distance
+- **Implementation**: 2-3 hours
 
-## 📊 Comparison Matrix
+## Recommended Combination
 
-| Solution | Quality | Performance | Dev Time | Complexity |
-|----------|---------|-------------|----------|------------|
-| Current (8x8) | ★★☆☆☆ | ★★★★★ | ✓ Done | Low |
-| Edge Smoothing | ★★★☆☆ | ★★★★☆ | 2-3h | Medium |
-| Raycasting | ★★★★☆ | ★★★★☆ | 4-6h | Medium |
-| Hybrid Pixels | ★★★★★ | ★★★☆☆ | 6-8h | High |
-| Templates | ★★★☆☆ | ★★★★★ | 2-4h | Low |
+### "Best Bang for Buck" Package:
+1. **Smooth Edge Anti-Aliasing** ✅
+2. **Dynamic Ray Count** ✅
+3. **Distance-Based LOD** ✅
 
-## 🎯 Recommendation
+**Total Performance Impact**: Neutral or better
+**Visual Improvement**: Significant
+**Implementation Time**: 1 day
 
-**For Best Results with Minimal Effort**: Implement **Raycasting**
-- Solves all current issues
-- Actually improves performance
-- Industry-standard approach
-- Natural-looking vision
+### "Premium" Package:
+All of the above plus:
+4. **Sub-Tile Precision** 
+5. **Flashlight Mode**
+6. **Light Sources** (2-3 lights max)
 
-**For Quick Polish**: Add **Edge Smoothing** to current system
-- Keeps current architecture
-- Just refines boundaries
-- Good cost/benefit ratio
+**Total Performance Impact**: +3-5ms
+**Visual Improvement**: Exceptional
+**Implementation Time**: 3-4 days
 
-## 🔧 Next Steps
+## Performance Guidelines
 
-1. **Update Frontend** for 8x8 tiles (required)
-2. **Test current improvements** 
-3. **Choose additional enhancement** based on priorities
-4. **Consider raycasting** for best long-term solution
+### Current Budget
+- Vision: 1-3ms
+- Physics: 5-10ms  
+- Networking: 2-5ms
+- **Total frame time**: ~16ms (60fps)
 
-The 8x8 tile change alone should make a noticeable improvement. The partial destruction fix means you can now see through heavily damaged walls. Test these changes first before deciding on further improvements! 
+### Available Headroom
+At 480×270 with 8 players, you have ~5-8ms to spare.
+
+### Optimization Tricks
+1. **Pre-calculate angles**: Store sin/cos lookup tables
+2. **Bitwise operations**: Use for tile flags
+3. **Object pooling**: Reuse ray result arrays
+4. **SIMD.js**: For batch calculations (if available)
+
+## Next Steps
+1. Pick a package (recommend "Best Bang for Buck")
+2. Implement incrementally
+3. Profile each addition
+4. Adjust quality dynamically based on performance 

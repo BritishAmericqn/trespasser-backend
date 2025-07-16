@@ -6,7 +6,7 @@ export class WeaponSystem {
   private projectileId: number = 0;
   
   constructor() {
-    console.log('WeaponSystem initialized');
+    // console.log('WeaponSystem initialized');
   }
   
   // Initialize player weapons

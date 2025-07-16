@@ -25,18 +25,18 @@ const defaultRoom = new GameRoom('default', io);
 rooms.set('default', defaultRoom);
 
 io.on('connection', (socket) => {
-  console.log('Player connected:', socket.id);
+  // console.log('Player connected:', socket.id);
   defaultRoom.addPlayer(socket);
   
   socket.on('disconnect', () => {
-    console.log('Player disconnected:', socket.id);
+    // console.log('Player disconnected:', socket.id);
     defaultRoom.removePlayer(socket.id);
   });
 });
 
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🎮 Game tick rate: ${GAME_CONFIG.TICK_RATE} Hz`);
-  console.log(`🌐 Network rate: ${GAME_CONFIG.NETWORK_RATE} Hz`);
+  // console.log(`🚀 Server running on port ${PORT}`);
+  // console.log(`🎮 Game tick rate: ${GAME_CONFIG.TICK_RATE} Hz`);
+  // console.log(`🌐 Network rate: ${GAME_CONFIG.NETWORK_RATE} Hz`);
 });

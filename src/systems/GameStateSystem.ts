@@ -5,6 +5,7 @@ import { WeaponSystem } from './WeaponSystem';
 import { ProjectileSystem } from './ProjectileSystem';
 import { DestructionSystem } from './DestructionSystem';
 import { TileVisionSystem } from './TileVisionSystem';
+import { VisibilityPolygonSystem } from './VisibilityPolygonSystem';
 import Matter from 'matter-js';
 
 export class GameStateSystem {
@@ -15,7 +16,8 @@ export class GameStateSystem {
   private weaponSystem: WeaponSystem;
   private projectileSystem: ProjectileSystem;
   private destructionSystem: DestructionSystem;
-  private visionSystem: TileVisionSystem;
+  private visionSystem: TileVisionSystem | VisibilityPolygonSystem;
+  private usePolygonVision: boolean = true; // Toggle between vision systems
   private lastInputSequence: Map<string, number> = new Map();
   private pendingWallDamageEvents: any[] = [];
   private pendingReloadCompleteEvents: any[] = [];
@@ -29,7 +31,15 @@ export class GameStateSystem {
     this.weaponSystem = new WeaponSystem();
     this.projectileSystem = new ProjectileSystem(physics, this.weaponSystem);
     this.destructionSystem = new DestructionSystem(physics);
-    this.visionSystem = new TileVisionSystem(GAME_CONFIG.GAME_WIDTH, GAME_CONFIG.GAME_HEIGHT);
+    
+    // Choose vision system based on toggle
+    if (this.usePolygonVision) {
+      this.visionSystem = new VisibilityPolygonSystem();
+      console.log('Using VisibilityPolygonSystem for sharp, clean sight lines');
+    } else {
+      this.visionSystem = new TileVisionSystem(GAME_CONFIG.GAME_WIDTH, GAME_CONFIG.GAME_HEIGHT);
+      console.log('Using TileVisionSystem');
+    }
     
     // Initialize vision system with walls
     this.initializeVisionWalls();
@@ -47,13 +57,14 @@ export class GameStateSystem {
       });
     });
     
-    console.log('GameStateSystem initialized with weapon and vision systems');
+    // console.log('GameStateSystem initialized with weapon and vision systems');
   }
   
   private initializeVisionWalls(): void {
     // Get walls from destruction system and pass to vision system
     const walls = this.destructionSystem.getWalls();
-    const wallData = Array.from(walls.values()).map(wall => ({
+    const wallData = Array.from(walls.entries()).map(([id, wall]) => ({
+      id: id,
       x: wall.position.x,
       y: wall.position.y,
       width: wall.width,
@@ -92,7 +103,7 @@ export class GameStateSystem {
       player.transform.position.y = 50 + Math.random() * (GAME_CONFIG.GAME_HEIGHT - 100);
       spawnAttempts++;
       
-      console.log(`🔄 SPAWN ATTEMPT ${spawnAttempts} for ${id}: (${player.transform.position.x.toFixed(1)}, ${player.transform.position.y.toFixed(1)})`);
+      // console.log(`🔄 SPAWN ATTEMPT ${spawnAttempts} for ${id}: (${player.transform.position.x.toFixed(1)}, ${player.transform.position.y.toFixed(1)})`);
     }
     
     if (spawnAttempts >= 10) {
@@ -125,7 +136,7 @@ export class GameStateSystem {
     this.players.set(id, player);
     this.lastInputSequence.set(id, 0);
     
-    // Debug: DISABLED FOR PERFORMANCE - this was creating intervals for every player!
+    // DEBUG: DISABLED FOR PERFORMANCE - this was creating intervals for every player!
     // setInterval(() => {
     //   const currentPlayer = this.players.get(id);
     //   if (currentPlayer && currentPlayer.isAlive) {
@@ -319,12 +330,12 @@ export class GameStateSystem {
           
           // Debug collision
           if (Math.random() < 0.1) { // 10% chance
-            console.log(`🧱 WALL SLIDE ${playerId.substring(0, 8)}: intended(${intendedPosition.x.toFixed(1)}, ${intendedPosition.y.toFixed(1)}) → slide(${slidePosition.x.toFixed(1)}, ${slidePosition.y.toFixed(1)})`);
+            // console.log(`🧱 WALL SLIDE ${playerId.substring(0, 8)}: intended(${intendedPosition.x.toFixed(1)}, ${intendedPosition.y.toFixed(1)}) → slide(${slidePosition.x.toFixed(1)}, ${slidePosition.y.toFixed(1)})`);
           }
         } else {
           // Can't move at all - log collision
           if (Math.random() < 0.1) { // 10% chance
-            console.log(`🚫 BLOCKED ${playerId.substring(0, 8)}: at (${player.transform.position.x.toFixed(1)}, ${player.transform.position.y.toFixed(1)})`);
+            // console.log(`🚫 BLOCKED ${playerId.substring(0, 8)}: at (${player.transform.position.x.toFixed(1)}, ${player.transform.position.y.toFixed(1)})`);
           }
         }
       }
@@ -352,7 +363,7 @@ export class GameStateSystem {
     
     const fireResult = this.weaponSystem.handleWeaponFire(event, player);
     if (!fireResult.canFire) {
-      console.log(`🔫 Fire failed for ${event.playerId}: ${fireResult.error}`);
+      // console.log(`🔫 Fire failed for ${event.playerId}: ${fireResult.error}`);
       return { success: false, events: [] };
     }
     
@@ -373,7 +384,7 @@ export class GameStateSystem {
       );
       
       // Debug logging
-      console.log(`🎯 HITSCAN from (${event.position.x.toFixed(1)}, ${event.position.y.toFixed(1)}) dir: ${(event.direction * 180 / Math.PI).toFixed(1)}° - Result: ${hitscanResult.hit ? `HIT ${hitscanResult.targetType} at (${hitscanResult.hitPoint.x.toFixed(1)}, ${hitscanResult.hitPoint.y.toFixed(1)})` : 'MISS'}`);
+      // console.log(`🎯 HITSCAN from (${event.position.x.toFixed(1)}, ${event.position.y.toFixed(1)}) dir: ${(event.direction * 180 / Math.PI).toFixed(1)}° - Result: ${hitscanResult.hit ? `HIT ${hitscanResult.targetType} at (${hitscanResult.hitPoint.x.toFixed(1)}, ${hitscanResult.hitPoint.y.toFixed(1)})` : 'MISS'}`);
       
       if (hitscanResult.hit) {
         if (hitscanResult.targetType === 'player' && hitscanResult.targetId) {
@@ -391,7 +402,7 @@ export class GameStateSystem {
           }
         } else if (hitscanResult.targetType === 'wall' && hitscanResult.targetId && hitscanResult.wallSliceIndex !== undefined) {
           // Wall hit
-          console.log(`🧱 WALL HIT: ${hitscanResult.targetId} slice ${hitscanResult.wallSliceIndex}`);
+          // console.log(`🧱 WALL HIT: ${hitscanResult.targetId} slice ${hitscanResult.wallSliceIndex}`);
           const wall = this.destructionSystem.getWall(hitscanResult.targetId);
           if (wall) {
             const damage = this.weaponSystem.calculateDamage(weapon, hitscanResult.distance);
@@ -399,7 +410,14 @@ export class GameStateSystem {
             
             if (damageEvent) {
               events.push({ type: EVENTS.WALL_DAMAGED, data: damageEvent });
-              console.log(`💥 WALL DAMAGED: ${damageEvent.wallId} slice ${damageEvent.sliceIndex} - new health: ${damageEvent.newHealth}`);
+              // console.log(`💥 WALL DAMAGED: ${damageEvent.wallId} slice ${damageEvent.sliceIndex} - new health: ${damageEvent.newHealth}`);
+              
+              // Notify vision system of wall destruction
+              this.visionSystem.onWallDestroyed(
+                hitscanResult.targetId!,
+                wall,
+                damageEvent.sliceIndex
+              );
               
               if (damageEvent.isDestroyed) {
                 events.push({ type: EVENTS.WALL_DESTROYED, data: damageEvent });
@@ -430,7 +448,7 @@ export class GameStateSystem {
       };
       
       if (weapon.type === 'grenade') {
-        console.log(`🎯 Grenade fire event - chargeLevel: ${event.chargeLevel}`);
+        // console.log(`🎯 Grenade fire event - chargeLevel: ${event.chargeLevel}`);
         if (event.chargeLevel) {
           // Use new grenade velocity system with charge levels
           const baseSpeed = GAME_CONFIG.WEAPONS.GRENADE.BASE_THROW_SPEED;
@@ -443,10 +461,10 @@ export class GameStateSystem {
           projectileOptions.range = weapon.range * chargeMultiplier;
           projectileOptions.chargeLevel = event.chargeLevel;
           
-          console.log(`💣 Grenade throw: charge=${event.chargeLevel}, speed=${speed}, range=${projectileOptions.range}`);
+          // console.log(`💣 Grenade throw: charge=${event.chargeLevel}, speed=${speed}, range=${projectileOptions.range}`);
         } else {
           // Fallback to default speed if no charge level
-          console.log('⚠️  No charge level provided, using default speed');
+          // console.log('⚠️  No charge level provided, using default speed');
           velocity = this.calculateProjectileVelocity(event.direction, weaponConfig.PROJECTILE_SPEED);
         }
       } else {
@@ -506,7 +524,7 @@ export class GameStateSystem {
     
     const reloadResult = this.weaponSystem.handleWeaponReload(reloadEvent, player);
     if (!reloadResult.canReload) {
-      console.log(`🔄 Reload failed for ${playerId}: ${reloadResult.error}`);
+      // console.log(`🔄 Reload failed for ${playerId}: ${reloadResult.error}`);
       return { success: false, events: [] };
     }
     
@@ -534,7 +552,7 @@ export class GameStateSystem {
     
     const switchResult = this.weaponSystem.handleWeaponSwitch(switchEvent, player);
     if (!switchResult.canSwitch) {
-      console.log(`🔄 Switch failed for ${playerId}: ${switchResult.error}`);
+      // console.log(`🔄 Switch failed for ${playerId}: ${switchResult.error}`);
       return { success: false, events: [] };
     }
     
@@ -554,7 +572,7 @@ export class GameStateSystem {
     
     const throwResult = this.weaponSystem.handleGrenadeThrow(event, player);
     if (!throwResult.canThrow) {
-      console.log(`💣 Grenade throw failed for ${event.playerId}: ${throwResult.error}`);
+      // console.log(`💣 Grenade throw failed for ${event.playerId}: ${throwResult.error}`);
       return { success: false, events: [] };
     }
     
@@ -629,7 +647,7 @@ export class GameStateSystem {
     const timeDiff = Math.abs(now - input.timestamp);
     
     if (timeDiff > 1000) { // 1 second tolerance
-      console.warn(`⏰ Input rejected for ${playerId.substring(0, 8)}: timestamp diff ${timeDiff}ms`);
+      // console.warn(`⏰ Input rejected for ${playerId.substring(0, 8)}: timestamp diff ${timeDiff}ms`);
       return false;
     }
     
@@ -638,7 +656,7 @@ export class GameStateSystem {
     if (input.sequence <= lastSequence) {
       // Be more lenient - allow some out-of-order packets
       if (input.sequence < lastSequence - 10) {
-        console.warn(`🔢 Input rejected for ${playerId.substring(0, 8)}: sequence ${input.sequence} <= ${lastSequence}`);
+        // console.warn(`🔢 Input rejected for ${playerId.substring(0, 8)}: sequence ${input.sequence} <= ${lastSequence}`);
         return false;
       }
     }
@@ -649,12 +667,12 @@ export class GameStateSystem {
                           input.mouse.y <= GAME_CONFIG.GAME_HEIGHT * GAME_CONFIG.SCALE_FACTOR;
     
     if (!isGameSpace && !isScreenSpace) {
-      console.warn(`🖱️ Input rejected for ${playerId.substring(0, 8)}: mouse out of bounds (${input.mouse.x}, ${input.mouse.y})`);
+      // console.warn(`🖱️ Input rejected for ${playerId.substring(0, 8)}: mouse out of bounds (${input.mouse.x}, ${input.mouse.y})`);
       return false;
     }
     
     if (input.mouse.buttons < 0 || input.mouse.buttons > 7) { // 3 bits for mouse buttons
-      console.warn(`🖱️ Input rejected for ${playerId.substring(0, 8)}: invalid button state ${input.mouse.buttons}`);
+      // console.warn(`🖱️ Input rejected for ${playerId.substring(0, 8)}: invalid button state ${input.mouse.buttons}`);
       return false;
     }
     
@@ -789,7 +807,7 @@ export class GameStateSystem {
     if (!player || !player.isAlive) return;
     
     // TODO: Implement shooting logic
-    console.log(`Player ${playerId} shooting with weapon ${player.weaponId}`);
+    // console.log(`Player ${playerId} shooting with weapon ${player.weaponId}`);
     
     // Create projectile based on player position and rotation
     // This would integrate with a ProjectileSystem
@@ -857,11 +875,17 @@ export class GameStateSystem {
     for (const [playerId, player] of this.players) {
       if (!player.isAlive) continue;
       
-      // Update vision (includes temporal coherence optimization)
-      const visibleTileIndices = this.visionSystem.updatePlayerVision(player);
-      if (visibleTileIndices) {
-        this.playerVisionTiles.set(playerId, visibleTileIndices);
+      // Update vision using raycast for better gap detection
+      const visibleTilesSet = this.visionSystem.updatePlayerVisionRaycast(player);
+      
+      // Convert Set to array of indices
+      const visibleTileIndices = new Uint16Array(visibleTilesSet.size);
+      let i = 0;
+      for (const tileIndex of visibleTilesSet) {
+        visibleTileIndices[i++] = tileIndex;
       }
+      
+      this.playerVisionTiles.set(playerId, visibleTileIndices);
     }
   }
   
@@ -906,8 +930,8 @@ export class GameStateSystem {
             
             // Notify vision system of wall destruction
             this.visionSystem.onWallDestroyed(
-              wallDamageResult.position.x,
-              wallDamageResult.position.y,
+              wallCollision.wall.id,
+              wallCollision.wall,
               wallDamageResult.sliceIndex
             );
             
@@ -944,17 +968,33 @@ export class GameStateSystem {
     
     // Queue wall damage events
     for (const wallDamageEvent of explosionResults.wallDamageEvents) {
-      this.pendingWallDamageEvents.push({ type: EVENTS.WALL_DAMAGED, data: wallDamageEvent });
-      
-      // Notify vision system of wall destruction
-      this.visionSystem.onWallDestroyed(
-        wallDamageEvent.position.x,
-        wallDamageEvent.position.y,
-        wallDamageEvent.sliceIndex
+      // Actually apply the damage to the wall!
+      const actualDamageResult = this.destructionSystem.applyDamage(
+        wallDamageEvent.wallId, 
+        wallDamageEvent.sliceIndex, 
+        wallDamageEvent.damage
       );
       
-      // Mark that walls were updated
-      this.wallsUpdatedThisTick = true;
+      if (actualDamageResult) {
+        this.pendingWallDamageEvents.push({ type: EVENTS.WALL_DAMAGED, data: actualDamageResult });
+        
+        if (actualDamageResult.isDestroyed) {
+          this.pendingWallDamageEvents.push({ type: EVENTS.WALL_DESTROYED, data: actualDamageResult });
+        }
+        
+        // Notify vision system of wall destruction
+        const wall = this.destructionSystem.getWall(wallDamageEvent.wallId);
+        if (wall) {
+          this.visionSystem.onWallDestroyed(
+            wallDamageEvent.wallId,
+            wall,
+            actualDamageResult.sliceIndex
+          );
+        }
+        
+        // Mark that walls were updated
+        this.wallsUpdatedThisTick = true;
+      }
     }
     
     // Queue explosion events
@@ -1089,12 +1129,29 @@ export class GameStateSystem {
       walls: wallsObject as any,
       timestamp: Date.now(),
       tickRate: GAME_CONFIG.TICK_RATE,
-      // Include vision data (sending tiles, not pixels!)
-      vision: player ? {
-        visibleTiles: Array.from(this.playerVisionTiles.get(playerId) || []),
-        viewAngle: GAME_CONFIG.VISION_ANGLE,
-        position: player.transform.position
-      } : undefined
+      // Include vision data - polygon if available, tiles as fallback
+      vision: player ? (() => {
+        // Check if we're using polygon system with getVisibilityData
+        if (this.usePolygonVision && 'getVisibilityData' in this.visionSystem) {
+          const visionData = (this.visionSystem as any).getVisibilityData(player);
+          return {
+            type: 'polygon',
+            polygon: visionData.polygon,
+            viewAngle: visionData.viewAngle,
+            viewDirection: visionData.viewDirection,
+            viewDistance: visionData.viewDistance,
+            position: player.transform.position
+          };
+        } else {
+          // Fallback to tile-based vision
+          return {
+            type: 'tiles',
+            visibleTiles: Array.from(this.playerVisionTiles.get(playerId) || []),
+            viewAngle: GAME_CONFIG.VISION_ANGLE,
+            position: player.transform.position
+          };
+        }
+      })() : undefined
     };
   }
   

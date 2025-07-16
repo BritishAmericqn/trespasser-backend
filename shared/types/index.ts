@@ -77,10 +77,21 @@ export interface GameState {
   timestamp: number;
   tickRate: number;
   vision?: {
-    visibleTiles: number[];  // Array of tile indices (y * 30 + x)
+    type: 'tiles' | 'polygon';
     viewAngle: number;
     position: Vector2;
-  };
+  } & (
+    | {
+        type: 'tiles';
+        visibleTiles: number[];  // Array of tile indices (y * 30 + x)
+      }
+    | {
+        type: 'polygon';
+        polygon: Vector2[];      // Visibility polygon vertices
+        viewDirection: number;   // Player's view direction
+        viewDistance: number;    // Maximum view distance
+      }
+  );
 }
 
 // Extended input types for weapons

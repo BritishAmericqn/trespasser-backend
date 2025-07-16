@@ -9,7 +9,7 @@ export class DestructionSystem {
   private wallIdCounter: number = 0;
   
   constructor(private physics?: PhysicsSystem) {
-    console.log('DestructionSystem initialized');
+    // console.log('DestructionSystem initialized');
     this.initializeTestWalls();
   }
   
@@ -106,7 +106,7 @@ export class DestructionSystem {
       material: 'concrete'
     });
     
-    console.log(`🧱 Initialized ${this.walls.size} walls (including boundaries)`);
+    // console.log(`🧱 Initialized ${this.walls.size} walls (including boundaries)`);
   }
   
   // Create a new wall
@@ -156,7 +156,7 @@ export class DestructionSystem {
       
       this.physics.addBody(body);
       this.wallBodies.set(wallId, body);
-      console.log(`🧱 Created physics body for wall ${wallId}`);
+      // console.log(`🧱 Created physics body for wall ${wallId}`);
     }
     
     return wall;

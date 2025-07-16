@@ -20,7 +20,7 @@ export class ProjectileSystem {
   constructor(physics: PhysicsSystem, weaponSystem: WeaponSystem) {
     this.physics = physics;
     this.weaponSystem = weaponSystem;
-    console.log('ProjectileSystem initialized');
+    // console.log('ProjectileSystem initialized');
   }
   
   // Create a new projectile
@@ -55,11 +55,11 @@ export class ProjectileSystem {
     
     // Debug: Log rocket creation
     if (type === 'rocket') {
-      console.log(`🚀 ROCKET CREATED:`);
-      console.log(`   ID: ${projectileId.substring(0, 8)}`);
-      console.log(`   Position: (${position.x.toFixed(1)}, ${position.y.toFixed(1)})`);
-      console.log(`   Velocity: (${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}) = ${Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y).toFixed(1)} px/s`);
-      console.log(`   Range: ${projectile.range}`);
+      // console.log(`🚀 ROCKET CREATED:`);
+      // console.log(`   ID: ${projectileId.substring(0, 8)}`);
+      // console.log(`   Position: (${position.x.toFixed(1)}, ${position.y.toFixed(1)})`);
+      // console.log(`   Velocity: (${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}) = ${Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y).toFixed(1)} px/s`);
+      // console.log(`   Range: ${projectile.range}`);
     }
     
     this.projectiles.set(projectileId, projectile);
@@ -77,7 +77,7 @@ export class ProjectileSystem {
       this.physics.registerCollisionCallback(projectileId, (event) => {
         // Grenade collision handled by Matter.js physics engine
         // No need to manually handle bouncing
-        console.log(`🎾 Grenade ${projectileId} bounced off wall (Matter.js handled)`);
+        // console.log(`🎾 Grenade ${projectileId} bounced off wall (Matter.js handled)`);
       });
     }
     
@@ -185,7 +185,7 @@ export class ProjectileSystem {
         const fuseTime = 3000; // 3 seconds
         const timeAlive = Date.now() - projectile.timestamp;
         if (timeAlive >= fuseTime) {
-          console.log(`💥 Grenade ${projectileId} exploding after ${timeAlive}ms`);
+          // console.log(`💥 Grenade ${projectileId} exploding after ${timeAlive}ms`);
           this.explodeProjectile(projectile);
           explodeEvents.push({
             id: projectile.id,
@@ -199,7 +199,7 @@ export class ProjectileSystem {
         // Remove grenades that are moving too slowly (effectively stuck)
         const velocityMagnitude = Math.sqrt(projectile.velocity.x ** 2 + projectile.velocity.y ** 2);
         if (velocityMagnitude < 0.1) { // Less than 0.1 px/s
-          console.log(`💥 Grenade ${projectileId} stuck (vel: ${velocityMagnitude}), exploding`);
+          // console.log(`💥 Grenade ${projectileId} stuck (vel: ${velocityMagnitude}), exploding`);
           this.explodeProjectile(projectile);
           explodeEvents.push({
             id: projectile.id,
@@ -242,7 +242,7 @@ export class ProjectileSystem {
               continue;
             }
             
-            console.log(`🚀 Projectile ${projectileId} hit wall ${wallCollision.wall.id} at step ${step}/${steps}!`);
+            // console.log(`🚀 Projectile ${projectileId} hit wall ${wallCollision.wall.id} at step ${step}/${steps}!`);
             // Update projectile position to collision point
             projectile.position = checkPos;
             
@@ -269,7 +269,7 @@ export class ProjectileSystem {
                 Matter.Body.setPosition(body, projectile.position);
                 Matter.Body.setVelocity(body, projectile.velocity);
               }
-              console.log(`🎾 Grenade ${projectileId} bounced off wall ${wallCollision.wall.id}!`);
+              // console.log(`🎾 Grenade ${projectileId} bounced off wall ${wallCollision.wall.id}!`);
               // Don't continue - we need to check timer and other conditions
             }
           }
@@ -282,7 +282,7 @@ export class ProjectileSystem {
       
       // Debug: Log rocket position updates
       if (projectile.type === 'rocket' && Math.random() < 0.2) { // 20% sample rate
-        console.log(`🚀 Rocket update: pos(${projectile.position.x.toFixed(1)}, ${projectile.position.y.toFixed(1)}) vel(${projectile.velocity.x.toFixed(1)}, ${projectile.velocity.y.toFixed(1)}) dist:${projectile.traveledDistance.toFixed(1)}/${projectile.range}`);
+        // console.log(`🚀 Rocket update: pos(${projectile.position.x.toFixed(1)}, ${projectile.position.y.toFixed(1)}) vel(${projectile.velocity.x.toFixed(1)}, ${projectile.velocity.y.toFixed(1)}) dist:${projectile.traveledDistance.toFixed(1)}/${projectile.range}`);
       }
       
       // Check if projectile has exceeded its range
@@ -316,7 +316,7 @@ export class ProjectileSystem {
       // Remove projectiles that are extremely far out of bounds (stuck projectiles)
       const maxBounds = 1000; // Well outside the 480x270 game area
       if (Math.abs(projectile.position.x) > maxBounds || Math.abs(projectile.position.y) > maxBounds) {
-        console.log(`🧹 Removing stuck projectile ${projectileId} at extreme position (${projectile.position.x}, ${projectile.position.y})`);
+        // console.log(`🧹 Removing stuck projectile ${projectileId} at extreme position (${projectile.position.x}, ${projectile.position.y})`);
         projectilesToRemove.push(projectileId);
       }
     }
@@ -373,10 +373,10 @@ export class ProjectileSystem {
     
     // Debug: Log rocket positions
     if (projectile.type === 'rocket') {
-      console.log(`🚀 Rocket ${projectile.id.substring(0, 8)} checking collision:`);
-      console.log(`   Previous: (${previousPosition.x.toFixed(1)}, ${previousPosition.y.toFixed(1)})`);
-      console.log(`   Current:  (${projectile.position.x.toFixed(1)}, ${projectile.position.y.toFixed(1)})`);
-      console.log(`   Distance: ${Math.sqrt(Math.pow(projectile.position.x - previousPosition.x, 2) + Math.pow(projectile.position.y - previousPosition.y, 2)).toFixed(1)}`);
+      // console.log(`🚀 Rocket ${projectile.id.substring(0, 8)} checking collision:`);
+      // console.log(`   Previous: (${previousPosition.x.toFixed(1)}, ${previousPosition.y.toFixed(1)})`);
+      // console.log(`   Current:  (${projectile.position.x.toFixed(1)}, ${projectile.position.y.toFixed(1)})`);
+      // console.log(`   Distance: ${Math.sqrt(Math.pow(projectile.position.x - previousPosition.x, 2) + Math.pow(projectile.position.y - previousPosition.y, 2)).toFixed(1)}`);
     }
     
     for (const [wallId, wall] of walls) {
@@ -387,7 +387,7 @@ export class ProjectileSystem {
       if (collision.hit) {
         // Debug: Log collision detection
         if (projectile.type === 'rocket') {
-          console.log(`   💥 HIT WALL ${wallId} at slice ${collision.sliceIndex}`);
+          // console.log(`   💥 HIT WALL ${wallId} at slice ${collision.sliceIndex}`);
         }
         return {
           hit: true,
