@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.VisibilityPolygonSystem = void 0;
 const constants_1 = require("../../shared/constants");
+const wallSliceHelpers_1 = require("../utils/wallSliceHelpers");
 class VisibilityPolygonSystem {
     walls = new Map();
     viewAngle = (120 * Math.PI) / 180; // 120 degrees in radians
@@ -20,6 +21,7 @@ class VisibilityPolygonSystem {
                 position: { x: wall.x, y: wall.y },
                 width: wall.width,
                 height: wall.height,
+                orientation: wall.width > wall.height ? 'horizontal' : 'vertical',
                 destroyedSlices: 0
             });
         });
@@ -34,6 +36,7 @@ class VisibilityPolygonSystem {
             position: { x: wall.position.x, y: wall.position.y },
             width: wall.width,
             height: wall.height,
+            orientation: wall.width > wall.height ? 'horizontal' : 'vertical',
             destroyedSlices: 0
         });
         // console.log(`[VisibilityPolygon] Added wall ${wallId}`);
@@ -216,26 +219,33 @@ class VisibilityPolygonSystem {
         corners.push({ x: wall.position.x + wall.width, y: wall.position.y + wall.height }); // Bottom-right
         // Also add corners created by destruction if the wall is partially destroyed
         if (wall.destroyedSlices !== 0 && wall.destroyedSlices !== 0b11111) {
-            // Wall slices are vertical divisions
-            const sliceWidth = wall.width / 5;
+            const sliceDimension = (0, wallSliceHelpers_1.getSliceDimension)(wall);
             let addedCorners = 0;
             // Check each boundary between slices
             for (let i = 0; i <= 5; i++) {
-                const leftSliceIndex = i - 1;
-                const rightSliceIndex = i;
+                const adjacentSliceIndices = wall.orientation === 'horizontal'
+                    ? { first: i - 1, second: i } // left/right for horizontal
+                    : { first: i - 1, second: i }; // top/bottom for vertical
                 // Get destruction state of adjacent slices
-                const leftDestroyed = leftSliceIndex >= 0 && leftSliceIndex < 5
-                    ? (wall.destroyedSlices >> leftSliceIndex) & 1
+                const firstDestroyed = adjacentSliceIndices.first >= 0 && adjacentSliceIndices.first < 5
+                    ? (wall.destroyedSlices >> adjacentSliceIndices.first) & 1
                     : 0;
-                const rightDestroyed = rightSliceIndex >= 0 && rightSliceIndex < 5
-                    ? (wall.destroyedSlices >> rightSliceIndex) & 1
+                const secondDestroyed = adjacentSliceIndices.second >= 0 && adjacentSliceIndices.second < 5
+                    ? (wall.destroyedSlices >> adjacentSliceIndices.second) & 1
                     : 0;
                 // Add corners where destruction state changes
-                if (leftDestroyed !== rightDestroyed) {
-                    const x = wall.position.x + i * sliceWidth;
-                    // Add both top and bottom corners at this transition
-                    corners.push({ x, y: wall.position.y });
-                    corners.push({ x, y: wall.position.y + wall.height });
+                if (firstDestroyed !== secondDestroyed) {
+                    const boundaryPos = (0, wallSliceHelpers_1.getSliceBoundaryPosition)(wall, i);
+                    if (wall.orientation === 'horizontal') {
+                        // Add both top and bottom corners at this vertical boundary
+                        corners.push({ x: boundaryPos, y: wall.position.y });
+                        corners.push({ x: boundaryPos, y: wall.position.y + wall.height });
+                    }
+                    else {
+                        // Add both left and right corners at this horizontal boundary
+                        corners.push({ x: wall.position.x, y: boundaryPos });
+                        corners.push({ x: wall.position.x + wall.width, y: boundaryPos });
+                    }
                     addedCorners += 2;
                 }
             }
@@ -341,26 +351,33 @@ class VisibilityPolygonSystem {
         corners.push({ x: wall.position.x + wall.width, y: wall.position.y + wall.height });
         // Add corners created by destroyed slices
         if (wall.destroyedSlices !== 0 && wall.destroyedSlices !== 0b11111) {
-            // Wall slices are vertical divisions
-            const sliceWidth = wall.width / 5;
+            const sliceDimension = (0, wallSliceHelpers_1.getSliceDimension)(wall);
             let addedCorners = 0;
             // Check each boundary between slices
             for (let i = 0; i <= 5; i++) {
-                const leftSliceIndex = i - 1;
-                const rightSliceIndex = i;
+                const adjacentSliceIndices = wall.orientation === 'horizontal'
+                    ? { first: i - 1, second: i } // left/right for horizontal
+                    : { first: i - 1, second: i }; // top/bottom for vertical
                 // Get destruction state of adjacent slices
-                const leftDestroyed = leftSliceIndex >= 0 && leftSliceIndex < 5
-                    ? (wall.destroyedSlices >> leftSliceIndex) & 1
+                const firstDestroyed = adjacentSliceIndices.first >= 0 && adjacentSliceIndices.first < 5
+                    ? (wall.destroyedSlices >> adjacentSliceIndices.first) & 1
                     : 0;
-                const rightDestroyed = rightSliceIndex >= 0 && rightSliceIndex < 5
-                    ? (wall.destroyedSlices >> rightSliceIndex) & 1
+                const secondDestroyed = adjacentSliceIndices.second >= 0 && adjacentSliceIndices.second < 5
+                    ? (wall.destroyedSlices >> adjacentSliceIndices.second) & 1
                     : 0;
                 // Add corners where destruction state changes
-                if (leftDestroyed !== rightDestroyed) {
-                    const x = wall.position.x + i * sliceWidth;
-                    // Add both top and bottom corners at this transition
-                    corners.push({ x, y: wall.position.y });
-                    corners.push({ x, y: wall.position.y + wall.height });
+                if (firstDestroyed !== secondDestroyed) {
+                    const boundaryPos = (0, wallSliceHelpers_1.getSliceBoundaryPosition)(wall, i);
+                    if (wall.orientation === 'horizontal') {
+                        // Add both top and bottom corners at this vertical boundary
+                        corners.push({ x: boundaryPos, y: wall.position.y });
+                        corners.push({ x: boundaryPos, y: wall.position.y + wall.height });
+                    }
+                    else {
+                        // Add both left and right corners at this horizontal boundary
+                        corners.push({ x: wall.position.x, y: boundaryPos });
+                        corners.push({ x: wall.position.x + wall.width, y: boundaryPos });
+                    }
                     addedCorners += 2;
                 }
             }
@@ -477,12 +494,9 @@ class VisibilityPolygonSystem {
                 const dist = Math.hypot(intersection.x - viewerPos.x, intersection.y - viewerPos.y);
                 if (dist < closestDistance) {
                     // Check which slice the ray hits
-                    const sliceWidth = wall.width / 5;
-                    const relativeX = intersection.x - wall.position.x;
-                    const hitSliceIndex = Math.floor(relativeX / sliceWidth);
-                    const clampedSliceIndex = Math.max(0, Math.min(4, hitSliceIndex));
+                    const hitSliceIndex = (0, wallSliceHelpers_1.calculateSliceIndex)(wall, intersection);
                     // Check if the hit slice is destroyed
-                    const sliceDestroyed = (wall.destroyedSlices & (1 << clampedSliceIndex)) !== 0;
+                    const sliceDestroyed = (wall.destroyedSlices & (1 << hitSliceIndex)) !== 0;
                     if (!sliceDestroyed) {
                         // Hit an intact slice - this is our intersection
                         closestIntersection = intersection;
@@ -538,11 +552,10 @@ class VisibilityPolygonSystem {
      * Check for slice boundaries when ray enters through a destroyed slice
      */
     checkSliceBoundaries(wall, rayStart, rayDir, entryPoint) {
-        const sliceWidth = wall.width / 5;
+        const sliceDimension = (0, wallSliceHelpers_1.getSliceDimension)(wall);
         let closestHit = null;
         // Calculate which slice we entered through
-        const entryRelativeX = entryPoint.x - wall.position.x;
-        const entrySliceIndex = Math.floor(entryRelativeX / sliceWidth);
+        const entrySliceIndex = (0, wallSliceHelpers_1.calculateSliceIndex)(wall, entryPoint);
         // Check all slice boundaries for potential hits
         for (let sliceIndex = 0; sliceIndex <= 5; sliceIndex++) {
             // Check if this boundary is between destroyed and intact slices
@@ -556,24 +569,53 @@ class VisibilityPolygonSystem {
             if (leftDestroyed === rightDestroyed)
                 continue;
             // Calculate boundary position
-            const boundaryX = wall.position.x + sliceIndex * sliceWidth;
-            // Check if ray intersects this vertical boundary
-            if (Math.abs(rayDir.x) > 0.0001) {
-                const t = (boundaryX - entryPoint.x) / rayDir.x;
-                // Only consider forward intersections
-                if (t > 0) {
-                    const intersectY = entryPoint.y + rayDir.y * t;
-                    // Check if intersection is within wall bounds
-                    if (intersectY >= wall.position.y && intersectY <= wall.position.y + wall.height) {
-                        const hitPoint = { x: boundaryX, y: intersectY };
-                        const distance = Math.hypot(hitPoint.x - rayStart.x, hitPoint.y - rayStart.y);
-                        // Update closest hit if this is nearer
-                        if (!closestHit || distance < closestHit.distance) {
-                            // Only count as hit if we're moving from destroyed to intact
-                            const movingRight = rayDir.x > 0;
-                            const hittingIntact = movingRight ? !rightDestroyed : !leftDestroyed;
-                            if (hittingIntact) {
-                                closestHit = { point: hitPoint, distance: distance };
+            const boundaryPos = (0, wallSliceHelpers_1.getSliceBoundaryPosition)(wall, sliceIndex);
+            // Check if ray intersects this boundary based on wall orientation
+            if (wall.orientation === 'horizontal') {
+                // Check vertical boundary (constant X)
+                if (Math.abs(rayDir.x) > 0.0001) {
+                    const t = (boundaryPos - entryPoint.x) / rayDir.x;
+                    // Only consider forward intersections
+                    if (t > 0) {
+                        const intersectY = entryPoint.y + rayDir.y * t;
+                        // Check if intersection is within wall bounds
+                        if (intersectY >= wall.position.y && intersectY <= wall.position.y + wall.height) {
+                            const hitPoint = { x: boundaryPos, y: intersectY };
+                            const distance = Math.hypot(hitPoint.x - rayStart.x, hitPoint.y - rayStart.y);
+                            // Update closest hit if this is nearer
+                            if (!closestHit || distance < closestHit.distance) {
+                                // Only count as hit if we're moving from destroyed to intact
+                                const movingRight = rayDir.x > 0;
+                                const hittingIntact = movingRight ? !rightDestroyed : !leftDestroyed;
+                                if (hittingIntact) {
+                                    closestHit = { point: hitPoint, distance: distance };
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else {
+                // Vertical wall - check horizontal boundary (constant Y)
+                if (Math.abs(rayDir.y) > 0.0001) {
+                    const t = (boundaryPos - entryPoint.y) / rayDir.y;
+                    // Only consider forward intersections
+                    if (t > 0) {
+                        const intersectX = entryPoint.x + rayDir.x * t;
+                        // Check if intersection is within wall bounds
+                        if (intersectX >= wall.position.x && intersectX <= wall.position.x + wall.width) {
+                            const hitPoint = { x: intersectX, y: boundaryPos };
+                            const distance = Math.hypot(hitPoint.x - rayStart.x, hitPoint.y - rayStart.y);
+                            // Update closest hit if this is nearer
+                            if (!closestHit || distance < closestHit.distance) {
+                                // Only count as hit if we're moving from destroyed to intact
+                                const movingDown = rayDir.y > 0;
+                                const topSlice = sliceIndex - 1;
+                                const bottomSlice = sliceIndex;
+                                const hittingIntact = movingDown ? !rightDestroyed : !leftDestroyed;
+                                if (hittingIntact) {
+                                    closestHit = { point: hitPoint, distance: distance };
+                                }
                             }
                         }
                     }
@@ -596,10 +638,8 @@ class VisibilityPolygonSystem {
             const clampedExitX = Math.max(wall.position.x, Math.min(wall.position.x + wall.width, exitX));
             const clampedExitY = Math.max(wall.position.y, Math.min(wall.position.y + wall.height, exitY));
             // Check which slice we're exiting through
-            const exitRelativeX = clampedExitX - wall.position.x;
-            const exitSliceIndex = Math.floor(exitRelativeX / sliceWidth);
-            const clampedExitSlice = Math.max(0, Math.min(4, exitSliceIndex));
-            const exitSliceDestroyed = (wall.destroyedSlices & (1 << clampedExitSlice)) !== 0;
+            const exitSliceIndex = (0, wallSliceHelpers_1.calculateSliceIndex)(wall, { x: clampedExitX, y: clampedExitY });
+            const exitSliceDestroyed = (wall.destroyedSlices & (1 << exitSliceIndex)) !== 0;
             if (!exitSliceDestroyed) {
                 // Exiting through intact slice
                 const hitPoint = { x: clampedExitX, y: clampedExitY };

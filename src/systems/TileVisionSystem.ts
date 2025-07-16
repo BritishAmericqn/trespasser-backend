@@ -1,5 +1,10 @@
 import { PlayerState } from '../../shared/types';
 import { Vector2 } from '../../shared/types'; // Added missing import
+import { 
+  determineWallOrientation,
+  calculateSliceIndex,
+  getSliceDimension
+} from '../utils/wallSliceHelpers';
 
 interface TileCoord {
     x: number;
@@ -19,6 +24,7 @@ interface PartialWallData {
     wallPosition: Vector2;
     wallWidth: number;
     wallHeight: number;
+    wallOrientation: 'horizontal' | 'vertical'; // Added orientation
 }
 
 export class TileVisionSystem {
@@ -113,6 +119,9 @@ export class TileVisionSystem {
         
         // console.log(`   Wall occupies tiles from (${startX},${startY}) to (${endX},${endY})`);
         
+        // Determine wall orientation
+        const orientation = determineWallOrientation(wall.width, wall.height);
+        
         // For each tile the wall occupies
         for (let y = startY; y <= endY; y++) {
             for (let x = startX; x <= endX; x++) {
@@ -126,7 +135,8 @@ export class TileVisionSystem {
                         wallId: wallId,
                         wallPosition: { x: wall.position.x, y: wall.position.y },
                         wallWidth: wall.width,
-                        wallHeight: wall.height
+                        wallHeight: wall.height,
+                        wallOrientation: orientation
                     };
                     this.partialWalls.set(tileIndex, partial);
                 }
@@ -390,12 +400,15 @@ export class TileVisionSystem {
                     sampleY <= wallData.wallPosition.y + wallData.wallHeight) {
                     
                     // Calculate which slice this sample point is in
-                    const sliceWidth = wallData.wallWidth / 5; // WALL_SLICES = 5
-                    const sliceIndex = Math.floor((sampleX - wallData.wallPosition.x) / sliceWidth);
-                    const clampedSliceIndex = Math.max(0, Math.min(4, sliceIndex));
+                    const sliceIndex = calculateSliceIndex({
+                        position: wallData.wallPosition,
+                        width: wallData.wallWidth,
+                        height: wallData.wallHeight,
+                        orientation: wallData.wallOrientation
+                    } as any, { x: sampleX, y: sampleY });
                     
                     // Check if this slice is destroyed
-                    if (wallData.destroyedSlices & (1 << clampedSliceIndex)) {
+                    if (wallData.destroyedSlices & (1 << sliceIndex)) {
                         return true; // Ray passes through a destroyed slice
                     }
                 }
@@ -424,12 +437,15 @@ export class TileVisionSystem {
             pixelY <= wallData.wallPosition.y + wallData.wallHeight) {
             
             // Calculate which slice this position is in
-            const sliceWidth = wallData.wallWidth / 5; // WALL_SLICES = 5
-            const sliceIndex = Math.floor((pixelX - wallData.wallPosition.x) / sliceWidth);
-            const clampedSliceIndex = Math.max(0, Math.min(4, sliceIndex));
+            const sliceIndex = calculateSliceIndex({
+                position: wallData.wallPosition,
+                width: wallData.wallWidth,
+                height: wallData.wallHeight,
+                orientation: wallData.wallOrientation
+            } as any, { x: pixelX, y: pixelY });
             
             // Check if this slice is destroyed
-            return (wallData.destroyedSlices & (1 << clampedSliceIndex)) !== 0;
+            return (wallData.destroyedSlices & (1 << sliceIndex)) !== 0;
         }
         
         return false; // Position not in wall
@@ -468,9 +484,12 @@ export class TileVisionSystem {
                     const rayPixelY = y * this.TILE_SIZE + this.TILE_SIZE / 2;
                     
                     // Calculate which slice this ray would pass through
-                    const sliceWidth = partial.wallWidth / 5; // 5 slices per wall
-                    const relativeX = rayPixelX - partial.wallPosition.x;
-                    const sliceIndex = Math.floor(relativeX / sliceWidth);
+                    const sliceIndex = calculateSliceIndex({
+                        position: partial.wallPosition,
+                        width: partial.wallWidth,
+                        height: partial.wallHeight,
+                        orientation: partial.wallOrientation
+                    } as any, { x: rayPixelX, y: rayPixelY });
                     
                     // Check if the ray is within wall bounds and hitting a valid slice
                     if (sliceIndex >= 0 && sliceIndex < 5) {
@@ -486,29 +505,65 @@ export class TileVisionSystem {
                             const nextPixelX = nextX * this.TILE_SIZE;
                             const nextPixelY = nextY * this.TILE_SIZE;
                             
-                            // Only check horizontal movement for vertical slice boundaries
-                            if (Math.abs(dx) > 0.01) { // Ray has horizontal component
-                                const nextRelativeX = nextPixelX - partial.wallPosition.x;
-                                const nextSliceIndex = Math.floor(nextRelativeX / sliceWidth);
-                                
-                                // Check if we're crossing into a different slice
-                                if (nextSliceIndex !== sliceIndex && nextSliceIndex >= 0 && nextSliceIndex < 5) {
-                                    // Check if the next slice is intact
-                                    const nextSliceDestroyed = (partial.destroyedSlices >> nextSliceIndex) & 1;
+                            // Get slice dimension based on orientation
+                            const sliceDimension = getSliceDimension({
+                                orientation: partial.wallOrientation,
+                                width: partial.wallWidth,
+                                height: partial.wallHeight
+                            } as any);
+                            
+                            if (partial.wallOrientation === 'horizontal') {
+                                // Only check horizontal movement for vertical slice boundaries
+                                if (Math.abs(dx) > 0.01) { // Ray has horizontal component
+                                    const nextRelativeX = nextPixelX - partial.wallPosition.x;
+                                    const nextSliceIndex = Math.floor(nextRelativeX / sliceDimension);
                                     
-                                    if (!nextSliceDestroyed) {
-                                        // We're about to hit an intact slice from inside the wall - stop here
-                                        break;
+                                    // Check if we're crossing into a different slice
+                                    if (nextSliceIndex !== sliceIndex && nextSliceIndex >= 0 && nextSliceIndex < 5) {
+                                        // Check if the next slice is intact
+                                        const nextSliceDestroyed = (partial.destroyedSlices >> nextSliceIndex) & 1;
+                                        
+                                        if (!nextSliceDestroyed) {
+                                            // We're about to hit an intact slice from inside the wall - stop here
+                                            break;
+                                        }
+                                    }
+                                    
+                                    // Also check if we're leaving the wall bounds horizontally
+                                    if (nextRelativeX < 0 || nextRelativeX >= partial.wallWidth) {
+                                        // Check if we're inside the wall vertically
+                                        if (nextPixelY >= partial.wallPosition.y && 
+                                            nextPixelY <= partial.wallPosition.y + partial.wallHeight) {
+                                            // We're trying to exit the wall horizontally while inside it - stop
+                                            break;
+                                        }
                                     }
                                 }
-                                
-                                // Also check if we're leaving the wall bounds horizontally
-                                if (nextRelativeX < 0 || nextRelativeX >= partial.wallWidth) {
-                                    // Check if we're inside the wall vertically
-                                    if (nextPixelY >= partial.wallPosition.y && 
-                                        nextPixelY <= partial.wallPosition.y + partial.wallHeight) {
-                                        // We're trying to exit the wall horizontally while inside it - stop
-                                        break;
+                            } else {
+                                // Vertical wall - check vertical movement for horizontal slice boundaries
+                                if (Math.abs(dy) > 0.01) { // Ray has vertical component
+                                    const nextRelativeY = nextPixelY - partial.wallPosition.y;
+                                    const nextSliceIndex = Math.floor(nextRelativeY / sliceDimension);
+                                    
+                                    // Check if we're crossing into a different slice
+                                    if (nextSliceIndex !== sliceIndex && nextSliceIndex >= 0 && nextSliceIndex < 5) {
+                                        // Check if the next slice is intact
+                                        const nextSliceDestroyed = (partial.destroyedSlices >> nextSliceIndex) & 1;
+                                        
+                                        if (!nextSliceDestroyed) {
+                                            // We're about to hit an intact slice from inside the wall - stop here
+                                            break;
+                                        }
+                                    }
+                                    
+                                    // Also check if we're leaving the wall bounds vertically
+                                    if (nextRelativeY < 0 || nextRelativeY >= partial.wallHeight) {
+                                        // Check if we're inside the wall horizontally
+                                        if (nextPixelX >= partial.wallPosition.x && 
+                                            nextPixelX <= partial.wallPosition.x + partial.wallWidth) {
+                                            // We're trying to exit the wall vertically while inside it - stop
+                                            break;
+                                        }
                                     }
                                 }
                             }

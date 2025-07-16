@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DestructionSystem = void 0;
 const constants_1 = require("../../shared/constants");
 const matter_js_1 = __importDefault(require("matter-js"));
+const wallSliceHelpers_1 = require("../utils/wallSliceHelpers");
 class DestructionSystem {
     physics;
     walls = new Map();
@@ -18,50 +19,58 @@ class DestructionSystem {
     }
     // Initialize test walls for development
     initializeTestWalls() {
-        // Original test walls
+        // Mix of horizontal and vertical walls for testing
+        // Horizontal walls (width > height)
         this.createWall({
             position: { x: 200, y: 100 },
             width: 60,
             height: 15,
             material: 'concrete'
         });
+        // Vertical wall (height > width)
         this.createWall({
-            position: { x: 100, y: 200 },
-            width: 45,
-            height: 15,
+            position: { x: 100, y: 150 },
+            width: 15,
+            height: 60,
             material: 'wood'
         });
+        // Horizontal wall
         this.createWall({
             position: { x: 300, y: 150 },
-            width: 60, // Changed from 30 to match frontend
+            width: 60,
             height: 15,
             material: 'metal'
         });
+        // Vertical wall
         this.createWall({
-            position: { x: 150, y: 50 },
-            width: 60, // Changed from 75 to match frontend
-            height: 15,
+            position: { x: 150, y: 30 },
+            width: 15,
+            height: 75,
             material: 'glass'
         });
-        // Additional walls for frontend player areas
+        // Additional mixed walls for testing
+        // Vertical wall
         this.createWall({
-            position: { x: 320, y: 80 },
-            width: 60,
-            height: 15,
+            position: { x: 320, y: 50 },
+            width: 15,
+            height: 60,
             material: 'concrete'
         });
+        // Horizontal wall
         this.createWall({
             position: { x: 280, y: 120 },
             width: 90,
             height: 15,
             material: 'wood'
         });
+        // Vertical wall
         this.createWall({
-            position: { x: 350, y: 160 },
-            width: 45,
-            height: 15,
+            position: { x: 380, y: 100 },
+            width: 15,
+            height: 45,
             material: 'metal'
         });
+        // Horizontal wall
         this.createWall({
             position: { x: 250, y: 180 },
             width: 75,
@@ -69,28 +78,28 @@ class DestructionSystem {
             material: 'glass'
         });
         // Create boundary walls for physics collisions
-        // Top boundary
+        // Top boundary (horizontal)
         this.createWall({
             position: { x: 0, y: -10 },
             width: constants_1.GAME_CONFIG.GAME_WIDTH,
             height: 10,
             material: 'concrete'
         });
-        // Bottom boundary
+        // Bottom boundary (horizontal)
         this.createWall({
             position: { x: 0, y: constants_1.GAME_CONFIG.GAME_HEIGHT },
             width: constants_1.GAME_CONFIG.GAME_WIDTH,
             height: 10,
             material: 'concrete'
         });
-        // Left boundary
+        // Left boundary (vertical)
         this.createWall({
             position: { x: -10, y: 0 },
             width: 10,
             height: constants_1.GAME_CONFIG.GAME_HEIGHT,
             material: 'concrete'
         });
-        // Right boundary
+        // Right boundary (vertical)
         this.createWall({
             position: { x: constants_1.GAME_CONFIG.GAME_WIDTH, y: 0 },
             width: 10,
@@ -102,6 +111,8 @@ class DestructionSystem {
     // Create a new wall
     createWall(params) {
         const wallId = `wall_${++this.wallIdCounter}`;
+        // Determine orientation based on dimensions
+        const orientation = (0, wallSliceHelpers_1.determineWallOrientation)(params.width, params.height);
         // Calculate slice health based on material
         const materialMultiplier = constants_1.GAME_CONFIG.DESTRUCTION.MATERIAL_MULTIPLIERS[params.material.toUpperCase()];
         const sliceHealth = constants_1.GAME_CONFIG.DESTRUCTION.SLICE_HEALTH * materialMultiplier;
@@ -110,6 +121,7 @@ class DestructionSystem {
             position: { ...params.position },
             width: params.width,
             height: params.height,
+            orientation: orientation, // Set orientation based on dimensions
             destructionMask: new Uint8Array(constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES),
             material: params.material,
             maxHealth: sliceHealth,
@@ -168,11 +180,7 @@ class DestructionSystem {
     }
     // Get the position of a specific slice
     getSlicePosition(wall, sliceIndex) {
-        const sliceWidth = wall.width / constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES;
-        return {
-            x: wall.position.x + (sliceIndex * sliceWidth) + (sliceWidth / 2),
-            y: wall.position.y + (wall.height / 2)
-        };
+        return (0, wallSliceHelpers_1.getSlicePosition)(wall, sliceIndex);
     }
     // Check if a wall slice is destroyed
     isSliceDestroyed(wallId, sliceIndex) {
@@ -242,14 +250,7 @@ class DestructionSystem {
         if (wall.destructionMask[sliceIndex] === 1) {
             return false;
         }
-        // Calculate slice bounds
-        const sliceWidth = wall.width / constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES;
-        const sliceLeft = wall.position.x + (sliceIndex * sliceWidth);
-        const sliceRight = sliceLeft + sliceWidth;
-        return (position.x >= sliceLeft &&
-            position.x <= sliceRight &&
-            position.y >= wall.position.y &&
-            position.y <= wall.position.y + wall.height);
+        return (0, wallSliceHelpers_1.isPointInSlice)(wall, position, sliceIndex);
     }
     // Check if a point is inside any wall slice
     isPointInAnyWall(position) {

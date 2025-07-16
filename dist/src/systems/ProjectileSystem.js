@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProjectileSystem = void 0;
 const constants_1 = require("../../shared/constants");
 const matter_js_1 = __importDefault(require("matter-js"));
+const wallSliceHelpers_1 = require("../utils/wallSliceHelpers");
 class ProjectileSystem {
     projectiles = new Map();
     projectileCounter = 0;
@@ -390,11 +391,10 @@ class ProjectileSystem {
             const hitX = start.x + dx * Math.max(0, tMin);
             const hitY = start.y + dy * Math.max(0, tMin);
             // Calculate which slice was hit (using original wall position, not expanded bounds)
-            const sliceWidth = wall.width / constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES;
-            const sliceIndex = Math.floor((hitX - (wall.position.x)) / sliceWidth);
+            const sliceIndex = (0, wallSliceHelpers_1.calculateSliceIndex)(wall, { x: hitX, y: hitY });
             return {
                 hit: true,
-                sliceIndex: Math.max(0, Math.min(constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, sliceIndex))
+                sliceIndex: sliceIndex
             };
         }
         return { hit: false };
@@ -408,11 +408,10 @@ class ProjectileSystem {
             projectile.position.y + projectileSize >= wall.position.y &&
             projectile.position.y - projectileSize <= wall.position.y + wall.height) {
             // Calculate which slice was hit
-            const sliceWidth = wall.width / constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES;
-            const sliceIndex = Math.floor((projectile.position.x - wall.position.x) / sliceWidth);
+            const sliceIndex = (0, wallSliceHelpers_1.calculateSliceIndex)(wall, projectile.position);
             return {
                 hit: true,
-                sliceIndex: Math.max(0, Math.min(constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, sliceIndex))
+                sliceIndex: sliceIndex
             };
         }
         return { hit: false };
@@ -552,12 +551,11 @@ class ProjectileSystem {
                     const damage = this.weaponSystem.calculateExplosionDamage(explosion.damage, distance, explosion.radius);
                     if (damage > 0) {
                         // Calculate which slice is closest to the explosion
-                        const sliceWidth = wall.width / constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES;
-                        const explosionRelativeX = explosion.position.x - wall.position.x;
-                        const closestSlice = Math.floor(explosionRelativeX / sliceWidth);
+                        const closestSlice = (0, wallSliceHelpers_1.calculateSliceIndex)(wall, explosion.position);
                         const centerSlice = Math.max(0, Math.min(constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, closestSlice));
-                        // Damage multiple slices based on explosion radius
-                        const slicesAffected = Math.ceil(explosion.radius / sliceWidth);
+                        // Damage multiple slices based on explosion radius and wall orientation
+                        const sliceDimension = (0, wallSliceHelpers_1.getSliceDimension)(wall);
+                        const slicesAffected = Math.ceil(explosion.radius / sliceDimension);
                         for (let i = 0; i < slicesAffected; i++) {
                             const sliceIndex = Math.max(0, Math.min(constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, centerSlice + i - Math.floor(slicesAffected / 2)));
                             wallDamageEvents.push(this.createWallDamageEvent(wall, sliceIndex, explosion.position, damage));

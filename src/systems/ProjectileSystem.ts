@@ -1,8 +1,12 @@
-import { ProjectileState, PlayerState, Vector2, WallState, ExplosionEvent, PlayerDamageEvent, WallDamageEvent } from '../../shared/types';
+import { ProjectileState, PlayerState, WallState, ExplosionEvent, WallDamageEvent, PlayerDamageEvent, Vector2 } from '../../shared/types';
 import { GAME_CONFIG } from '../../shared/constants';
+import Matter from 'matter-js';
 import { PhysicsSystem } from './PhysicsSystem';
 import { WeaponSystem } from './WeaponSystem';
-import Matter from 'matter-js';
+import { 
+  calculateSliceIndex,
+  getSliceDimension
+} from '../utils/wallSliceHelpers';
 
 export class ProjectileSystem {
   private projectiles: Map<string, ProjectileState> = new Map();
@@ -474,12 +478,11 @@ export class ProjectileSystem {
       const hitY = start.y + dy * Math.max(0, tMin);
       
       // Calculate which slice was hit (using original wall position, not expanded bounds)
-      const sliceWidth = wall.width / GAME_CONFIG.DESTRUCTION.WALL_SLICES;
-      const sliceIndex = Math.floor((hitX - (wall.position.x)) / sliceWidth);
+      const sliceIndex = calculateSliceIndex(wall, { x: hitX, y: hitY });
       
       return {
         hit: true,
-        sliceIndex: Math.max(0, Math.min(GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, sliceIndex))
+        sliceIndex: sliceIndex
       };
     }
     
@@ -498,12 +501,11 @@ export class ProjectileSystem {
       projectile.position.y - projectileSize <= wall.position.y + wall.height
     ) {
       // Calculate which slice was hit
-      const sliceWidth = wall.width / GAME_CONFIG.DESTRUCTION.WALL_SLICES;
-      const sliceIndex = Math.floor((projectile.position.x - wall.position.x) / sliceWidth);
+      const sliceIndex = calculateSliceIndex(wall, projectile.position);
       
       return {
         hit: true,
-        sliceIndex: Math.max(0, Math.min(GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, sliceIndex))
+        sliceIndex: sliceIndex
       };
     }
     
@@ -677,13 +679,12 @@ export class ProjectileSystem {
           
           if (damage > 0) {
             // Calculate which slice is closest to the explosion
-            const sliceWidth = wall.width / GAME_CONFIG.DESTRUCTION.WALL_SLICES;
-            const explosionRelativeX = explosion.position.x - wall.position.x;
-            const closestSlice = Math.floor(explosionRelativeX / sliceWidth);
+            const closestSlice = calculateSliceIndex(wall, explosion.position);
             const centerSlice = Math.max(0, Math.min(GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, closestSlice));
             
-            // Damage multiple slices based on explosion radius
-            const slicesAffected = Math.ceil(explosion.radius / sliceWidth);
+            // Damage multiple slices based on explosion radius and wall orientation
+            const sliceDimension = getSliceDimension(wall);
+            const slicesAffected = Math.ceil(explosion.radius / sliceDimension);
             
             for (let i = 0; i < slicesAffected; i++) {
               const sliceIndex = Math.max(0, Math.min(GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, centerSlice + i - Math.floor(slicesAffected / 2)));

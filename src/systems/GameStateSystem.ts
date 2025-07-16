@@ -7,6 +7,7 @@ import { DestructionSystem } from './DestructionSystem';
 import { TileVisionSystem } from './TileVisionSystem';
 import { VisibilityPolygonSystem } from './VisibilityPolygonSystem';
 import Matter from 'matter-js';
+import { calculateSliceIndex, isPointInSlice } from '../utils/wallSliceHelpers';
 
 export class GameStateSystem {
   private players: Map<string, PlayerState> = new Map();
@@ -763,16 +764,21 @@ export class GameStateSystem {
       
       if (distanceSquared < playerRadius * playerRadius) {
         // Check if any slice in this wall is intact
-        for (let i = 0; i < GAME_CONFIG.DESTRUCTION.WALL_SLICES; i++) {
-          if (wall.destructionMask[i] === 0) { // Slice is intact
-            // Check if collision point is within this slice
-            const sliceWidth = wall.width / GAME_CONFIG.DESTRUCTION.WALL_SLICES;
-            const sliceLeft = wall.position.x + (i * sliceWidth);
-            const sliceRight = sliceLeft + sliceWidth;
-            
-            if (closestX >= sliceLeft && closestX <= sliceRight) {
-              return false; // Collision detected
-            }
+        const closestPoint = { x: closestX, y: closestY };
+        
+        // Find which slice the collision point is in
+        const sliceIndex = calculateSliceIndex(wall, closestPoint);
+        
+        // Check if the slice is intact
+        if (sliceIndex >= 0 && sliceIndex < GAME_CONFIG.DESTRUCTION.WALL_SLICES && 
+            wall.destructionMask[sliceIndex] === 0) {
+          return false; // Collision detected with intact slice
+        }
+        
+        // Also check adjacent slices for edge cases
+        for (let i = Math.max(0, sliceIndex - 1); i <= Math.min(GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, sliceIndex + 1); i++) {
+          if (wall.destructionMask[i] === 0 && isPointInSlice(wall, closestPoint, i)) {
+            return false; // Collision with adjacent intact slice
           }
         }
       }

@@ -11,6 +11,7 @@ const DestructionSystem_1 = require("./DestructionSystem");
 const TileVisionSystem_1 = require("./TileVisionSystem");
 const VisibilityPolygonSystem_1 = require("./VisibilityPolygonSystem");
 const matter_js_1 = __importDefault(require("matter-js"));
+const wallSliceHelpers_1 = require("../utils/wallSliceHelpers");
 class GameStateSystem {
     players = new Map();
     playerBodies = new Map();
@@ -633,15 +634,18 @@ class GameStateSystem {
             const distanceSquared = distanceX * distanceX + distanceY * distanceY;
             if (distanceSquared < playerRadius * playerRadius) {
                 // Check if any slice in this wall is intact
-                for (let i = 0; i < constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES; i++) {
-                    if (wall.destructionMask[i] === 0) { // Slice is intact
-                        // Check if collision point is within this slice
-                        const sliceWidth = wall.width / constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES;
-                        const sliceLeft = wall.position.x + (i * sliceWidth);
-                        const sliceRight = sliceLeft + sliceWidth;
-                        if (closestX >= sliceLeft && closestX <= sliceRight) {
-                            return false; // Collision detected
-                        }
+                const closestPoint = { x: closestX, y: closestY };
+                // Find which slice the collision point is in
+                const sliceIndex = (0, wallSliceHelpers_1.calculateSliceIndex)(wall, closestPoint);
+                // Check if the slice is intact
+                if (sliceIndex >= 0 && sliceIndex < constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES &&
+                    wall.destructionMask[sliceIndex] === 0) {
+                    return false; // Collision detected with intact slice
+                }
+                // Also check adjacent slices for edge cases
+                for (let i = Math.max(0, sliceIndex - 1); i <= Math.min(constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, sliceIndex + 1); i++) {
+                    if (wall.destructionMask[i] === 0 && (0, wallSliceHelpers_1.isPointInSlice)(wall, closestPoint, i)) {
+                        return false; // Collision with adjacent intact slice
                     }
                 }
             }

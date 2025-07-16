@@ -49,6 +49,7 @@ export interface WallState {
   position: Vector2;
   width: number;
   height: number;
+  orientation: 'horizontal' | 'vertical'; // NEW: Determined by width/height ratio
   destructionMask: Uint8Array; // 5 slices per wall
   material: 'concrete' | 'wood' | 'metal' | 'glass';
   maxHealth: number;

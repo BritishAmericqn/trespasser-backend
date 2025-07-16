@@ -1,5 +1,20 @@
-import { WeaponState, WeaponFireEvent, WeaponHitEvent, WeaponReloadEvent, WeaponSwitchEvent, GrenadeThrowEvent, PlayerState, Vector2, HitscanResult } from '../../shared/types';
+import { 
+  PlayerState, 
+  WeaponState, 
+  HitscanResult, 
+  ProjectileState, 
+  Vector2,
+  WeaponFireEvent,
+  WeaponHitEvent,
+  WeaponReloadEvent,
+  WeaponSwitchEvent,
+  GrenadeThrowEvent
+} from '../../shared/types';
 import { GAME_CONFIG } from '../../shared/constants';
+import { 
+  calculateSliceIndex,
+  getSliceDimension
+} from '../utils/wallSliceHelpers';
 
 export class WeaponSystem {
   private weapons: Map<string, WeaponState> = new Map();
@@ -303,12 +318,13 @@ export class WeaponSystem {
       // Check if the slice is destroyed
       if (hit.wall.destructionMask && hit.wall.destructionMask[hit.sliceIndex] === 1) {
         // This slice is destroyed - check for intact slices within this wall
-        const sliceWidth = hit.wall.width / GAME_CONFIG.DESTRUCTION.WALL_SLICES;
+        const sliceDimension = getSliceDimension(hit.wall);
         let foundIntactSlice = false;
         
         // Step through the wall to find intact slices
         const rayStep = 0.5;
-        const maxSteps = Math.min(100, hit.wall.width / rayStep);
+        const stepDimension = hit.wall.orientation === 'horizontal' ? hit.wall.width : hit.wall.height;
+        const maxSteps = Math.min(100, stepDimension / rayStep);
         
         for (let step = 1; step <= maxSteps; step++) {
           const checkDist = hit.distance + (step * rayStep);
@@ -326,18 +342,17 @@ export class WeaponSystem {
               checkPoint.x <= hit.wall.position.x + hit.wall.width) {
             
             // Calculate which slice we're in
-            const currentSliceIndex = Math.floor((checkPoint.x - hit.wall.position.x) / sliceWidth);
-            const clampedIndex = Math.max(0, Math.min(GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, currentSliceIndex));
+            const currentSliceIndex = calculateSliceIndex(hit.wall, checkPoint);
             
             // If we hit an intact slice, record it
-            if (hit.wall.destructionMask[clampedIndex] === 0) {
+            if (hit.wall.destructionMask[currentSliceIndex] === 0) {
               closestHit = {
                 hit: true,
                 targetType: 'wall',
                 targetId: hit.wallId,
                 hitPoint: checkPoint,
                 distance: checkDist,
-                wallSliceIndex: clampedIndex
+                wallSliceIndex: currentSliceIndex
               };
               foundIntactSlice = true;
               break;
@@ -479,16 +494,14 @@ export class WeaponSystem {
       };
       
       // Calculate which slice was hit
-      const sliceWidth = wall.width / GAME_CONFIG.DESTRUCTION.WALL_SLICES;
-      const sliceIndex = Math.floor((hitPoint.x - wall.position.x) / sliceWidth);
-      const clampedSliceIndex = Math.max(0, Math.min(GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, sliceIndex));
+      const sliceIndex = calculateSliceIndex(wall, hitPoint);
       
       // Always return the hit info, even for destroyed slices
       // The performHitscan method will handle checking for intact slices
       return {
         hitPoint,
         distance: tMin,
-        sliceIndex: clampedSliceIndex
+        sliceIndex: sliceIndex
       };
     }
     
