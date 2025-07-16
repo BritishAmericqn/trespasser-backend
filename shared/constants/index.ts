@@ -61,11 +61,11 @@ export const GAME_CONFIG = {
       FIRE_RATE: 60,
       RELOAD_TIME: 1000,
       ACCURACY: 1.0,
-      RANGE: 150,
+      RANGE: 150, // Increased back to support faster speeds
       HITSCAN: false,
       PROJECTILE_SPEED: 200, // Legacy - not used with new system
-      BASE_THROW_SPEED: 2,   // Base speed for grenades (8 px/s at charge 1)
-      CHARGE_SPEED_BONUS: 6, // Speed added per charge level (results in 8-32 px/s)
+      BASE_THROW_SPEED: 12,  // Base speed for 24 px/s at charge 1
+      CHARGE_SPEED_BONUS: 18, // Results in 24-96 px/s range
       EXPLOSION_RADIUS: 40,
       CHARGE_LEVELS: 5,
       CHARGE_MULTIPLIER: 1.5

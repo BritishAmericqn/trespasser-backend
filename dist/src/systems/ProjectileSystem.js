@@ -8,20 +8,31 @@ const constants_1 = require("../../shared/constants");
 const matter_js_1 = __importDefault(require("matter-js"));
 const wallSliceHelpers_1 = require("../utils/wallSliceHelpers");
 class ProjectileSystem {
-    projectiles = new Map();
-    projectileCounter = 0;
-    projectileBodies = new Map();
+    projectiles;
     physics;
     weaponSystem;
+    destructionSystem;
+    projectileBodies;
+    previousPositions;
+    recentCollisions; // projectileId -> wallId -> timestamp
     explosionQueue = [];
-    previousPositions = new Map();
-    recentCollisions = new Map(); // Track recent wall collisions
-    // Constants
+    // Grenade physics constants
     GRENADE_RADIUS = 2;
-    constructor(physics, weaponSystem) {
+    GRENADE_GROUND_FRICTION = 0.85; // per second - increased from 0.95 for faster slowdown
+    GRENADE_BOUNCE_DAMPING = 0.7; // energy retained after bounce
+    GRENADE_WALL_FRICTION = 0.85; // tangential velocity retained
+    GRENADE_MIN_BOUNCE_SPEED = 10; // minimum speed to bounce
+    GRENADE_COLLISION_COOLDOWN = 200; // ms between collisions with same wall
+    GRENADE_SEPARATION_DISTANCE = 3; // extra pixels from wall
+    GRENADE_VELOCITY_THRESHOLD = 5; // speed below which we apply heavy damping
+    constructor(physics, weaponSystem, destructionSystem) {
+        this.projectiles = new Map();
         this.physics = physics;
         this.weaponSystem = weaponSystem;
-        // console.log('ProjectileSystem initialized');
+        this.destructionSystem = destructionSystem;
+        this.projectileBodies = new Map();
+        this.previousPositions = new Map();
+        this.recentCollisions = new Map();
     }
     // Create a new projectile
     createProjectile(type, position, velocity, ownerId, damage, options = {}) {
@@ -40,28 +51,14 @@ class ProjectileSystem {
             explosionRadius: options.explosionRadius,
             chargeLevel: options.chargeLevel
         };
-        // Debug: Log rocket creation
-        if (type === 'rocket') {
-            // console.log(`🚀 ROCKET CREATED:`);
-            // console.log(`   ID: ${projectileId.substring(0, 8)}`);
-            // console.log(`   Position: (${position.x.toFixed(1)}, ${position.y.toFixed(1)})`);
-            // console.log(`   Velocity: (${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}) = ${Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y).toFixed(1)} px/s`);
-            // console.log(`   Range: ${projectile.range}`);
-        }
         this.projectiles.set(projectileId, projectile);
         this.recentCollisions.set(projectileId, new Map());
-        // Create physics body for projectile
-        if (type === 'grenade') { // Only grenades need physics for bouncing
+        // Only create physics bodies for non-grenade projectiles
+        // Grenades use manual physics for predictable behavior
+        if (type === 'rocket') {
             const body = this.createProjectileBody(projectile);
             this.projectileBodies.set(projectileId, body);
-            // Track this body as active for physics
             this.physics.addActiveBody(projectileId);
-            // Register collision callback for grenades
-            this.physics.registerCollisionCallback(projectileId, (event) => {
-                // Grenade collision handled by Matter.js physics engine
-                // No need to manually handle bouncing
-                // console.log(`🎾 Grenade ${projectileId} bounced off wall (Matter.js handled)`);
-            });
         }
         return projectile;
     }
@@ -105,42 +102,43 @@ class ProjectileSystem {
     }
     // Update all projectiles
     update(deltaTime, walls) {
-        // CRITICAL PERFORMANCE: Skip everything if no projectiles
-        if (this.projectiles.size === 0) {
-            return { updateEvents: [], explodeEvents: [] };
-        }
-        const projectilesToRemove = [];
         const updateEvents = [];
         const explodeEvents = [];
+        const projectilesToRemove = [];
         projectileLoop: for (const [projectileId, projectile] of this.projectiles) {
             // Store previous position before updating
             this.previousPositions.set(projectileId, { ...projectile.position });
+            // Get physics body if it exists (only for rockets now)
             const body = this.projectileBodies.get(projectileId);
-            if (body) {
-                // Update position from physics body
+            // Update position based on projectile type
+            if (projectile.type === 'grenade') {
+                // Manual physics for grenades
+                this.updateGrenade(projectile, deltaTime, walls);
+            }
+            else if (body) {
+                // Sync position from Matter.js physics body (rockets)
                 projectile.position.x = body.position.x;
                 projectile.position.y = body.position.y;
                 projectile.velocity.x = body.velocity.x;
                 projectile.velocity.y = body.velocity.y;
             }
             else {
-                // For bullets without physics bodies, update position manually
+                // Manual position update for bullets and other projectiles
                 projectile.position.x += projectile.velocity.x * (deltaTime / 1000);
                 projectile.position.y += projectile.velocity.y * (deltaTime / 1000);
             }
-            // Add update event for non-bullet projectiles (rockets and grenades need position tracking)
+            // Add update event for non-bullet projectiles
             if (projectile.type !== 'bullet') {
                 updateEvents.push({
                     id: projectile.id,
                     position: { x: projectile.position.x, y: projectile.position.y }
                 });
             }
-            // Check for grenade timer explosion (MOVED UP before collision checks)
+            // Check for grenade timer explosion
             if (projectile.type === 'grenade') {
                 const fuseTime = 3000; // 3 seconds
                 const timeAlive = Date.now() - projectile.timestamp;
                 if (timeAlive >= fuseTime) {
-                    // console.log(`💥 Grenade ${projectileId} exploding after ${timeAlive}ms`);
                     this.explodeProjectile(projectile);
                     explodeEvents.push({
                         id: projectile.id,
@@ -150,10 +148,9 @@ class ProjectileSystem {
                     projectilesToRemove.push(projectileId);
                     continue;
                 }
-                // Remove grenades that are moving too slowly (effectively stuck)
-                const velocityMagnitude = Math.sqrt(projectile.velocity.x ** 2 + projectile.velocity.y ** 2);
-                if (velocityMagnitude < 0.1) { // Less than 0.1 px/s
-                    // console.log(`💥 Grenade ${projectileId} stuck (vel: ${velocityMagnitude}), exploding`);
+                // Remove grenades that are stuck
+                const speed = Math.sqrt(projectile.velocity.x ** 2 + projectile.velocity.y ** 2);
+                if (speed < this.GRENADE_MIN_BOUNCE_SPEED) {
                     this.explodeProjectile(projectile);
                     explodeEvents.push({
                         id: projectile.id,
@@ -164,70 +161,23 @@ class ProjectileSystem {
                     continue;
                 }
             }
-            // CRITICAL: Check wall collisions FIRST (before range/boundary checks)
-            if (walls && projectile.type !== 'bullet') { // Bullets use hitscan
-                // For fast projectiles, subdivide the path
-                const steps = projectile.type === 'rocket' ? 5 : 1; // More steps for rockets
-                const prevPos = this.previousPositions.get(projectile.id) || projectile.position;
-                // For grenades, we still need manual collision detection for walls
-                // Matter.js will handle the bouncing physics, but we need to detect the collision
-                for (let step = 1; step <= steps; step++) {
-                    const t = step / steps;
-                    const checkPos = {
-                        x: prevPos.x + (projectile.position.x - prevPos.x) * t,
-                        y: prevPos.y + (projectile.position.y - prevPos.y) * t
-                    };
-                    // Check collision at this interpolated position
-                    const tempProjectile = { ...projectile, position: checkPos };
-                    const wallCollision = this.checkWallCollision(tempProjectile, walls);
-                    if (wallCollision.hit && wallCollision.wall) {
-                        // Check if we recently collided with this wall
-                        const collisionHistory = this.recentCollisions.get(projectileId);
-                        const lastCollisionTime = collisionHistory?.get(wallCollision.wall.id) || 0;
-                        const now = Date.now();
-                        // Skip if we collided with this wall in the last 100ms
-                        if (now - lastCollisionTime < 100) {
-                            continue;
-                        }
-                        // console.log(`🚀 Projectile ${projectileId} hit wall ${wallCollision.wall.id} at step ${step}/${steps}!`);
-                        // Update projectile position to collision point
-                        projectile.position = checkPos;
-                        // Record this collision
-                        if (collisionHistory) {
-                            collisionHistory.set(wallCollision.wall.id, now);
-                        }
-                        // Handle collision based on projectile type
-                        if (projectile.type === 'rocket') {
-                            this.explodeProjectile(projectile);
-                            explodeEvents.push({
-                                id: projectile.id,
-                                position: { x: projectile.position.x, y: projectile.position.y },
-                                radius: projectile.explosionRadius || 50
-                            });
-                            projectilesToRemove.push(projectileId);
-                            continue projectileLoop; // Skip other checks
-                        }
-                        else if (projectile.type === 'grenade') {
-                            // For grenades, handle the bounce
-                            this.handleWallBounce(projectile, wallCollision.wall);
-                            // Update physics body position if it exists
-                            if (body) {
-                                matter_js_1.default.Body.setPosition(body, projectile.position);
-                                matter_js_1.default.Body.setVelocity(body, projectile.velocity);
-                            }
-                            // console.log(`🎾 Grenade ${projectileId} bounced off wall ${wallCollision.wall.id}!`);
-                            // Don't continue - we need to check timer and other conditions
-                        }
-                    }
+            // Check wall collisions for rockets
+            if (walls && projectile.type === 'rocket') {
+                const wallCollision = this.checkWallCollision(projectile, walls);
+                if (wallCollision.hit) {
+                    this.explodeProjectile(projectile);
+                    explodeEvents.push({
+                        id: projectile.id,
+                        position: { x: projectile.position.x, y: projectile.position.y },
+                        radius: projectile.explosionRadius || 50
+                    });
+                    projectilesToRemove.push(projectileId);
+                    continue;
                 }
             }
             // Update traveled distance
-            const speed = Math.sqrt(projectile.velocity.x * projectile.velocity.x + projectile.velocity.y * projectile.velocity.y);
+            const speed = Math.sqrt(projectile.velocity.x ** 2 + projectile.velocity.y ** 2);
             projectile.traveledDistance += speed * (deltaTime / 1000);
-            // Debug: Log rocket position updates
-            if (projectile.type === 'rocket' && Math.random() < 0.2) { // 20% sample rate
-                // console.log(`🚀 Rocket update: pos(${projectile.position.x.toFixed(1)}, ${projectile.position.y.toFixed(1)}) vel(${projectile.velocity.x.toFixed(1)}, ${projectile.velocity.y.toFixed(1)}) dist:${projectile.traveledDistance.toFixed(1)}/${projectile.range}`);
-            }
             // Check if projectile has exceeded its range
             if (projectile.traveledDistance >= projectile.range) {
                 if (projectile.type === 'grenade') {
@@ -241,9 +191,8 @@ class ProjectileSystem {
                 projectilesToRemove.push(projectileId);
                 continue;
             }
-            // Check for boundary collisions (grenades handled by Matter.js boundary walls)
-            if (this.checkBoundaryCollision(projectile) && projectile.type !== 'grenade') {
-                // Rockets explode on boundary hit
+            // Check for boundary collisions (grenades handled in updateGrenade)
+            if (projectile.type !== 'grenade' && this.checkBoundaryCollision(projectile)) {
                 if (projectile.type === 'rocket') {
                     this.explodeProjectile(projectile);
                     explodeEvents.push({
@@ -254,10 +203,9 @@ class ProjectileSystem {
                 }
                 projectilesToRemove.push(projectileId);
             }
-            // Remove projectiles that are extremely far out of bounds (stuck projectiles)
-            const maxBounds = 1000; // Well outside the 480x270 game area
+            // Remove projectiles that are extremely far out of bounds
+            const maxBounds = 1000;
             if (Math.abs(projectile.position.x) > maxBounds || Math.abs(projectile.position.y) > maxBounds) {
-                // console.log(`🧹 Removing stuck projectile ${projectileId} at extreme position (${projectile.position.x}, ${projectile.position.y})`);
                 projectilesToRemove.push(projectileId);
             }
         }
@@ -267,37 +215,190 @@ class ProjectileSystem {
         }
         return { updateEvents, explodeEvents };
     }
+    // Manual physics update for grenades
+    updateGrenade(grenade, deltaTime, walls) {
+        const deltaSeconds = deltaTime / 1000;
+        const prevPos = { ...grenade.position };
+        // Apply ground friction
+        grenade.velocity.x *= Math.pow(this.GRENADE_GROUND_FRICTION, deltaSeconds);
+        grenade.velocity.y *= Math.pow(this.GRENADE_GROUND_FRICTION, deltaSeconds);
+        // Stop grenade if moving very slowly
+        const speed = Math.sqrt(grenade.velocity.x ** 2 + grenade.velocity.y ** 2);
+        if (speed < 2) {
+            grenade.velocity.x = 0;
+            grenade.velocity.y = 0;
+            return; // Don't update position
+        }
+        // Calculate new position
+        const newX = grenade.position.x + grenade.velocity.x * deltaSeconds;
+        const newY = grenade.position.y + grenade.velocity.y * deltaSeconds;
+        // Swept sphere collision detection
+        const collision = this.checkGrenadeMovement(prevPos, { x: newX, y: newY }, walls);
+        if (collision) {
+            // Handle the collision
+            this.handleGrenadeCollision(grenade, collision);
+        }
+        else {
+            // No collision, update position
+            grenade.position.x = newX;
+            grenade.position.y = newY;
+        }
+        // Handle boundary collisions
+        this.handleGrenadeBoundaryCollision(grenade);
+    }
+    // Check grenade movement for collisions
+    checkGrenadeMovement(from, to, walls) {
+        if (!walls)
+            return null;
+        // Calculate movement vector
+        const dx = to.x - from.x;
+        const dy = to.y - from.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < 0.001)
+            return null; // Not moving
+        // Number of steps based on speed
+        const steps = Math.max(1, Math.ceil(distance / this.GRENADE_RADIUS));
+        // Check each step
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            const checkX = from.x + dx * t;
+            const checkY = from.y + dy * t;
+            // Check all walls
+            for (const [wallId, wall] of walls) {
+                // Expand wall bounds by grenade radius
+                const expandedBounds = {
+                    left: wall.position.x - this.GRENADE_RADIUS,
+                    right: wall.position.x + wall.width + this.GRENADE_RADIUS,
+                    top: wall.position.y - this.GRENADE_RADIUS,
+                    bottom: wall.position.y + wall.height + this.GRENADE_RADIUS
+                };
+                // Check if grenade center is inside expanded bounds
+                if (checkX >= expandedBounds.left && checkX <= expandedBounds.right &&
+                    checkY >= expandedBounds.top && checkY <= expandedBounds.bottom) {
+                    // Find closest point on actual wall
+                    const closestX = Math.max(wall.position.x, Math.min(checkX, wall.position.x + wall.width));
+                    const closestY = Math.max(wall.position.y, Math.min(checkY, wall.position.y + wall.height));
+                    // Check if we're actually colliding
+                    const distX = checkX - closestX;
+                    const distY = checkY - closestY;
+                    const distSq = distX * distX + distY * distY;
+                    if (distSq < this.GRENADE_RADIUS * this.GRENADE_RADIUS) {
+                        // Calculate normal
+                        const dist = Math.sqrt(distSq);
+                        const normal = dist > 0
+                            ? { x: distX / dist, y: distY / dist }
+                            : { x: 0, y: -1 }; // Default to up if exactly on edge
+                        return {
+                            type: 'wall',
+                            normal,
+                            point: { x: closestX, y: closestY },
+                            wall
+                        };
+                    }
+                }
+            }
+        }
+        return null;
+    }
+    // Handle grenade collision
+    handleGrenadeCollision(grenade, collision) {
+        // Check collision cooldown
+        if (collision.wall) {
+            const collisionHistory = this.recentCollisions.get(grenade.id);
+            const lastCollisionTime = collisionHistory?.get(collision.wall.id) || 0;
+            const now = Date.now();
+            if (now - lastCollisionTime < this.GRENADE_COLLISION_COOLDOWN) {
+                return; // Skip this collision
+            }
+            // Record collision
+            if (collisionHistory) {
+                collisionHistory.set(collision.wall.id, now);
+            }
+        }
+        // Calculate dot product to check if moving towards wall
+        const dot = grenade.velocity.x * collision.normal.x + grenade.velocity.y * collision.normal.y;
+        if (dot < 0) {
+            // Moving towards wall, apply reflection
+            // v' = v - 2(v·n)n
+            grenade.velocity.x -= 2 * dot * collision.normal.x;
+            grenade.velocity.y -= 2 * dot * collision.normal.y;
+            // Apply bounce damping
+            grenade.velocity.x *= this.GRENADE_BOUNCE_DAMPING;
+            grenade.velocity.y *= this.GRENADE_BOUNCE_DAMPING;
+            // Apply wall friction to tangential component
+            const tangentX = -collision.normal.y;
+            const tangentY = collision.normal.x;
+            const tangentVel = grenade.velocity.x * tangentX + grenade.velocity.y * tangentY;
+            grenade.velocity.x = collision.normal.x * (grenade.velocity.x * collision.normal.x + grenade.velocity.y * collision.normal.y) +
+                tangentX * tangentVel * this.GRENADE_WALL_FRICTION;
+            grenade.velocity.y = collision.normal.y * (grenade.velocity.x * collision.normal.x + grenade.velocity.y * collision.normal.y) +
+                tangentY * tangentVel * this.GRENADE_WALL_FRICTION;
+            // Apply extra damping for slow speeds
+            const speed = Math.sqrt(grenade.velocity.x ** 2 + grenade.velocity.y ** 2);
+            if (speed < this.GRENADE_MIN_BOUNCE_SPEED) {
+                grenade.velocity.x *= 0.5;
+                grenade.velocity.y *= 0.5;
+            }
+        }
+        // Position correction - push grenade away from collision
+        const pushDistance = this.GRENADE_RADIUS + 1; // Small epsilon
+        grenade.position.x = collision.point.x + collision.normal.x * pushDistance;
+        grenade.position.y = collision.point.y + collision.normal.y * pushDistance;
+    }
+    // Handle grenade boundary collisions
+    handleGrenadeBoundaryCollision(grenade) {
+        let bounced = false;
+        // Left boundary
+        if (grenade.position.x - this.GRENADE_RADIUS <= 0) {
+            grenade.position.x = this.GRENADE_RADIUS;
+            if (grenade.velocity.x < 0) {
+                grenade.velocity.x = -grenade.velocity.x * this.GRENADE_BOUNCE_DAMPING;
+                grenade.velocity.y *= this.GRENADE_WALL_FRICTION;
+                bounced = true;
+            }
+        }
+        // Right boundary
+        if (grenade.position.x + this.GRENADE_RADIUS >= constants_1.GAME_CONFIG.GAME_WIDTH) {
+            grenade.position.x = constants_1.GAME_CONFIG.GAME_WIDTH - this.GRENADE_RADIUS;
+            if (grenade.velocity.x > 0) {
+                grenade.velocity.x = -grenade.velocity.x * this.GRENADE_BOUNCE_DAMPING;
+                grenade.velocity.y *= this.GRENADE_WALL_FRICTION;
+                bounced = true;
+            }
+        }
+        // Top boundary
+        if (grenade.position.y - this.GRENADE_RADIUS <= 0) {
+            grenade.position.y = this.GRENADE_RADIUS;
+            if (grenade.velocity.y < 0) {
+                grenade.velocity.y = -grenade.velocity.y * this.GRENADE_BOUNCE_DAMPING;
+                grenade.velocity.x *= this.GRENADE_WALL_FRICTION;
+                bounced = true;
+            }
+        }
+        // Bottom boundary
+        if (grenade.position.y + this.GRENADE_RADIUS >= constants_1.GAME_CONFIG.GAME_HEIGHT) {
+            grenade.position.y = constants_1.GAME_CONFIG.GAME_HEIGHT - this.GRENADE_RADIUS;
+            if (grenade.velocity.y > 0) {
+                grenade.velocity.y = -grenade.velocity.y * this.GRENADE_BOUNCE_DAMPING;
+                grenade.velocity.x *= this.GRENADE_WALL_FRICTION;
+                bounced = true;
+            }
+        }
+        // Apply extra damping for slow speeds after bounce
+        if (bounced) {
+            const speed = Math.sqrt(grenade.velocity.x ** 2 + grenade.velocity.y ** 2);
+            if (speed < this.GRENADE_MIN_BOUNCE_SPEED) {
+                grenade.velocity.x *= 0.5;
+                grenade.velocity.y *= 0.5;
+            }
+        }
+    }
     // Check collision with game boundaries
     checkBoundaryCollision(projectile) {
         return (projectile.position.x < 0 ||
             projectile.position.x > constants_1.GAME_CONFIG.GAME_WIDTH ||
             projectile.position.y < 0 ||
             projectile.position.y > constants_1.GAME_CONFIG.GAME_HEIGHT);
-    }
-    // Handle projectile bouncing off boundaries
-    handleBoundaryBounce(projectile, body) {
-        // Clamp position to boundaries
-        if (projectile.position.x < 0) {
-            projectile.position.x = 0;
-            projectile.velocity.x = -projectile.velocity.x * 0.7; // Reduce velocity on bounce
-        }
-        if (projectile.position.x > constants_1.GAME_CONFIG.GAME_WIDTH) {
-            projectile.position.x = constants_1.GAME_CONFIG.GAME_WIDTH;
-            projectile.velocity.x = -projectile.velocity.x * 0.7;
-        }
-        if (projectile.position.y < 0) {
-            projectile.position.y = 0;
-            projectile.velocity.y = -projectile.velocity.y * 0.7;
-        }
-        if (projectile.position.y > constants_1.GAME_CONFIG.GAME_HEIGHT) {
-            projectile.position.y = constants_1.GAME_CONFIG.GAME_HEIGHT;
-            projectile.velocity.y = -projectile.velocity.y * 0.7;
-        }
-        // Update physics body if it exists
-        if (body) {
-            matter_js_1.default.Body.setPosition(body, projectile.position);
-            matter_js_1.default.Body.setVelocity(body, projectile.velocity);
-        }
     }
     // Check collision with walls
     checkWallCollision(projectile, walls) {
@@ -432,47 +533,92 @@ class ProjectileSystem {
     }
     // Handle projectile bouncing off wall
     handleWallBounce(projectile, wall) {
-        const body = this.projectileBodies.get(projectile.id);
-        // Calculate which side of the wall we hit
-        const grenadeRadius = 2; // Small radius for grenade
+        const grenadeRadius = this.GRENADE_RADIUS;
         const wallLeft = wall.position.x;
         const wallRight = wall.position.x + wall.width;
         const wallTop = wall.position.y;
         const wallBottom = wall.position.y + wall.height;
-        // Find closest point on wall to grenade center
+        // Find the closest point on the wall to the grenade
         const closestX = Math.max(wallLeft, Math.min(projectile.position.x, wallRight));
         const closestY = Math.max(wallTop, Math.min(projectile.position.y, wallBottom));
-        // Calculate collision normal
+        // Calculate the normal from the closest point to the grenade center
         let normalX = projectile.position.x - closestX;
         let normalY = projectile.position.y - closestY;
-        // Normalize
+        // Normalize the normal vector
         const length = Math.sqrt(normalX * normalX + normalY * normalY);
         if (length > 0) {
             normalX /= length;
             normalY /= length;
         }
         else {
-            // Edge case: grenade is exactly at wall corner
-            normalX = 1;
-            normalY = 0;
+            // Grenade is exactly on wall edge/corner - use velocity to determine normal
+            const speed = Math.sqrt(projectile.velocity.x ** 2 + projectile.velocity.y ** 2);
+            if (speed > 0) {
+                normalX = -projectile.velocity.x / speed;
+                normalY = -projectile.velocity.y / speed;
+            }
+            else {
+                return; // No velocity, no bounce
+            }
         }
-        // Reflect velocity using the normal
+        // Calculate dot product
         const dotProduct = projectile.velocity.x * normalX + projectile.velocity.y * normalY;
-        const bounceFactor = 0.6;
-        projectile.velocity.x = (projectile.velocity.x - 2 * dotProduct * normalX) * bounceFactor;
-        projectile.velocity.y = (projectile.velocity.y - 2 * dotProduct * normalY) * bounceFactor;
-        // Push grenade away from wall to prevent re-collision
-        const pushDistance = grenadeRadius + 5; // Increased from 2 to 5 for better separation
-        projectile.position.x = closestX + normalX * pushDistance;
-        projectile.position.y = closestY + normalY * pushDistance;
-        // Ensure we're within game bounds
-        projectile.position.x = Math.max(5, Math.min(constants_1.GAME_CONFIG.GAME_WIDTH - 5, projectile.position.x));
-        projectile.position.y = Math.max(5, Math.min(constants_1.GAME_CONFIG.GAME_HEIGHT - 5, projectile.position.y));
-        // Update physics body
-        if (body) {
-            matter_js_1.default.Body.setPosition(body, projectile.position);
-            matter_js_1.default.Body.setVelocity(body, projectile.velocity);
+        // Only bounce if moving towards the wall (dot product is positive when moving towards wall)
+        if (dotProduct > 0) {
+            const bounceFactor = 0.7;
+            // Apply reflection formula: v' = v - 2(v·n)n
+            projectile.velocity.x = projectile.velocity.x - 2 * dotProduct * normalX;
+            projectile.velocity.y = projectile.velocity.y - 2 * dotProduct * normalY;
+            // Apply bounce damping
+            projectile.velocity.x *= bounceFactor;
+            projectile.velocity.y *= bounceFactor;
+            // Additional damping for very slow grenades to prevent micro-bounces
+            const newSpeed = Math.sqrt(projectile.velocity.x ** 2 + projectile.velocity.y ** 2);
+            if (newSpeed < 5) {
+                // Almost stopped - apply heavy damping
+                projectile.velocity.x *= 0.5;
+                projectile.velocity.y *= 0.5;
+            }
         }
+        // Position correction - push grenade outside of wall
+        const overlap = grenadeRadius - length;
+        if (overlap > 0 || length < grenadeRadius * 3) {
+            // Ensure grenade is pushed far enough from wall
+            // Use larger push distance to prevent immediate re-collision
+            const minPushDistance = grenadeRadius + 3;
+            // Also consider velocity - push further if moving fast
+            const speed = Math.sqrt(projectile.velocity.x ** 2 + projectile.velocity.y ** 2);
+            const velocityFactor = Math.max(1, speed / 50); // Extra push for fast grenades
+            const pushDistance = minPushDistance * velocityFactor;
+            projectile.position.x = closestX + normalX * pushDistance;
+            projectile.position.y = closestY + normalY * pushDistance;
+        }
+        // Double-check: if still inside wall, push to nearest edge
+        if (projectile.position.x > wallLeft && projectile.position.x < wallRight &&
+            projectile.position.y > wallTop && projectile.position.y < wallBottom) {
+            // Find distances to each edge
+            const distLeft = projectile.position.x - wallLeft;
+            const distRight = wallRight - projectile.position.x;
+            const distTop = projectile.position.y - wallTop;
+            const distBottom = wallBottom - projectile.position.y;
+            // Push to nearest edge
+            const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+            if (minDist === distLeft) {
+                projectile.position.x = wallLeft - grenadeRadius - 3;
+            }
+            else if (minDist === distRight) {
+                projectile.position.x = wallRight + grenadeRadius + 3;
+            }
+            else if (minDist === distTop) {
+                projectile.position.y = wallTop - grenadeRadius - 3;
+            }
+            else {
+                projectile.position.y = wallBottom + grenadeRadius + 3;
+            }
+        }
+        // Ensure we're within game bounds
+        projectile.position.x = Math.max(grenadeRadius, Math.min(constants_1.GAME_CONFIG.GAME_WIDTH - grenadeRadius, projectile.position.x));
+        projectile.position.y = Math.max(grenadeRadius, Math.min(constants_1.GAME_CONFIG.GAME_HEIGHT - grenadeRadius, projectile.position.y));
     }
     // Handle projectile collision with player
     handlePlayerCollision(projectile, player) {
@@ -493,78 +639,96 @@ class ProjectileSystem {
             timestamp: Date.now()
         };
     }
-    // Create explosion from projectile
+    // Mark projectile for explosion
     explodeProjectile(projectile) {
         if (projectile.isExploded)
             return;
         projectile.isExploded = true;
-        let explosionRadius = projectile.explosionRadius || 30;
-        let explosionDamage = projectile.damage;
-        // Apply charge level multiplier for grenades
-        if (projectile.type === 'grenade' && projectile.chargeLevel) {
-            const chargeMultiplier = 1 + ((projectile.chargeLevel - 1) * 0.3); // 30% increase per charge level
-            explosionRadius *= chargeMultiplier;
-            explosionDamage *= chargeMultiplier;
-        }
         const explosion = {
-            position: { ...projectile.position },
-            radius: explosionRadius,
-            damage: explosionDamage,
+            position: { x: projectile.position.x, y: projectile.position.y },
+            radius: projectile.explosionRadius || 50,
+            damage: projectile.damage,
             sourcePlayerId: projectile.ownerId,
             timestamp: Date.now()
         };
         this.explosionQueue.push(explosion);
     }
-    // Process explosion damage
+    // Get distance from point to wall
+    getDistanceToWall(point, wall) {
+        // Calculate distance to closest point on wall
+        const closestX = Math.max(wall.position.x, Math.min(point.x, wall.position.x + wall.width));
+        const closestY = Math.max(wall.position.y, Math.min(point.y, wall.position.y + wall.height));
+        return Math.sqrt(Math.pow(point.x - closestX, 2) +
+            Math.pow(point.y - closestY, 2));
+    }
+    // Process explosions and return damage events
     processExplosions(players, walls) {
         const playerDamageEvents = [];
         const wallDamageEvents = [];
         const explosions = [...this.explosionQueue];
         for (const explosion of this.explosionQueue) {
+            // Add null check for explosion
+            if (!explosion || !explosion.position) {
+                console.error('Invalid explosion in queue:', explosion);
+                continue;
+            }
             // Damage players in explosion radius
             for (const [playerId, player] of players) {
-                if (playerId === explosion.sourcePlayerId || !player.isAlive)
+                if (!player || !player.isAlive || !player.position)
                     continue;
-                const distance = Math.sqrt(Math.pow(explosion.position.x - player.transform.position.x, 2) +
-                    Math.pow(explosion.position.y - player.transform.position.y, 2));
+                const distance = Math.sqrt(Math.pow(player.position.x - explosion.position.x, 2) +
+                    Math.pow(player.position.y - explosion.position.y, 2));
                 if (distance <= explosion.radius) {
-                    const damage = this.weaponSystem.calculateExplosionDamage(explosion.damage, distance, explosion.radius);
-                    if (damage > 0) {
-                        playerDamageEvents.push({
-                            playerId,
-                            damage,
-                            damageType: 'explosion',
-                            sourcePlayerId: explosion.sourcePlayerId,
+                    const damageMultiplier = 1 - (distance / explosion.radius);
+                    const damage = Math.floor(explosion.damage * damageMultiplier);
+                    playerDamageEvents.push({
+                        playerId,
+                        damage,
+                        damageType: 'explosion',
+                        sourcePlayerId: explosion.sourcePlayerId,
+                        position: { ...player.position },
+                        newHealth: Math.max(0, player.health - damage),
+                        isKilled: player.health - damage <= 0,
+                        timestamp: Date.now()
+                    });
+                }
+            }
+            // Damage walls in explosion radius
+            for (const [wallId, wall] of walls) {
+                const distance = this.getDistanceToWall(explosion.position, wall);
+                if (distance <= explosion.radius) {
+                    const damageMultiplier = 1 - (distance / explosion.radius);
+                    const damage = Math.floor(explosion.damage * damageMultiplier);
+                    // Calculate which slices are affected
+                    const sliceWidth = wall.width / constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES;
+                    const affectedSlices = [];
+                    for (let i = 0; i < constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES; i++) {
+                        const sliceCenterX = wall.position.x + (i + 0.5) * sliceWidth;
+                        const sliceCenterY = wall.position.y + wall.height / 2;
+                        const sliceDistance = Math.sqrt(Math.pow(sliceCenterX - explosion.position.x, 2) +
+                            Math.pow(sliceCenterY - explosion.position.y, 2));
+                        if (sliceDistance <= explosion.radius) {
+                            affectedSlices.push(i);
+                        }
+                    }
+                    // Create damage event for each affected slice
+                    for (const sliceIndex of affectedSlices) {
+                        const sliceHealth = wall.sliceHealth[sliceIndex];
+                        const newHealth = Math.max(0, sliceHealth - damage);
+                        wallDamageEvents.push({
+                            wallId,
                             position: { ...explosion.position },
-                            newHealth: Math.max(0, player.health - damage),
-                            isKilled: player.health - damage <= 0,
+                            damage,
+                            sliceIndex,
+                            newHealth,
+                            isDestroyed: newHealth <= 0,
                             timestamp: Date.now()
                         });
                     }
                 }
             }
-            // Damage walls in explosion radius
-            for (const [wallId, wall] of walls) {
-                const distance = Math.sqrt(Math.pow(explosion.position.x - (wall.position.x + wall.width / 2), 2) +
-                    Math.pow(explosion.position.y - (wall.position.y + wall.height / 2), 2));
-                if (distance <= explosion.radius) {
-                    const damage = this.weaponSystem.calculateExplosionDamage(explosion.damage, distance, explosion.radius);
-                    if (damage > 0) {
-                        // Calculate which slice is closest to the explosion
-                        const closestSlice = (0, wallSliceHelpers_1.calculateSliceIndex)(wall, explosion.position);
-                        const centerSlice = Math.max(0, Math.min(constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, closestSlice));
-                        // Damage multiple slices based on explosion radius and wall orientation
-                        const sliceDimension = (0, wallSliceHelpers_1.getSliceDimension)(wall);
-                        const slicesAffected = Math.ceil(explosion.radius / sliceDimension);
-                        for (let i = 0; i < slicesAffected; i++) {
-                            const sliceIndex = Math.max(0, Math.min(constants_1.GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, centerSlice + i - Math.floor(slicesAffected / 2)));
-                            wallDamageEvents.push(this.createWallDamageEvent(wall, sliceIndex, explosion.position, damage));
-                        }
-                    }
-                }
-            }
         }
-        // Clear explosion queue
+        // Clear the explosion queue after processing
         this.explosionQueue = [];
         return { playerDamageEvents, wallDamageEvents, explosions };
     }
@@ -591,7 +755,7 @@ class ProjectileSystem {
             // Stop tracking this body for physics
             this.physics.removeActiveBody(projectileId);
             // Unregister collision callback if it was a grenade
-            this.physics.unregisterCollisionCallback(projectileId);
+            // this.physics.unregisterCollisionCallback(projectileId); // No longer needed for grenades
         }
         this.projectiles.delete(projectileId);
         this.previousPositions.delete(projectileId);
@@ -607,9 +771,10 @@ class ProjectileSystem {
     }
     // Clear all projectiles
     clear() {
-        // Remove all physics bodies
-        for (const body of this.projectileBodies.values()) {
+        // Clean up Matter.js bodies
+        for (const [projectileId, body] of this.projectileBodies) {
             this.physics.removeBody(body);
+            this.physics.removeActiveBody(projectileId);
         }
         this.projectiles.clear();
         this.projectileBodies.clear();

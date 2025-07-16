@@ -31,9 +31,10 @@ class GameStateSystem {
     visionUpdateCounter = 0;
     constructor(physics) {
         this.physics = physics;
-        this.weaponSystem = new WeaponSystem_1.WeaponSystem();
-        this.projectileSystem = new ProjectileSystem_1.ProjectileSystem(physics, this.weaponSystem);
+        // Initialize systems
         this.destructionSystem = new DestructionSystem_1.DestructionSystem(physics);
+        this.weaponSystem = new WeaponSystem_1.WeaponSystem();
+        this.projectileSystem = new ProjectileSystem_1.ProjectileSystem(physics, this.weaponSystem, this.destructionSystem);
         // Choose vision system based on toggle
         if (this.usePolygonVision) {
             this.visionSystem = new VisibilityPolygonSystem_1.VisibilityPolygonSystem();
@@ -43,8 +44,7 @@ class GameStateSystem {
             this.visionSystem = new TileVisionSystem_1.TileVisionSystem(constants_1.GAME_CONFIG.GAME_WIDTH, constants_1.GAME_CONFIG.GAME_HEIGHT);
             console.log('Using TileVisionSystem');
         }
-        // Initialize vision system with walls
-        this.initializeVisionWalls();
+        this.initializeWalls();
         // Set up reload complete callback
         this.weaponSystem.setReloadCompleteCallback((playerId, weapon) => {
             this.pendingReloadCompleteEvents.push({
@@ -59,7 +59,7 @@ class GameStateSystem {
         });
         // console.log('GameStateSystem initialized with weapon and vision systems');
     }
-    initializeVisionWalls() {
+    initializeWalls() {
         // Get walls from destruction system and pass to vision system
         const walls = this.destructionSystem.getWalls();
         const wallData = Array.from(walls.entries()).map(([id, wall]) => ({
