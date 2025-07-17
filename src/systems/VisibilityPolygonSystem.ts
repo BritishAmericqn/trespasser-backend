@@ -7,7 +7,8 @@ import {
   getSliceDimension,
   shouldAllowVisionThrough,
   shouldSliceBlockVision,
-  shouldSliceBlockVisionByHealth
+  shouldSliceBlockVisionByHealth,
+  shouldSliceAllowVision
 } from '../utils/wallSliceHelpers';
 
 interface Corner {
@@ -100,9 +101,12 @@ export class VisibilityPolygonSystem {
       // Update slice health
       storedWall.sliceHealth[sliceIndex] = wall.sliceHealth[sliceIndex];
       
-      // Update destruction mask if slice is fully destroyed
-      if (wall.sliceHealth[sliceIndex] <= 0) {
+      // Update bitmask based on health-based visibility logic
+      const shouldAllowVision = shouldSliceAllowVision(wall.material, wall.sliceHealth[sliceIndex], wall.maxHealth);
+      if (shouldAllowVision) {
         storedWall.destroyedSlices |= (1 << sliceIndex);
+      } else {
+        storedWall.destroyedSlices &= ~(1 << sliceIndex);
       }
       
       // console.log(`[VisibilityPolygon] Wall ${wallId} slice ${sliceIndex} updated. Health: ${wall.sliceHealth[sliceIndex]}, Mask: ${oldMask.toString(2).padStart(5, '0')} → ${storedWall.destroyedSlices.toString(2).padStart(5, '0')}`);
@@ -812,9 +816,9 @@ export class VisibilityPolygonSystem {
       // Check which slice we're exiting through
       const exitSliceIndex = calculateSliceIndex(wall as any, { x: clampedExitX, y: clampedExitY });
       
-      const exitSliceDestroyed = (wall.destroyedSlices & (1 << exitSliceIndex)) !== 0;
+      const exitSliceBlocksVision = shouldSliceBlockVisionByHealth(wall as any, exitSliceIndex);
       
-      if (!exitSliceDestroyed) {
+      if (exitSliceBlocksVision) {
         // Exiting through intact slice
         const hitPoint = { x: clampedExitX, y: clampedExitY };
         const distance = Math.hypot(hitPoint.x - rayStart.x, hitPoint.y - rayStart.y);

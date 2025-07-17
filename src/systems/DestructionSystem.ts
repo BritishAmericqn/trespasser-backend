@@ -6,7 +6,8 @@ import {
   determineWallOrientation, 
   getSlicePosition as getSlicePositionHelper,
   isPointInSlice,
-  calculateSliceIndex
+  calculateSliceIndex,
+  shouldSliceAllowVision
 } from '../utils/wallSliceHelpers';
 import { MapLoader } from '../utils/MapLoader';
 
@@ -234,9 +235,11 @@ export class DestructionSystem {
     
     // Check if slice is destroyed
     const isDestroyed = newHealth <= 0;
-    if (isDestroyed) {
-      wall.destructionMask[sliceIndex] = 1;
-    }
+    
+    // Update bitmask based on health-based visibility logic
+    // For soft walls: transparent at 50% health, for hard walls: only when fully destroyed
+    const shouldAllowVision = shouldSliceAllowVision(wall.material, newHealth, wall.maxHealth);
+    wall.destructionMask[sliceIndex] = shouldAllowVision ? 1 : 0;
     
     return {
       wallId,
@@ -475,10 +478,9 @@ export class DestructionSystem {
     
     wall.sliceHealth[sliceIndex] = newHealth;
     
-    // Update destruction mask
-    if (newHealth > 0) {
-      wall.destructionMask[sliceIndex] = 0;
-    }
+    // Update bitmask based on health-based visibility logic
+    const shouldAllowVision = shouldSliceAllowVision(wall.material, newHealth, wall.maxHealth);
+    wall.destructionMask[sliceIndex] = shouldAllowVision ? 1 : 0;
     
     return true;
   }

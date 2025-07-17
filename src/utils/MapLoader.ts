@@ -15,12 +15,27 @@ interface ProcessedWall {
   width: number;
   height: number;
   material: 'concrete' | 'wood' | 'metal' | 'glass';
+  actualLength?: number; // Optional: actual length in tiles for partial walls
+  preDestroyedSlices?: number[]; // Optional: which slices to pre-destroy
+}
+
+interface WallPattern {
+  x: number;
+  y: number;
+  rightExtent: number;
+  downExtent: number;
+  isLShape: boolean;
+  isTShape: boolean;
+  material: string;
 }
 
 export class MapLoader {
   private static readonly GRID_SIZE = 10;
   private static readonly MAP_WIDTH_CELLS = 48;
   private static readonly MAP_HEIGHT_CELLS = 27;
+  
+  // Maximum wall length to prevent slice stretching (5 tiles = 1 tile per slice)
+  private static readonly MAX_WALL_LENGTH = 5;
   
   private static readonly COLOR_MAP: Record<string, string> = {
     // Wall Materials
@@ -55,17 +70,15 @@ export class MapLoader {
       // Load the image
       const image = await Jimp.read(mapPath);
       
-      if (image.bitmap.width !== 480 || image.bitmap.height !== 270) {
-        throw new Error(`Map must be exactly 480x270 pixels, got ${image.bitmap.width}x${image.bitmap.height}`);
+      // Maps are now 48x27 directly
+      if (image.bitmap.width !== 48 || image.bitmap.height !== 27) {
+        throw new Error(`Map must be exactly 48x27 pixels, got ${image.bitmap.width}x${image.bitmap.height}`);
       }
       
-      // Downscale to 48x27 grid
-      const scaledImage = image.resize(48, 27, Jimp.RESIZE_NEAREST_NEIGHBOR);
+      // Convert directly to grid (no downscaling needed!)
+      this.imageToGrid(image);
       
-      // Convert to grid
-      this.imageToGrid(scaledImage);
-      
-      // Process grid into walls
+      // Process grid into walls with smart orientation detection
       this.processGridToWalls();
       
     } catch (error) {
@@ -118,75 +131,19 @@ export class MapLoader {
     const walls: ProcessedWall[] = [];
     const visited = new Set<string>();
     
-    // Find horizontal walls
+    // Process each unvisited wall cell
     for (let y = 0; y < 27; y++) {
       for (let x = 0; x < 48; x++) {
         const key = `${x},${y}`;
-        if (visited.has(key)) continue;
+        if (visited.has(key) || this.grid[y][x].type !== 'wall') continue;
         
-        const cell = this.grid[y][x];
-        if (cell.type !== 'wall') continue;
+        // Analyze the wall pattern starting from this cell
+        const pattern = this.analyzeWallPattern(x, y, visited);
+        const material = this.grid[y][x].material!;
         
-        // Find horizontal run
-        let endX = x;
-        while (endX < 48 && 
-               this.grid[y][endX].type === 'wall' && 
-               this.grid[y][endX].material === cell.material) {
-          endX++;
-        }
-        
-        const length = endX - x;
-        // Only process runs of 2+ cells horizontally
-        // Single cells will be handled as vertical walls (pillars) in the next pass
-        if (length > 1) {
-          // Mark cells as visited only if we're creating a wall
-          for (let visitX = x; visitX < endX; visitX++) {
-            visited.add(`${visitX},${y}`);
-          }
-          walls.push({
-            position: { 
-              x: x * MapLoader.GRID_SIZE, 
-              y: y * MapLoader.GRID_SIZE 
-            },
-            width: length * MapLoader.GRID_SIZE,
-            height: MapLoader.GRID_SIZE,
-            material: cell.material as any
-          });
-        }
-      }
-    }
-    
-    // Find vertical walls (for remaining unvisited cells)
-    for (let y = 0; y < 27; y++) {
-      for (let x = 0; x < 48; x++) {
-        const key = `${x},${y}`;
-        if (visited.has(key)) continue;
-        
-        const cell = this.grid[y][x];
-        if (cell.type !== 'wall') continue;
-        
-        // Find vertical run
-        let endY = y;
-        while (endY < 27 && 
-               this.grid[endY][x].type === 'wall' && 
-               this.grid[endY][x].material === cell.material &&
-               !visited.has(`${x},${endY}`)) {
-          visited.add(`${x},${endY}`);
-          endY++;
-        }
-        
-        const length = endY - y;
-        if (length > 0) { // Allow single cells as vertical walls (pillars)
-          walls.push({
-            position: { 
-              x: x * MapLoader.GRID_SIZE, 
-              y: y * MapLoader.GRID_SIZE 
-            },
-            width: MapLoader.GRID_SIZE,
-            height: length * MapLoader.GRID_SIZE,
-            material: cell.material as any
-          });
-        }
+        // Convert pattern to optimal walls
+        const optimalWalls = this.createOptimalWalls(pattern, material, visited);
+        walls.push(...optimalWalls);
       }
     }
     
@@ -199,10 +156,210 @@ export class MapLoader {
         material: wall.material
       });
       
-      // Don't mark any slices as destroyed - let all walls be fully intact
-      // The previous code was marking bottom slices of vertical walls as destroyed,
-      // causing collision to only work at the top of the wall
+      // If this wall has pre-destroyed slices, mark them as destroyed
+      if (wall.preDestroyedSlices && wall.preDestroyedSlices.length > 0) {
+        wall.preDestroyedSlices.forEach(sliceIndex => {
+          // Mark slice as destroyed by setting health to 0
+          this.destructionSystem.applyDamage(createdWall.id, sliceIndex, 999999); // Excessive damage to ensure destruction
+        });
+        
+        console.log(`🧱 Created partial wall ${createdWall.id} (${wall.actualLength}/${5} slices), pre-destroyed slices: [${wall.preDestroyedSlices.join(', ')}]`);
+      }
     });
+  }
+  
+  // Analyze what kind of wall pattern we're looking at
+  private analyzeWallPattern(startX: number, startY: number, visited: Set<string>): WallPattern {
+    const material = this.grid[startY][startX].material!; // We know it's a wall, so material is defined
+    
+    // Look ahead to understand the shape
+    let rightExtent = 0;
+    let downExtent = 0;
+    let isLShape = false;
+    let isTShape = false;
+    
+    // Check horizontal extent (limited to prevent stretching)
+    for (let x = startX; x < 48 && x < startX + MapLoader.MAX_WALL_LENGTH && this.isWallOfType(x, startY, material) && !visited.has(`${x},${startY}`); x++) {
+      rightExtent++;
+    }
+    
+    // Check vertical extent (limited to prevent stretching)
+    for (let y = startY; y < 27 && y < startY + MapLoader.MAX_WALL_LENGTH && this.isWallOfType(startX, y, material) && !visited.has(`${startX},${y}`); y++) {
+      downExtent++;
+    }
+    
+    // Check for L-shape (wall extends both right and down)
+    if (rightExtent >= 2 && downExtent >= 2) {
+      // Check if there's a wall at the corner
+      isLShape = this.isWallOfType(startX + 1, startY + 1, material);
+    }
+    
+    // Check for T-shape patterns (with length limits)
+    if (rightExtent >= 3 && downExtent >= 2) {
+      // Check for T with stem going down
+      const midX = startX + Math.floor(rightExtent / 2);
+      isTShape = this.isWallOfType(midX, startY + 1, material);
+    }
+    
+    return {
+      x: startX,
+      y: startY,
+      rightExtent,
+      downExtent,
+      isLShape,
+      isTShape,
+      material
+    };
+  }
+  
+  // Create optimal walls based on the pattern
+  private createOptimalWalls(pattern: WallPattern, material: string, visited: Set<string>): ProcessedWall[] {
+    const walls: ProcessedWall[] = [];
+    const { x, y, rightExtent, downExtent, isLShape, isTShape } = pattern;
+    
+    // Handle different patterns
+    if (isLShape) {
+      // L-shape: Create horizontal part first (usually more important)
+      if (rightExtent > downExtent) {
+        // Horizontal-dominant L
+        walls.push(this.createHorizontalWall(x, y, rightExtent, material, visited));
+        // Then create vertical part from the remainder
+        for (let dy = 1; dy < downExtent; dy++) {
+          if (!visited.has(`${x},${y + dy}`)) {
+            const vertLength = this.measureVerticalExtent(x, y + dy, material, visited);
+            if (vertLength > 0) {
+              walls.push(this.createVerticalWall(x, y + dy, vertLength, material, visited));
+            }
+          }
+        }
+      } else {
+        // Vertical-dominant L
+        walls.push(this.createVerticalWall(x, y, downExtent, material, visited));
+        // Then create horizontal part from the remainder
+        for (let dx = 1; dx < rightExtent; dx++) {
+          if (!visited.has(`${x + dx},${y}`)) {
+            const horizLength = this.measureHorizontalExtent(x + dx, y, material, visited);
+            if (horizLength > 0) {
+              walls.push(this.createHorizontalWall(x + dx, y, horizLength, material, visited));
+            }
+          }
+        }
+      }
+    } else if (isTShape) {
+      // T-shape: Create the top bar first
+      walls.push(this.createHorizontalWall(x, y, rightExtent, material, visited));
+      // Then handle the stem
+      const stemX = x + Math.floor(rightExtent / 2);
+      for (let dy = 1; dy < 27 - y; dy++) {
+        if (this.isWallOfType(stemX, y + dy, material) && !visited.has(`${stemX},${y + dy}`)) {
+          const stemLength = this.measureVerticalExtent(stemX, y + dy, material, visited);
+          if (stemLength > 0) {
+            walls.push(this.createVerticalWall(stemX, y + dy, stemLength, material, visited));
+            break;
+          }
+        }
+      }
+    } else if (rightExtent >= 2 && rightExtent > downExtent) {
+      // Simple horizontal wall
+      walls.push(this.createHorizontalWall(x, y, rightExtent, material, visited));
+    } else if (downExtent >= 2) {
+      // Simple vertical wall
+      walls.push(this.createVerticalWall(x, y, downExtent, material, visited));
+    } else {
+      // Single cell - prefer vertical (as per your original logic)
+      walls.push(this.createVerticalWall(x, y, 1, material, visited));
+    }
+    
+    return walls;
+  }
+  
+  // Helper methods
+  private isWallOfType(x: number, y: number, material: string | undefined): boolean {
+    return x >= 0 && x < 48 && y >= 0 && y < 27 && 
+           this.grid[y][x].type === 'wall' && 
+           this.grid[y][x].material === material;
+  }
+  
+  private measureHorizontalExtent(x: number, y: number, material: string | undefined, visited: Set<string>): number {
+    let length = 0;
+    for (let dx = x; dx < 48 && dx < x + MapLoader.MAX_WALL_LENGTH && this.isWallOfType(dx, y, material) && !visited.has(`${dx},${y}`); dx++) {
+      length++;
+    }
+    return length;
+  }
+  
+  private measureVerticalExtent(x: number, y: number, material: string | undefined, visited: Set<string>): number {
+    let length = 0;
+    for (let dy = y; dy < 27 && dy < y + MapLoader.MAX_WALL_LENGTH && this.isWallOfType(x, dy, material) && !visited.has(`${x},${dy}`); dy++) {
+      length++;
+    }
+    return length;
+  }
+  
+  private createHorizontalWall(x: number, y: number, length: number, material: string, visited: Set<string>): ProcessedWall {
+    // Mark cells as visited
+    for (let dx = 0; dx < length; dx++) {
+      visited.add(`${x + dx},${y}`);
+    }
+    
+    // Always create a 5-slice wall, but mark unused slices as destroyed
+    const SLICES_PER_WALL = 5;
+    const preDestroyedSlices: number[] = [];
+    
+    // If wall is shorter than 5 tiles, mark the extra slices as pre-destroyed
+    if (length < SLICES_PER_WALL) {
+      for (let i = length; i < SLICES_PER_WALL; i++) {
+        preDestroyedSlices.push(i);
+      }
+    }
+    
+    // Always create wall as if it were 5 tiles long (50 pixels) for consistent slicing
+    const wallWidth = SLICES_PER_WALL * MapLoader.GRID_SIZE;
+    
+    return {
+      position: { 
+        x: x * MapLoader.GRID_SIZE, 
+        y: y * MapLoader.GRID_SIZE 
+      },
+      width: wallWidth,
+      height: MapLoader.GRID_SIZE,
+      material: material as any,
+      actualLength: length,
+      preDestroyedSlices: preDestroyedSlices.length > 0 ? preDestroyedSlices : undefined
+    };
+  }
+  
+  private createVerticalWall(x: number, y: number, length: number, material: string, visited: Set<string>): ProcessedWall {
+    // Mark cells as visited
+    for (let dy = 0; dy < length; dy++) {
+      visited.add(`${x},${y + dy}`);
+    }
+    
+    // Always create a 5-slice wall, but mark unused slices as destroyed
+    const SLICES_PER_WALL = 5;
+    const preDestroyedSlices: number[] = [];
+    
+    // If wall is shorter than 5 tiles, mark the extra slices as pre-destroyed
+    if (length < SLICES_PER_WALL) {
+      for (let i = length; i < SLICES_PER_WALL; i++) {
+        preDestroyedSlices.push(i);
+      }
+    }
+    
+    // Always create wall as if it were 5 tiles long (50 pixels) for consistent slicing
+    const wallHeight = SLICES_PER_WALL * MapLoader.GRID_SIZE;
+    
+    return {
+      position: { 
+        x: x * MapLoader.GRID_SIZE, 
+        y: y * MapLoader.GRID_SIZE 
+      },
+      width: MapLoader.GRID_SIZE,
+      height: wallHeight,
+      material: material as any,
+      actualLength: length,
+      preDestroyedSlices: preDestroyedSlices.length > 0 ? preDestroyedSlices : undefined
+    };
   }
   
   private rgbToHex(r: number, g: number, b: number): string {

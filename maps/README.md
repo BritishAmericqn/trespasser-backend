@@ -1,7 +1,7 @@
 # Map Creation Guide
 
 ## Overview
-Maps are created as 480x270 PNG images that are automatically converted to game walls.
+Maps are created as 48x27 PNG images where each pixel represents a 10x10 game unit cell.
 
 ## Color Palette
 
@@ -22,17 +22,22 @@ Maps are created as 480x270 PNG images that are automatically converted to game 
 
 ## How It Works
 
-1. The 480x270 image is divided into a 48x27 grid (10x10 pixels per cell)
-2. Each cell is read and converted based on its color
-3. Adjacent wall cells of the same material are merged into single walls
-4. Walls automatically get 1-5 destructible slices based on their length
+1. Each pixel in the 48x27 image represents one cell (10x10 game units)
+2. The smart wall detection algorithm analyzes patterns to create optimal walls
+3. L-shapes and T-shapes are automatically split into appropriate horizontal/vertical walls
+4. **Partial Wall System**: All walls maintain exactly 5 slices for consistency
+   - Walls shorter than 5 tiles have unused slices pre-destroyed
+   - Example: A 2-tile wall has slices 0-1 intact, slices 2-4 destroyed
+   - This prevents visual stretching while maintaining uniform destruction mechanics
+5. Adjacent wall cells of the same material are intelligently merged
+6. Walls automatically get 1-5 destructible slices based on their length
 
 ## Creating Maps
 
-1. Create a new 480x270 PNG image
+1. Create a new 48x27 PNG image
 2. Use the exact colors from the palette above
-3. Draw walls as continuous lines (horizontal or vertical)
-4. Place spawn points as single 10x10 blocks
+3. Draw walls pixel by pixel - each pixel = one 10x10 game cell
+4. Place spawn points as single pixels
 5. Save as `mapname.png` in this directory
 
 ## Loading Maps
@@ -47,29 +52,31 @@ npm start
 
 ## Tips
 
-- Keep walls aligned to the 10x10 grid for best results
-- **Single cells (10x10) become vertical pillars** with 5 slices (2 pixels per slice)
-- Horizontal walls require at least 2 connected cells
-- For better slice dimensions, use walls that are 2+ cells long
-- Horizontal walls are preferred for runs of cells
-- Single isolated cells automatically become vertical walls (pillars)
+- Use a pixel art editor with grid overlay (Aseprite, GraphicsGale)
+- Zoom in significantly (800-1600%) while drawing
+- Keep a reference window at 100% to see actual scale
+- **Wall Length Limit**: Walls are automatically limited to 5 tiles maximum to prevent slice stretching
+  - Each wall has exactly 5 destructible slices
+  - Longer walls would make each slice wider than 1 tile, creating visual stretching
+  - Long lines will be automatically broken into multiple 5-tile walls
+- The algorithm intelligently handles L-shapes and T-shapes:
+  - Horizontal-dominant L-shapes become horizontal wall + vertical wall
+  - Vertical-dominant L-shapes become vertical wall + horizontal wall
+  - T-shapes are split at natural junction points
+- Single pixels become vertical walls (pillars)
 - The game automatically adds boundary walls, so you don't need to draw them
 
-## Example Layout
+## Example Layout (actual size = 48x27 pixels)
 
 ```
-+--------------------+
-|    B              |
-|  ##### ######     |
-|       #      #    |
-| ####  #  ##  #    |
-|    #  #   #  #    |
-|    ####   ####    |
-|                   |
-|              R    |
-+--------------------+
+████████████████████████████████████████████████
+█                                              █
+█  █████  ██████                               █
+█     █        █                               █
+█  ████  █  ██ █                               █
+█     █  █   █ █                               █
+█                                              █
+████████████████████████████████████████████████
+```
 
-B = Blue spawn
-R = Red spawn
-# = Wall
-``` 
+Note: In your image editor, this would be just 48x27 pixels! 

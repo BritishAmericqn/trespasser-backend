@@ -5,7 +5,8 @@ import {
   calculateSliceIndex,
   getSliceDimension,
   shouldAllowVisionThrough,
-  shouldSliceBlockVisionByHealth
+  shouldSliceBlockVisionByHealth,
+  shouldSliceAllowVision
 } from '../utils/wallSliceHelpers';
 
 interface TileCoord {
@@ -151,10 +152,13 @@ export class TileVisionSystem {
                 
                 const oldMask = partial.destroyedSlices;
                 
-                // Update slice health and destruction mask
+                // Update slice health and bitmask based on health-based visibility logic
                 partial.sliceHealth[sliceIndex] = wall.sliceHealth[sliceIndex];
-                if (wall.sliceHealth[sliceIndex] <= 0) {
+                const shouldAllowVision = shouldSliceAllowVision(wall.material, wall.sliceHealth[sliceIndex], wall.maxHealth);
+                if (shouldAllowVision) {
                     partial.destroyedSlices |= (1 << sliceIndex);
+                } else {
+                    partial.destroyedSlices &= ~(1 << sliceIndex);
                 }
                 
                 // console.log(`   Tile ${x},${y}: slice ${sliceIndex} health: ${partial.sliceHealth[sliceIndex]}, destroyed slices ${oldMask.toString(2)} → ${partial.destroyedSlices.toString(2)}`);

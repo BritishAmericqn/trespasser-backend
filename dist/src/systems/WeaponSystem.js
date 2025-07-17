@@ -433,11 +433,14 @@ class WeaponSystem {
                 else {
                     // Soft wall - apply penetration
                     const penetrationDamage = constants_1.GAME_CONFIG.DESTRUCTION.SOFT_WALL_PENETRATION_DAMAGE;
-                    if (currentDamage > penetrationDamage) {
+                    const sliceHealth = wall.sliceHealth[sliceIndex];
+                    // Calculate actual penetration cost (limited by wall's remaining health)
+                    const actualPenetrationCost = Math.min(penetrationDamage, sliceHealth);
+                    if (currentDamage >= actualPenetrationCost) {
                         // Bullet penetrates
-                        // console.log(`🔫 Bullet penetrates soft wall ${wall.material}, damage: ${currentDamage} -> ${currentDamage - penetrationDamage}`);
-                        const damageToWall = penetrationDamage;
-                        const remainingDamage = currentDamage - penetrationDamage;
+                        const damageToWall = actualPenetrationCost;
+                        const remainingDamage = currentDamage - damageToWall;
+                        // console.log(`🔫 Bullet penetrates soft wall ${wall.material}, wall health: ${sliceHealth}, penetration cost: ${actualPenetrationCost}, bullet: ${currentDamage} -> ${remainingDamage}`);
                         hits.push({
                             targetType: 'wall',
                             targetId: closestHit.id,

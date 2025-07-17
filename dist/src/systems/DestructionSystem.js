@@ -191,9 +191,10 @@ class DestructionSystem {
         wall.sliceHealth[sliceIndex] = newHealth;
         // Check if slice is destroyed
         const isDestroyed = newHealth <= 0;
-        if (isDestroyed) {
-            wall.destructionMask[sliceIndex] = 1;
-        }
+        // Update bitmask based on health-based visibility logic
+        // For soft walls: transparent at 50% health, for hard walls: only when fully destroyed
+        const shouldAllowVision = (0, wallSliceHelpers_1.shouldSliceAllowVision)(wall.material, newHealth, wall.maxHealth);
+        wall.destructionMask[sliceIndex] = shouldAllowVision ? 1 : 0;
         return {
             wallId,
             position: this.getSlicePosition(wall, sliceIndex),
@@ -385,10 +386,9 @@ class DestructionSystem {
         const currentHealth = wall.sliceHealth[sliceIndex];
         const newHealth = Math.min(wall.maxHealth, currentHealth + healthToRestore);
         wall.sliceHealth[sliceIndex] = newHealth;
-        // Update destruction mask
-        if (newHealth > 0) {
-            wall.destructionMask[sliceIndex] = 0;
-        }
+        // Update bitmask based on health-based visibility logic
+        const shouldAllowVision = (0, wallSliceHelpers_1.shouldSliceAllowVision)(wall.material, newHealth, wall.maxHealth);
+        wall.destructionMask[sliceIndex] = shouldAllowVision ? 1 : 0;
         return true;
     }
     // Repair entire wall (for testing/admin purposes)

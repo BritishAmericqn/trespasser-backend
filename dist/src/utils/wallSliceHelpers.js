@@ -172,9 +172,9 @@ function shouldSliceAllowVision(material, sliceHealth, maxHealth) {
         return sliceHealth <= 0;
     }
     else {
-        // Soft walls (wood/glass): allow vision when slice is heavily damaged (<25% health)
+        // Soft walls (wood/glass): allow vision when slice is at 50% health or less
         const healthPercentage = sliceHealth / maxHealth;
-        return healthPercentage < 0.25; // Less than 25% health remaining
+        return healthPercentage <= 0.5; // 50% or less health remaining
     }
 }
 /**

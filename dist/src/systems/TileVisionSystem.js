@@ -99,10 +99,14 @@ class TileVisionSystem {
                     this.partialWalls.set(tileIndex, partial);
                 }
                 const oldMask = partial.destroyedSlices;
-                // Update slice health and destruction mask
+                // Update slice health and bitmask based on health-based visibility logic
                 partial.sliceHealth[sliceIndex] = wall.sliceHealth[sliceIndex];
-                if (wall.sliceHealth[sliceIndex] <= 0) {
+                const shouldAllowVision = (0, wallSliceHelpers_1.shouldSliceAllowVision)(wall.material, wall.sliceHealth[sliceIndex], wall.maxHealth);
+                if (shouldAllowVision) {
                     partial.destroyedSlices |= (1 << sliceIndex);
+                }
+                else {
+                    partial.destroyedSlices &= ~(1 << sliceIndex);
                 }
                 // console.log(`   Tile ${x},${y}: slice ${sliceIndex} health: ${partial.sliceHealth[sliceIndex]}, destroyed slices ${oldMask.toString(2)} → ${partial.destroyedSlices.toString(2)}`);
                 // If all 5 slices are destroyed, remove the wall tile
