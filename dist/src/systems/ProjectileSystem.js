@@ -300,6 +300,13 @@ class ProjectileSystem {
                     const distY = checkY - closestY;
                     const distSq = distX * distX + distY * distY;
                     if (distSq < this.GRENADE_RADIUS * this.GRENADE_RADIUS) {
+                        // ✅ NEW: Check if the slice at collision point is destroyed
+                        const sliceIndex = (0, wallSliceHelpers_1.calculateSliceIndex)(wall, { x: closestX, y: closestY });
+                        // If this slice is destroyed, grenade should pass through
+                        if (wall.destructionMask && wall.destructionMask[sliceIndex] === 1) {
+                            continue; // Skip this collision, grenade passes through destroyed slice
+                        }
+                        // Slice is intact - proceed with normal collision
                         // Calculate normal
                         const dist = Math.sqrt(distSq);
                         const normal = dist > 0
@@ -521,6 +528,11 @@ class ProjectileSystem {
             const hitY = start.y + dy * Math.max(0, tMin);
             // Calculate which slice was hit (using original wall position, not expanded bounds)
             const sliceIndex = (0, wallSliceHelpers_1.calculateSliceIndex)(wall, { x: hitX, y: hitY });
+            // ✅ NEW: Check if the slice at collision point is destroyed
+            if (wall.destructionMask && wall.destructionMask[sliceIndex] === 1) {
+                return { hit: false }; // Rocket passes through destroyed slice
+            }
+            // Slice is intact - proceed with normal collision
             return {
                 hit: true,
                 sliceIndex: sliceIndex
