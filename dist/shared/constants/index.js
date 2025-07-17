@@ -95,7 +95,8 @@ exports.GAME_CONFIG = {
             WOOD: 0.8,
             METAL: 2.0,
             GLASS: 0.3
-        }
+        },
+        SOFT_WALL_PENETRATION_DAMAGE: 15 // Damage absorbed when penetrating soft walls
     },
     // Combat system
     COMBAT: {

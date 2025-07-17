@@ -74,7 +74,10 @@ class GameStateSystem {
             x: wall.position.x,
             y: wall.position.y,
             width: wall.width,
-            height: wall.height
+            height: wall.height,
+            material: wall.material,
+            sliceHealth: [...wall.sliceHealth],
+            maxHealth: wall.maxHealth
         }));
         this.visionSystem.initializeWalls(wallData);
         // Get spawn positions from destruction system (if loaded from map)
@@ -358,46 +361,46 @@ class GameStateSystem {
         const events = [];
         // Handle hitscan weapons (rifle, pistol)
         if (weaponConfig.HITSCAN) {
-            const hitscanResult = this.weaponSystem.performHitscan(event.position, event.direction, weapon.range, weapon, player, this.destructionSystem.getWalls(), this.players);
-            // Debug logging
-            // console.log(`🎯 HITSCAN from (${event.position.x.toFixed(1)}, ${event.position.y.toFixed(1)}) dir: ${(event.direction * 180 / Math.PI).toFixed(1)}° - Result: ${hitscanResult.hit ? `HIT ${hitscanResult.targetType} at (${hitscanResult.hitPoint.x.toFixed(1)}, ${hitscanResult.hitPoint.y.toFixed(1)})` : 'MISS'}`);
-            if (hitscanResult.hit) {
-                if (hitscanResult.targetType === 'player' && hitscanResult.targetId) {
-                    // Player hit
-                    const targetPlayer = this.players.get(hitscanResult.targetId);
-                    if (targetPlayer) {
-                        const damage = this.weaponSystem.calculateDamage(weapon, hitscanResult.distance);
-                        const damageEvent = this.applyPlayerDamage(targetPlayer, damage, 'bullet', event.playerId, hitscanResult.hitPoint);
-                        events.push({ type: constants_1.EVENTS.PLAYER_DAMAGED, data: damageEvent });
-                        if (damageEvent.isKilled) {
-                            player.kills++;
-                            events.push({ type: constants_1.EVENTS.PLAYER_KILLED, data: damageEvent });
+            const penetrationHits = this.weaponSystem.performHitscanWithPenetration(event.position, event.direction, weapon.range, weapon, player, this.destructionSystem.getWalls(), this.players);
+            // Process all hits from penetration
+            if (penetrationHits.length > 0) {
+                for (const hit of penetrationHits) {
+                    if (hit.targetType === 'player') {
+                        // Player hit
+                        const targetPlayer = this.players.get(hit.targetId);
+                        if (targetPlayer) {
+                            const damageEvent = this.applyPlayerDamage(targetPlayer, hit.damage, 'bullet', event.playerId, hit.hitPoint);
+                            events.push({ type: constants_1.EVENTS.PLAYER_DAMAGED, data: damageEvent });
+                            if (damageEvent.isKilled) {
+                                player.kills++;
+                                events.push({ type: constants_1.EVENTS.PLAYER_KILLED, data: damageEvent });
+                            }
                         }
                     }
-                }
-                else if (hitscanResult.targetType === 'wall' && hitscanResult.targetId && hitscanResult.wallSliceIndex !== undefined) {
-                    // Wall hit
-                    // console.log(`🧱 WALL HIT: ${hitscanResult.targetId} slice ${hitscanResult.wallSliceIndex}`);
-                    const wall = this.destructionSystem.getWall(hitscanResult.targetId);
-                    if (wall) {
-                        const damage = this.weaponSystem.calculateDamage(weapon, hitscanResult.distance);
-                        const damageEvent = this.destructionSystem.applyDamage(hitscanResult.targetId, hitscanResult.wallSliceIndex, damage);
-                        if (damageEvent) {
-                            events.push({ type: constants_1.EVENTS.WALL_DAMAGED, data: damageEvent });
-                            // console.log(`💥 WALL DAMAGED: ${damageEvent.wallId} slice ${damageEvent.sliceIndex} - new health: ${damageEvent.newHealth}`);
-                            // Notify vision system of wall destruction
-                            this.visionSystem.onWallDestroyed(hitscanResult.targetId, wall, damageEvent.sliceIndex);
-                            if (damageEvent.isDestroyed) {
-                                events.push({ type: constants_1.EVENTS.WALL_DESTROYED, data: damageEvent });
+                    else if (hit.targetType === 'wall' && hit.wallSliceIndex !== undefined) {
+                        // Wall hit
+                        const wall = this.destructionSystem.getWall(hit.targetId);
+                        if (wall) {
+                            const damageEvent = this.destructionSystem.applyDamage(hit.targetId, hit.wallSliceIndex, hit.damage);
+                            if (damageEvent) {
+                                events.push({ type: constants_1.EVENTS.WALL_DAMAGED, data: damageEvent });
+                                // Notify vision system of wall destruction
+                                this.visionSystem.onWallDestroyed(hit.targetId, wall, damageEvent.sliceIndex);
+                                if (damageEvent.isDestroyed) {
+                                    events.push({ type: constants_1.EVENTS.WALL_DESTROYED, data: damageEvent });
+                                }
                             }
                         }
                     }
                 }
+                // Use the first hit for the hit event
+                const firstHit = penetrationHits[0];
                 events.push({ type: constants_1.EVENTS.WEAPON_HIT, data: {
                         playerId: event.playerId,
-                        position: hitscanResult.hitPoint,
-                        targetType: hitscanResult.targetType,
-                        targetId: hitscanResult.targetId
+                        position: firstHit.hitPoint,
+                        targetType: firstHit.targetType,
+                        targetId: firstHit.targetId,
+                        penetrationCount: penetrationHits.length
                     } });
             }
             else {

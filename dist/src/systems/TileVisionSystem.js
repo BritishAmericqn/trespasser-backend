@@ -91,13 +91,20 @@ class TileVisionSystem {
                         wallPosition: { x: wall.position.x, y: wall.position.y },
                         wallWidth: wall.width,
                         wallHeight: wall.height,
-                        wallOrientation: orientation
+                        wallOrientation: orientation,
+                        wallMaterial: wall.material,
+                        sliceHealth: [...wall.sliceHealth], // Copy slice health array
+                        maxHealth: wall.maxHealth
                     };
                     this.partialWalls.set(tileIndex, partial);
                 }
                 const oldMask = partial.destroyedSlices;
-                partial.destroyedSlices |= (1 << sliceIndex);
-                // console.log(`   Tile ${x},${y}: destroyed slices ${oldMask.toString(2)} → ${partial.destroyedSlices.toString(2)}`);
+                // Update slice health and destruction mask
+                partial.sliceHealth[sliceIndex] = wall.sliceHealth[sliceIndex];
+                if (wall.sliceHealth[sliceIndex] <= 0) {
+                    partial.destroyedSlices |= (1 << sliceIndex);
+                }
+                // console.log(`   Tile ${x},${y}: slice ${sliceIndex} health: ${partial.sliceHealth[sliceIndex]}, destroyed slices ${oldMask.toString(2)} → ${partial.destroyedSlices.toString(2)}`);
                 // If all 5 slices are destroyed, remove the wall tile
                 if (partial.destroyedSlices === 0b11111) {
                     this.wallTileIndices.delete(tileIndex);
@@ -236,9 +243,31 @@ class TileVisionSystem {
                 // Check if this tile has partial wall destruction
                 const tileIndex = this.tileToIndex(x, y);
                 const partial = this.partialWalls.get(tileIndex);
-                if (partial && partial.destroyedSlices > 0) {
-                    // TEMPORARY: Allow through if ANY slice destroyed (will be replaced with individual segments)
-                    // Continue - don't return false
+                if (partial) {
+                    // Create a temporary wall object to check individual slice health
+                    const tempWall = {
+                        material: partial.wallMaterial,
+                        destructionMask: new Uint8Array(5),
+                        id: partial.wallId,
+                        position: partial.wallPosition,
+                        width: partial.wallWidth,
+                        height: partial.wallHeight,
+                        orientation: partial.wallOrientation,
+                        maxHealth: partial.maxHealth,
+                        sliceHealth: partial.sliceHealth
+                    };
+                    // For ray passing through a tile, check if ANY slice blocks vision
+                    let anySliceBlocks = false;
+                    for (let i = 0; i < 5; i++) {
+                        if ((0, wallSliceHelpers_1.shouldSliceBlockVisionByHealth)(tempWall, i)) {
+                            anySliceBlocks = true;
+                            break;
+                        }
+                    }
+                    if (anySliceBlocks) {
+                        return false; // At least one slice still blocks vision
+                    }
+                    // Otherwise continue - all slices allow vision through
                 }
                 else {
                     // Solid wall with no destroyed slices blocks vision

@@ -3,7 +3,9 @@ import { Vector2 } from '../../shared/types'; // Added missing import
 import { 
   determineWallOrientation,
   calculateSliceIndex,
-  getSliceDimension
+  getSliceDimension,
+  shouldAllowVisionThrough,
+  shouldSliceBlockVisionByHealth
 } from '../utils/wallSliceHelpers';
 
 interface TileCoord {
@@ -25,6 +27,9 @@ interface PartialWallData {
     wallWidth: number;
     wallHeight: number;
     wallOrientation: 'horizontal' | 'vertical'; // Added orientation
+    wallMaterial: 'concrete' | 'wood' | 'metal' | 'glass'; // Added material
+    sliceHealth: number[]; // Health of each slice
+    maxHealth: number; // Maximum health per slice
 }
 
 export class TileVisionSystem {
@@ -67,7 +72,7 @@ export class TileVisionSystem {
         };
     }
     
-    initializeWalls(walls: Array<{ id: string; x: number; y: number; width: number; height: number }>) {
+    initializeWalls(walls: Array<{ id: string; x: number; y: number; width: number; height: number; material: string }>) {
         this.wallTileIndices.clear();
         
         for (const wall of walls) {
@@ -107,7 +112,7 @@ export class TileVisionSystem {
         // Would need wall bounds to properly remove tiles
     }
     
-    onWallDestroyed(wallId: string, wall: { position: Vector2; width: number; height: number }, sliceIndex: number) {
+    onWallDestroyed(wallId: string, wall: { position: Vector2; width: number; height: number; material: string; sliceHealth: number[]; maxHealth: number }, sliceIndex: number) {
         // console.log(`🔍 onWallDestroyed called for ${wallId} slice ${sliceIndex}`);
         // console.log(`   Wall position: (${wall.position.x}, ${wall.position.y}) size: ${wall.width}x${wall.height}`);
         
@@ -136,15 +141,23 @@ export class TileVisionSystem {
                         wallPosition: { x: wall.position.x, y: wall.position.y },
                         wallWidth: wall.width,
                         wallHeight: wall.height,
-                        wallOrientation: orientation
+                        wallOrientation: orientation,
+                        wallMaterial: wall.material as 'concrete' | 'wood' | 'metal' | 'glass',
+                        sliceHealth: [...wall.sliceHealth], // Copy slice health array
+                        maxHealth: wall.maxHealth
                     };
                     this.partialWalls.set(tileIndex, partial);
                 }
                 
                 const oldMask = partial.destroyedSlices;
-                partial.destroyedSlices |= (1 << sliceIndex);
                 
-                // console.log(`   Tile ${x},${y}: destroyed slices ${oldMask.toString(2)} → ${partial.destroyedSlices.toString(2)}`);
+                // Update slice health and destruction mask
+                partial.sliceHealth[sliceIndex] = wall.sliceHealth[sliceIndex];
+                if (wall.sliceHealth[sliceIndex] <= 0) {
+                    partial.destroyedSlices |= (1 << sliceIndex);
+                }
+                
+                // console.log(`   Tile ${x},${y}: slice ${sliceIndex} health: ${partial.sliceHealth[sliceIndex]}, destroyed slices ${oldMask.toString(2)} → ${partial.destroyedSlices.toString(2)}`);
                 
                 // If all 5 slices are destroyed, remove the wall tile
                 if (partial.destroyedSlices === 0b11111) {
@@ -321,9 +334,33 @@ export class TileVisionSystem {
                 const tileIndex = this.tileToIndex(x, y);
                 const partial = this.partialWalls.get(tileIndex);
                 
-                if (partial && partial.destroyedSlices > 0) {
-                    // TEMPORARY: Allow through if ANY slice destroyed (will be replaced with individual segments)
-                    // Continue - don't return false
+                if (partial) {
+                    // Create a temporary wall object to check individual slice health
+                    const tempWall = {
+                        material: partial.wallMaterial,
+                        destructionMask: new Uint8Array(5),
+                        id: partial.wallId,
+                        position: partial.wallPosition,
+                        width: partial.wallWidth,
+                        height: partial.wallHeight,
+                        orientation: partial.wallOrientation,
+                        maxHealth: partial.maxHealth,
+                        sliceHealth: partial.sliceHealth
+                    };
+                    
+                    // For ray passing through a tile, check if ANY slice blocks vision
+                    let anySliceBlocks = false;
+                    for (let i = 0; i < 5; i++) {
+                        if (shouldSliceBlockVisionByHealth(tempWall, i)) {
+                            anySliceBlocks = true;
+                            break;
+                        }
+                    }
+                    
+                    if (anySliceBlocks) {
+                        return false; // At least one slice still blocks vision
+                    }
+                    // Otherwise continue - all slices allow vision through
                 } else {
                     // Solid wall with no destroyed slices blocks vision
                     return false;

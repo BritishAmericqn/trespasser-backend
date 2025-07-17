@@ -204,3 +204,14 @@ export interface HitscanResult {
   targetId?: string;
   wallSliceIndex?: number;
 }
+
+// Penetration hit for bullets that pass through multiple targets
+export interface PenetrationHit {
+  targetType: 'player' | 'wall';
+  targetId: string;
+  hitPoint: Vector2;
+  distance: number;
+  wallSliceIndex?: number;
+  damage: number; // Damage dealt to this target
+  remainingDamage: number; // Damage remaining after this hit
+}

@@ -4,7 +4,10 @@ import type { PlayerState } from '../../shared/types';
 import { 
   getSliceBoundaryPosition,
   calculateSliceIndex,
-  getSliceDimension
+  getSliceDimension,
+  shouldAllowVisionThrough,
+  shouldSliceBlockVision,
+  shouldSliceBlockVisionByHealth
 } from '../utils/wallSliceHelpers';
 
 interface Corner {
@@ -22,6 +25,9 @@ interface Wall {
   height: number;
   orientation: 'horizontal' | 'vertical'; // Added orientation
   destroyedSlices: number;
+  material: string; // Added material
+  sliceHealth: number[]; // Health of each slice
+  maxHealth: number; // Maximum health per slice
 }
 
 export class VisibilityPolygonSystem {
@@ -36,7 +42,7 @@ export class VisibilityPolygonSystem {
   /**
    * Initialize walls from destruction system format
    */
-  initializeWalls(wallData: Array<{id: string, x: number, y: number, width: number, height: number}>) {
+  initializeWalls(wallData: Array<{id: string, x: number, y: number, width: number, height: number, material: string, sliceHealth: number[], maxHealth: number}>) {
     this.walls.clear();
     
     wallData.forEach((wall) => {
@@ -46,7 +52,10 @@ export class VisibilityPolygonSystem {
         width: wall.width,
         height: wall.height,
         orientation: wall.width > wall.height ? 'horizontal' : 'vertical',
-        destroyedSlices: 0
+        destroyedSlices: 0,
+        material: wall.material,
+        sliceHealth: [...wall.sliceHealth],
+        maxHealth: wall.maxHealth
       });
     });
     
@@ -56,14 +65,17 @@ export class VisibilityPolygonSystem {
   /**
    * Add a single wall (for dynamically created walls)
    */
-  addWall(wallId: string, wall: { position: Vector2; width: number; height: number }) {
+  addWall(wallId: string, wall: { position: Vector2; width: number; height: number; material: string; sliceHealth: number[]; maxHealth: number }) {
     this.walls.set(wallId, {
       id: wallId,
       position: { x: wall.position.x, y: wall.position.y },
       width: wall.width,
       height: wall.height,
       orientation: wall.width > wall.height ? 'horizontal' : 'vertical',
-      destroyedSlices: 0
+      destroyedSlices: 0,
+      material: wall.material,
+      sliceHealth: [...wall.sliceHealth],
+      maxHealth: wall.maxHealth
     });
     // console.log(`[VisibilityPolygon] Added wall ${wallId}`);
   }
@@ -80,12 +92,20 @@ export class VisibilityPolygonSystem {
   /**
    * Update wall destruction state
    */
-  onWallDestroyed(wallId: string, wall: { position: Vector2; width: number; height: number }, sliceIndex: number) {
+  onWallDestroyed(wallId: string, wall: { position: Vector2; width: number; height: number; material: string; sliceHealth: number[]; maxHealth: number }, sliceIndex: number) {
     const storedWall = this.walls.get(wallId);
     if (storedWall) {
       const oldMask = storedWall.destroyedSlices;
-      storedWall.destroyedSlices |= (1 << sliceIndex);
-      // console.log(`[VisibilityPolygon] Wall ${wallId} slice ${sliceIndex} destroyed. Mask: ${oldMask.toString(2).padStart(5, '0')} → ${storedWall.destroyedSlices.toString(2).padStart(5, '0')}`);
+      
+      // Update slice health
+      storedWall.sliceHealth[sliceIndex] = wall.sliceHealth[sliceIndex];
+      
+      // Update destruction mask if slice is fully destroyed
+      if (wall.sliceHealth[sliceIndex] <= 0) {
+        storedWall.destroyedSlices |= (1 << sliceIndex);
+      }
+      
+      // console.log(`[VisibilityPolygon] Wall ${wallId} slice ${sliceIndex} updated. Health: ${wall.sliceHealth[sliceIndex]}, Mask: ${oldMask.toString(2).padStart(5, '0')} → ${storedWall.destroyedSlices.toString(2).padStart(5, '0')}`);
     } else {
       console.warn(`[VisibilityPolygon] Wall ${wallId} not found in visibility system!`);
     }
@@ -597,16 +617,27 @@ export class VisibilityPolygonSystem {
           // Check which slice the ray hits
           const hitSliceIndex = calculateSliceIndex(wall as any, intersection);
           
-          // Check if the hit slice is destroyed
-          const sliceDestroyed = (wall.destroyedSlices & (1 << hitSliceIndex)) !== 0;
+          // Create a temporary wall object to check material-based visibility
+          const tempWall = {
+            material: wall.material as 'concrete' | 'wood' | 'metal' | 'glass',
+            destructionMask: new Uint8Array(5),
+            id: wall.id,
+            position: wall.position,
+            width: wall.width,
+            height: wall.height,
+            orientation: wall.orientation,
+            maxHealth: wall.maxHealth,
+            sliceHealth: wall.sliceHealth
+          };
           
-          if (!sliceDestroyed) {
-            // Hit an intact slice - this is our intersection
+          // Check if this slice should block vision based on health
+          if (shouldSliceBlockVisionByHealth(tempWall, hitSliceIndex)) {
+            // This slice blocks vision - this is our intersection
             closestIntersection = intersection;
             closestDistance = dist;
           } else {
-            // Hit a destroyed slice - check for slice boundaries
-            // Cast ray through the wall to find where it would exit or hit an intact slice
+            // This slice doesn't block vision - check for slice boundaries
+            // Cast ray through the wall to find where it would exit or hit a blocking slice
             const sliceBoundaryHit = this.checkSliceBoundaries(wall, viewerPos, { x: dx, y: dy }, intersection);
             
             if (sliceBoundaryHit && sliceBoundaryHit.distance < closestDistance) {
@@ -687,13 +718,14 @@ export class VisibilityPolygonSystem {
       const leftSlice = sliceIndex - 1;
       const rightSlice = sliceIndex;
       
-      const leftDestroyed = leftSlice >= 0 && leftSlice < 5 ? 
-        (wall.destroyedSlices & (1 << leftSlice)) !== 0 : true;
-      const rightDestroyed = rightSlice >= 0 && rightSlice < 5 ? 
-        (wall.destroyedSlices & (1 << rightSlice)) !== 0 : true;
+      // Check if slices allow vision based on health
+      const leftAllowsVision = leftSlice >= 0 && leftSlice < 5 ? 
+        !shouldSliceBlockVisionByHealth(wall as any, leftSlice) : true;
+      const rightAllowsVision = rightSlice >= 0 && rightSlice < 5 ? 
+        !shouldSliceBlockVisionByHealth(wall as any, rightSlice) : true;
       
-      // Skip if both sides are the same (both destroyed or both intact)
-      if (leftDestroyed === rightDestroyed) continue;
+      // Skip if both sides are the same (both allow vision or both block)
+      if (leftAllowsVision === rightAllowsVision) continue;
       
       // Calculate boundary position
       const boundaryPos = getSliceBoundaryPosition(wall as any, sliceIndex);
@@ -717,9 +749,9 @@ export class VisibilityPolygonSystem {
               if (!closestHit || distance < closestHit.distance) {
                 // Only count as hit if we're moving from destroyed to intact
                 const movingRight = rayDir.x > 0;
-                const hittingIntact = movingRight ? !rightDestroyed : !leftDestroyed;
+                const hittingBlockingSlice = movingRight ? !rightAllowsVision : !leftAllowsVision;
                 
-                if (hittingIntact) {
+                if (hittingBlockingSlice) {
                   closestHit = { point: hitPoint, distance: distance };
                 }
               }
@@ -746,9 +778,9 @@ export class VisibilityPolygonSystem {
                 const movingDown = rayDir.y > 0;
                 const topSlice = sliceIndex - 1;
                 const bottomSlice = sliceIndex;
-                const hittingIntact = movingDown ? !rightDestroyed : !leftDestroyed;
+                const hittingBlockingSlice = movingDown ? !rightAllowsVision : !leftAllowsVision;
                 
-                if (hittingIntact) {
+                if (hittingBlockingSlice) {
                   closestHit = { point: hitPoint, distance: distance };
                 }
               }

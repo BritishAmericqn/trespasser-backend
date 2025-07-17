@@ -199,6 +199,22 @@ class WeaponSystem {
         const result = this.raycast(startPos, endPos, walls, players, player.id);
         return result;
     }
+    // Perform hitscan with penetration support
+    performHitscanWithPenetration(startPos, direction, range, weapon, player, walls, players) {
+        const accuracy = this.calculateAccuracy(weapon, player);
+        // Apply spread based on accuracy
+        const maxSpread = (1 - accuracy) * 0.2; // 0.2 radians max spread
+        const spread = (Math.random() - 0.5) * maxSpread;
+        const finalDirection = direction + spread;
+        // Calculate end position
+        const endPos = {
+            x: startPos.x + Math.cos(finalDirection) * range,
+            y: startPos.y + Math.sin(finalDirection) * range
+        };
+        // Check for hits along the ray with penetration
+        const hits = this.raycastWithPenetration(startPos, endPos, walls, players, player.id, weapon.damage);
+        return hits;
+    }
     // Raycast for collision detection
     raycast(start, end, walls, players, shooterId) {
         const direction = {
@@ -314,6 +330,150 @@ class WeaponSystem {
             }
         }
         return closestHit;
+    }
+    // Raycast with penetration support for soft walls
+    raycastWithPenetration(start, end, walls, players, shooterId, initialDamage) {
+        const direction = {
+            x: end.x - start.x,
+            y: end.y - start.y
+        };
+        const distance = Math.sqrt(direction.x * direction.x + direction.y * direction.y);
+        // Normalize direction
+        direction.x /= distance;
+        direction.y /= distance;
+        const hits = [];
+        let currentDamage = initialDamage;
+        let currentStart = { ...start };
+        let remainingDistance = distance;
+        let iterations = 0;
+        const maxIterations = 20; // Safety limit to prevent infinite loops
+        // Keep searching until we run out of damage or distance
+        while (currentDamage > 0 && remainingDistance > 0 && iterations < maxIterations) {
+            iterations++;
+            let closestHit = null;
+            // Check all walls
+            for (const [wallId, wall] of walls) {
+                const wallHit = this.checkWallHit(currentStart, direction, remainingDistance, wall);
+                if (wallHit) {
+                    if (!closestHit || wallHit.distance < closestHit.distance) {
+                        closestHit = {
+                            type: 'wall',
+                            id: wallId,
+                            hitPoint: wallHit.hitPoint,
+                            distance: wallHit.distance,
+                            sliceIndex: wallHit.sliceIndex,
+                            wall: wall
+                        };
+                    }
+                }
+            }
+            // Check all players
+            for (const [playerId, player] of players) {
+                if (playerId === shooterId || !player.isAlive)
+                    continue;
+                const playerHit = this.checkPlayerHit(currentStart, direction, remainingDistance, player);
+                if (playerHit) {
+                    if (!closestHit || playerHit.distance < closestHit.distance) {
+                        closestHit = {
+                            type: 'player',
+                            id: playerId,
+                            hitPoint: playerHit.hitPoint,
+                            distance: playerHit.distance
+                        };
+                    }
+                }
+            }
+            // If no hit, we're done
+            if (!closestHit)
+                break;
+            // Process the hit
+            if (closestHit.type === 'player') {
+                // Player hit - bullet stops here
+                hits.push({
+                    targetType: 'player',
+                    targetId: closestHit.id,
+                    hitPoint: closestHit.hitPoint,
+                    distance: closestHit.distance,
+                    damage: currentDamage,
+                    remainingDamage: 0
+                });
+                break; // Bullet stops at player
+            }
+            else {
+                // Wall hit
+                const wall = closestHit.wall;
+                const sliceIndex = closestHit.sliceIndex;
+                // Check if slice is already destroyed
+                if (wall.destructionMask && wall.destructionMask[sliceIndex] === 1) {
+                    // Slice is destroyed - ray continues without damage reduction
+                    // Move start point slightly past the hit to avoid re-hitting the same wall
+                    const epsilon = 0.1;
+                    currentStart = {
+                        x: closestHit.hitPoint.x + direction.x * epsilon,
+                        y: closestHit.hitPoint.y + direction.y * epsilon
+                    };
+                    remainingDistance -= (closestHit.distance + epsilon);
+                    continue;
+                }
+                // Check if it's a hard wall
+                if ((0, wallSliceHelpers_1.isHardWall)(wall.material)) {
+                    // console.log(`🛑 Bullet hit hard wall ${wall.material}, stopping`);
+                    // Hard wall - bullet stops here
+                    hits.push({
+                        targetType: 'wall',
+                        targetId: closestHit.id,
+                        hitPoint: closestHit.hitPoint,
+                        distance: closestHit.distance,
+                        wallSliceIndex: sliceIndex,
+                        damage: currentDamage,
+                        remainingDamage: 0
+                    });
+                    break;
+                }
+                else {
+                    // Soft wall - apply penetration
+                    const penetrationDamage = constants_1.GAME_CONFIG.DESTRUCTION.SOFT_WALL_PENETRATION_DAMAGE;
+                    if (currentDamage > penetrationDamage) {
+                        // Bullet penetrates
+                        // console.log(`🔫 Bullet penetrates soft wall ${wall.material}, damage: ${currentDamage} -> ${currentDamage - penetrationDamage}`);
+                        const damageToWall = penetrationDamage;
+                        const remainingDamage = currentDamage - penetrationDamage;
+                        hits.push({
+                            targetType: 'wall',
+                            targetId: closestHit.id,
+                            hitPoint: closestHit.hitPoint,
+                            distance: closestHit.distance,
+                            wallSliceIndex: sliceIndex,
+                            damage: damageToWall,
+                            remainingDamage: remainingDamage
+                        });
+                        // Continue with reduced damage
+                        currentDamage = remainingDamage;
+                        // Move start point slightly past the hit to avoid re-hitting the same wall
+                        const epsilon = 0.1;
+                        currentStart = {
+                            x: closestHit.hitPoint.x + direction.x * epsilon,
+                            y: closestHit.hitPoint.y + direction.y * epsilon
+                        };
+                        remainingDistance -= (closestHit.distance + epsilon);
+                    }
+                    else {
+                        // Bullet doesn't have enough damage to penetrate
+                        hits.push({
+                            targetType: 'wall',
+                            targetId: closestHit.id,
+                            hitPoint: closestHit.hitPoint,
+                            distance: closestHit.distance,
+                            wallSliceIndex: sliceIndex,
+                            damage: currentDamage,
+                            remainingDamage: 0
+                        });
+                        break;
+                    }
+                }
+            }
+        }
+        return hits;
     }
     // Check if ray hits a player
     checkPlayerHit(start, direction, maxDistance, player) {

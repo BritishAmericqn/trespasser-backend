@@ -99,3 +99,102 @@ export function isPointInSlice(wall: WallState, point: Vector2, sliceIndex: numb
 export function determineWallOrientation(width: number, height: number): 'horizontal' | 'vertical' {
   return width > height ? 'horizontal' : 'vertical';
 } 
+
+/**
+ * Classify a wall as hard or soft based on its material
+ * Hard walls: concrete, metal - require full destruction to see through
+ * Soft walls: wood, glass - allow vision with partial destruction
+ */
+export function isHardWall(material: string): boolean {
+  return material === 'concrete' || material === 'metal';
+}
+
+/**
+ * Check if a wall should allow vision through based on material and destruction state
+ * @param wall The wall to check
+ * @param destroyedSlices Bitmask of destroyed slices (0b11111 = all destroyed)
+ * @returns true if vision should pass through this wall
+ */
+export function shouldAllowVisionThrough(wall: WallState, destroyedSlices: number): boolean {
+  if (isHardWall(wall.material)) {
+    // Hard walls: only allow vision when ALL slices are destroyed
+    return destroyedSlices === 0b11111; // All 5 slices destroyed
+  } else {
+    // Soft walls: require higher threshold (3+ slices destroyed instead of just 1)
+    let destroyedCount = 0;
+    let mask = destroyedSlices;
+    while (mask) {
+      destroyedCount += mask & 1;
+      mask >>= 1;
+    }
+    return destroyedCount >= 3; // At least 3 out of 5 slices destroyed
+  }
+}
+
+/**
+ * Check if a specific slice in a wall should block vision
+ * @param wall The wall to check
+ * @param sliceIndex The specific slice index (0-4)
+ * @param destroyedSlices Bitmask of destroyed slices
+ * @returns true if this slice should block vision
+ */
+export function shouldSliceBlockVision(wall: WallState, sliceIndex: number, destroyedSlices: number): boolean {
+  const sliceDestroyed = (destroyedSlices & (1 << sliceIndex)) !== 0;
+  
+  if (isHardWall(wall.material)) {
+    // Hard walls: individual slices always block unless ALL slices are destroyed
+    return destroyedSlices !== 0b11111;
+  } else {
+    // Soft walls: this slice blocks if it's intact AND we haven't reached the threshold
+    if (sliceDestroyed) {
+      return false; // This specific slice is destroyed, so it doesn't block
+    }
+    
+    // Check if we've reached the soft wall threshold
+    let destroyedCount = 0;
+    let mask = destroyedSlices;
+    while (mask) {
+      destroyedCount += mask & 1;
+      mask >>= 1;
+    }
+    
+    // If we have 3+ destroyed slices, even intact slices don't block (wall is "open enough")
+    return destroyedCount < 3;
+  }
+}
+
+/**
+ * Check if an individual slice should allow vision through based on its health and material
+ * @param material The wall material ('concrete', 'wood', 'metal', 'glass')
+ * @param sliceHealth Current health of the slice
+ * @param maxHealth Maximum health of the slice
+ * @returns true if vision should pass through this slice
+ */
+export function shouldSliceAllowVision(material: string, sliceHealth: number, maxHealth: number): boolean {
+  if (isHardWall(material)) {
+    // Hard walls (concrete/metal): only allow vision when slice is completely destroyed
+    return sliceHealth <= 0;
+  } else {
+    // Soft walls (wood/glass): allow vision when slice is heavily damaged (<25% health)
+    const healthPercentage = sliceHealth / maxHealth;
+    return healthPercentage < 0.25; // Less than 25% health remaining
+  }
+}
+
+/**
+ * Check if a specific slice in a wall should block vision based on actual health values
+ * @param wall The wall to check
+ * @param sliceIndex The specific slice index (0-4)
+ * @returns true if this slice should block vision
+ */
+export function shouldSliceBlockVisionByHealth(wall: WallState, sliceIndex: number): boolean {
+  if (sliceIndex < 0 || sliceIndex >= wall.sliceHealth.length) {
+    return true; // Invalid slice index blocks vision
+  }
+  
+  const sliceHealth = wall.sliceHealth[sliceIndex];
+  const maxHealth = wall.maxHealth;
+  
+  // Return the opposite of shouldSliceAllowVision
+  return !shouldSliceAllowVision(wall.material, sliceHealth, maxHealth);
+} 
