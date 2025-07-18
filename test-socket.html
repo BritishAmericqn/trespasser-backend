@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Socket.IO Direct Test</title>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+  <h1>Direct Socket Test</h1>
+  <button onclick="testEmit()">Test Emit</button>
+  <pre id="log"></pre>
+  
+  <script>
+    const socket = io('http://localhost:3000');
+    const log = document.getElementById('log');
+    
+    function addLog(msg) {
+      log.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + log.textContent;
+    }
+    
+    // Log ALL events
+    socket.onAny((eventName, ...args) => {
+      addLog(`EVENT: ${eventName} (${args.length} args)`);
+      if (eventName === 'game:state') {
+        const state = args[0];
+        addLog(`GAME STATE: walls=${Object.keys(state.walls || {}).length}, players=${Object.keys(state.players || {}).length}`);
+      }
+    });
+    
+    socket.on('connect', () => {
+      addLog('CONNECTED: ' + socket.id);
+      // Send auth as STRING (your game might be doing this)
+      socket.emit('authenticate', 'MyGamePassword123');
+      addLog('Sent auth as STRING');
+    });
+    
+    socket.on('disconnect', (reason) => {
+      addLog('DISCONNECTED: ' + reason);
+    });
+    
+    socket.on('authenticated', () => {
+      addLog('AUTHENTICATED SUCCESS!');
+    });
+    
+    socket.on('auth-failed', (msg) => {
+      addLog('AUTH FAILED: ' + msg);
+    });
+    
+    socket.on('error', (err) => {
+      addLog('ERROR: ' + err);
+    });
+    
+    function testEmit() {
+      socket.emit('test', 'hello');
+      addLog('Emitted test event');
+    }
+  </script>
+</body>
+</html> 

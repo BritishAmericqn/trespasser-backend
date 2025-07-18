@@ -1,0 +1,808 @@
+
+> trespasser-backend@1.0.0 start
+> node dist/src/index.js
+
+
+==================================================
+🎮 TRESPASSER MULTIPLAYER SERVER STARTED
+==================================================
+🚀 Status: ONLINE
+🔧 Port: 3000
+👥 Max Players: 8
+🔐 Password: ✅ Required
+🔑 Password: "MyGamePassword123"
+
+📱 CONNECTION METHODS:
+   Local:    http://localhost:3000
+   Local:    http://127.0.0.1:3000
+   LAN (en0): http://192.168.1.238:3000
+
+🌐 FOR INTERNET PLAY:
+1. Port forward TCP port 3000 to this computer
+2. Find your public IP: curl ifconfig.me
+3. Share: http://[YOUR-PUBLIC-IP]:3000
+
+🏠 FOR LAN PLAY:
+Share any of these URLs with friends on your network:
+   http://192.168.1.238:3000
+
+🎯 GAME INFO:
+   Tick Rate: 60 Hz
+   Network Rate: 20 Hz
+==================================================
+
+🔄 Initializing game room...
+VisibilityPolygonSystem initialized
+❌ Failed to load map maps/yourmap2.png: [Error: ENOENT: no such file or directory, open './maps/maps/yourmap2.png.png'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: './maps/maps/yourmap2.png.png',
+  methodName: 'constructor'
+}
+Failed to load map file, falling back to test walls: [Error: ENOENT: no such file or directory, open './maps/maps/yourmap2.png.png'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: './maps/maps/yourmap2.png.png',
+  methodName: 'constructor'
+}
+🧱 Initializing 12 walls for GameStateSystem
+Initialized 12 walls for visibility polygon
+✅ GameRoom initialized with map loaded
+✅ Game room ready!
+💡 TROUBLESHOOTING:
+   • Test server: curl http://localhost:3000
+   • Kill conflicting process: lsof -ti:3000 | xargs kill -9
+   • Use different port: PORT=3001 npm start
+
+🔌 Connection attempt from 127.0.0.1 (WDQTx8M9z4nLOC4LAAAB)
+📤 Sending initial game state to WDQTx8M9z4nLOC4LAAAB: { players: 1, walls: 12, projectiles: 0 }
+📡 Using event name: "game:state"
+🧱 First wall data: {
+  id: 'wall_1',
+  position: { x: 200, y: 100 },
+  width: 60,
+  height: 15,
+  orientation: 'horizontal',
+  destructionMask: [ 0, 0, 0, 0, 0 ],
+  material: 'concrete',
+  maxHealth: 150,
+  sliceHealth: [ 150, 150, 150, 150, 150 ]
+}
+✅ Player authenticated: WDQTx8M9z4nLOC4LAAAB from 127.0.0.1
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818430066,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818430370,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818430522,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+🔌 Connection attempt from 127.0.0.1 (3fUbrYWYGhPoAkwYAAAD)
+📤 Sending initial game state to 3fUbrYWYGhPoAkwYAAAD: { players: 2, walls: 12, projectiles: 0 }
+📡 Using event name: "game:state"
+🧱 First wall data: {
+  id: 'wall_1',
+  position: { x: 200, y: 100 },
+  width: 60,
+  height: 15,
+  orientation: 'horizontal',
+  destructionMask: [ 0, 0, 0, 0, 0 ],
+  material: 'concrete',
+  maxHealth: 150,
+  sliceHealth: [ 150, 150, 150, 150, 150 ]
+}
+✅ Player authenticated: 3fUbrYWYGhPoAkwYAAAD from 127.0.0.1
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818431462,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818431726,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818433655,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818434263,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818434263,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818435282,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818435795,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818435846,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818436199,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818436250,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818437071,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818437686,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818437887,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818438543,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818438543,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818439726,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818439878,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818440180,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818440230,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818440536,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818441146,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818441146,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818441248,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818441654,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818441756,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818442163,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818442571,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818442773,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818442873,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818443127,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818443281,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818443994,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818444553,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818444857,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818446137,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818447263,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818447366,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818448086,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818449208,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818449462,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818449768,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818450635,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818450684,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818450785,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818450836,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818450989,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818452724,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818453334,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818453638,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818454693,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818455662,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818455868,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818455868,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818456123,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818456828,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818456981,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818457690,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818457891,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818457994,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818458197,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818458903,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818459414,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818460635,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818461854,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818462057,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818462159,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818462871,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}
+📊 Sending game state to WDQTx8M9z4nLOC4LAAAB: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818464090,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: 'WDQTx8M9z4nLOC4LAAAB'
+}
+📊 Sending game state to 3fUbrYWYGhPoAkwYAAAD: {
+  players: 2,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752818465410,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ],
+  socketConnected: true,
+  socketId: '3fUbrYWYGhPoAkwYAAAD'
+}

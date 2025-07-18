@@ -66,6 +66,8 @@ export class GameStateSystem {
   private initializeWalls(): void {
     // Get walls from destruction system and pass to vision system
     const walls = this.destructionSystem.getWalls();
+    console.log(`🧱 Initializing ${walls.size} walls for GameStateSystem`);
+    
     const wallData = Array.from(walls.entries()).map(([id, wall]) => ({
       id: id,
       x: wall.position.x,
@@ -185,6 +187,10 @@ export class GameStateSystem {
   
   getPlayer(id: string): PlayerState | undefined {
     return this.players.get(id);
+  }
+  
+  getPlayers(): Map<string, PlayerState> {
+    return this.players;
   }
   
   removePlayer(id: string): void {

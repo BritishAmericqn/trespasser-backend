@@ -21,6 +21,12 @@ class GameRoom {
         // Initialize asynchronously
         this.initialize();
     }
+    isInitialized() {
+        return this.initialized;
+    }
+    getGameState() {
+        return this.gameState;
+    }
     async initialize() {
         try {
             // Wait for destruction system to load map
@@ -46,6 +52,19 @@ class GameRoom {
         const playerState = this.gameState.createPlayer(socket.id);
         // Send initial filtered state to the joining player
         const filteredState = this.gameState.getFilteredGameState(socket.id);
+        console.log(`📤 Sending initial game state to ${socket.id}:`, {
+            players: Object.keys(filteredState.players).length,
+            walls: Object.keys(filteredState.walls).length,
+            projectiles: filteredState.projectiles.length
+        });
+        // Debug: Log the event name being used
+        console.log(`📡 Using event name: "${constants_1.EVENTS.GAME_STATE}"`);
+        // Log the first wall to verify structure
+        const wallsAsObject = filteredState.walls;
+        const firstWallId = Object.keys(wallsAsObject)[0];
+        if (firstWallId) {
+            console.log(`🧱 First wall data:`, wallsAsObject[firstWallId]);
+        }
         socket.emit(constants_1.EVENTS.GAME_STATE, filteredState);
         socket.broadcast.emit(constants_1.EVENTS.PLAYER_JOINED, playerState);
         // Player input handling
@@ -171,6 +190,23 @@ class GameRoom {
             // Send filtered game state to each player based on their vision
             for (const [playerId, socket] of this.players) {
                 const filteredState = this.gameState.getFilteredGameState(playerId);
+                // Debug: Log what we're sending every 5 seconds
+                if (Math.random() < 0.05) { // 5% chance = roughly every second at 20Hz
+                    console.log(`📊 Sending game state to ${playerId}:`, {
+                        players: Object.keys(filteredState.players).length,
+                        walls: Object.keys(filteredState.walls).length,
+                        projectiles: filteredState.projectiles.length,
+                        timestamp: filteredState.timestamp,
+                        hasVision: !!filteredState.vision,
+                        wallIds: Object.keys(filteredState.walls).slice(0, 3), // Show first 3 wall IDs
+                        socketConnected: socket.connected,
+                        socketId: socket.id
+                    });
+                }
+                if (!socket.connected) {
+                    console.warn(`⚠️ Socket ${playerId} is disconnected but still in players map!`);
+                    continue;
+                }
                 socket.emit(constants_1.EVENTS.GAME_STATE, filteredState);
             }
         }, 1000 / constants_1.GAME_CONFIG.NETWORK_RATE);

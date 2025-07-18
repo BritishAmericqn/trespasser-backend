@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Trespasser Connection Test</title>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <style>
+    body { font-family: monospace; padding: 20px; }
+    .status { margin: 10px 0; padding: 10px; background: #f0f0f0; }
+    .error { background: #ffcccc; }
+    .success { background: #ccffcc; }
+    .log { margin: 5px 0; padding: 5px; background: #e0e0e0; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Trespasser Backend Connection Test</h1>
+  
+  <div class="status" id="status">Initializing...</div>
+  
+  <h2>Server Info</h2>
+  <div id="serverInfo">Checking server...</div>
+  
+  <h2>Game State</h2>
+  <div id="gameState">No game state received yet</div>
+  
+  <h2>Event Log</h2>
+  <div id="eventLog"></div>
+  
+  <script>
+    const SERVER_URL = 'http://localhost:3000';
+    const PASSWORD = 'MyGamePassword123';
+    
+    // First check server status via HTTP
+    fetch(SERVER_URL + '/debug/gamestate')
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('serverInfo').innerHTML = `
+          <div class="status success">
+            ✅ Server is running!<br>
+            Room initialized: ${data.roomInitialized}<br>
+            Walls: ${data.wallCount}<br>
+            Players: ${data.playerCount}
+          </div>
+        `;
+      })
+      .catch(err => {
+        document.getElementById('serverInfo').innerHTML = `
+          <div class="status error">❌ Cannot reach server: ${err.message}</div>
+        `;
+      });
+    
+    // Connect via Socket.IO
+    const socket = io(SERVER_URL);
+    let eventCount = 0;
+    
+    function addLog(message, isError = false) {
+      const log = document.createElement('div');
+      log.className = 'log' + (isError ? ' error' : '');
+      log.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      document.getElementById('eventLog').prepend(log);
+      
+      // Keep only last 20 logs
+      const logs = document.getElementById('eventLog').children;
+      while (logs.length > 20) {
+        logs[logs.length - 1].remove();
+      }
+    }
+    
+    // Track ALL events
+    socket.onAny((eventName, ...args) => {
+      eventCount++;
+      addLog(`📨 Event #${eventCount}: ${eventName} (${args.length} args)`);
+      
+      // Special handling for game:state
+      if (eventName === 'game:state') {
+        const gameState = args[0];
+        const wallCount = Object.keys(gameState.walls || {}).length;
+        const playerCount = Object.keys(gameState.players || {}).length;
+        
+        document.getElementById('gameState').innerHTML = `
+          <div class="status success">
+            Walls: ${wallCount}<br>
+            Players: ${playerCount}<br>
+            Projectiles: ${(gameState.projectiles || []).length}<br>
+            Timestamp: ${gameState.timestamp}<br>
+            <details>
+              <summary>Raw Data</summary>
+              <pre>${JSON.stringify(gameState, null, 2)}</pre>
+            </details>
+          </div>
+        `;
+      }
+    });
+    
+    socket.on('connect', () => {
+      document.getElementById('status').innerHTML = 
+        '<div class="status success">✅ Connected! Socket ID: ' + socket.id + '</div>';
+      addLog('Connected to server, sending authentication...');
+      
+      // Send authentication
+      socket.emit('authenticate', { password: PASSWORD });
+      addLog('Sent authentication with password: ' + PASSWORD);
+    });
+    
+    socket.on('authenticated', () => {
+      addLog('✅ Authentication successful!');
+    });
+    
+    socket.on('disconnect', (reason) => {
+      document.getElementById('status').innerHTML = 
+        '<div class="status error">❌ Disconnected: ' + reason + '</div>';
+      addLog('Disconnected: ' + reason, true);
+    });
+    
+    socket.on('connect_error', (error) => {
+      document.getElementById('status').innerHTML = 
+        '<div class="status error">❌ Connection error: ' + error.message + '</div>';
+      addLog('Connection error: ' + error.message, true);
+    });
+    
+    socket.on('error', (error) => {
+      addLog('❌ Error: ' + error, true);
+    });
+  </script>
+</body>
+</html> 

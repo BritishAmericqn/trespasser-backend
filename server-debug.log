@@ -1,0 +1,1754 @@
+
+> trespasser-backend@1.0.0 start
+> node dist/src/index.js
+
+
+==================================================
+🎮 TRESPASSER MULTIPLAYER SERVER STARTED
+==================================================
+🚀 Status: ONLINE
+🔧 Port: 3000
+👥 Max Players: 8
+🔐 Password: ✅ Required
+🔑 Password: "MyGamePassword123"
+
+📱 CONNECTION METHODS:
+   Local:    http://localhost:3000
+   Local:    http://127.0.0.1:3000
+   LAN (en0): http://192.168.1.238:3000
+
+🌐 FOR INTERNET PLAY:
+1. Port forward TCP port 3000 to this computer
+2. Find your public IP: curl ifconfig.me
+3. Share: http://[YOUR-PUBLIC-IP]:3000
+
+🏠 FOR LAN PLAY:
+Share any of these URLs with friends on your network:
+   http://192.168.1.238:3000
+
+🎯 GAME INFO:
+   Tick Rate: 60 Hz
+   Network Rate: 20 Hz
+==================================================
+
+🔄 Initializing game room...
+VisibilityPolygonSystem initialized
+📍 No map file specified, using test walls
+🧱 Initializing 12 walls for GameStateSystem
+Initialized 12 walls for visibility polygon
+✅ GameRoom initialized with map loaded
+✅ Game room ready!
+💡 TROUBLESHOOTING:
+   • Test server: curl http://localhost:3000
+   • Kill conflicting process: lsof -ti:3000 | xargs kill -9
+   • Use different port: PORT=3001 npm start
+
+🔌 Connection attempt from 192.168.1.238 (sMXp3IgqcvING-3xAAAB)
+📤 Sending initial game state to sMXp3IgqcvING-3xAAAB: { players: 1, walls: 12, projectiles: 0 }
+✅ Player authenticated: sMXp3IgqcvING-3xAAAB from 192.168.1.238
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817518042,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817521307,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817521664,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817522527,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817522935,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817526964,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817528594,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817529158,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817530023,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817530788,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817530889,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817532820,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817535169,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817536954,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817537312,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817540585,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817543394,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817545231,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817546432,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817547246,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817547754,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817548515,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817548924,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817549841,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817552834,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817553902,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817556963,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817558743,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817558998,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817560118,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817560220,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817560320,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817561652,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817561703,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817562826,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817563488,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817564757,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817565419,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817566997,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817569244,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817569500,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817569704,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817570471,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817570522,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817570727,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817571435,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817572917,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817574694,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817575153,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817575510,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817575867,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817577353,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817577506,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817579743,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817580100,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817580758,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817580910,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817583003,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817583156,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817583615,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817585292,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817585393,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817585648,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817586817,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817588088,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817588959,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817590442,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817591318,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817591725,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817592386,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817592590,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817593100,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817594884,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817597949,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817598457,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817598919,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817599225,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817600954,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817601159,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817601210,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817601514,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817602628,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817602778,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817604206,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817604357,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817604663,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817606092,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817606604,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817609267,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817609724,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817610383,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817611403,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817612675,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817612931,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817613086,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817614921,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817615480,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817615837,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817616871,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+🔌 Connection attempt from 127.0.0.1 (KcmJ2u9pcft71nB8AAAD)
+❌ Failed auth from 127.0.0.1: wrong password
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817619403,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817620665,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817620868,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817620971,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817621888,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817623917,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817624017,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817625184,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817625745,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817626556,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817627271,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817628848,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817629877,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817630640,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817630793,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817631099,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817631352,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817632475,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817633284,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817634144,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817635214,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817635265,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817635773,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817636079,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817637041,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817638010,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817638741,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817639553,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817640822,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817642445,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817643919,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817645903,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817646409,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817648061,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817648214,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817648570,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817649233,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817649284,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817649386,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817649538,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817650455,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817652190,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817652547,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817657588,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817658149,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817658352,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817658607,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817659628,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817660087,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817662221,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817663035,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817664563,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817664663,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817665018,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817665732,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817667714,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817668883,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817668934,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817669444,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817670870,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817671583,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817675659,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817677647,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817678458,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817680950,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817683694,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817683846,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817685679,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817686342,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817686546,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817686597,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817690215,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817690674,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817690929,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817691592,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817692508,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817693728,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817695356,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817696427,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817697091,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817697752,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817697956,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817698209,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817700549,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817700700,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817701412,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817702073,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817702940,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817703143,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817703856,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817706199,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817706351,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817708995,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817709097,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817711389,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817715358,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817715713,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817717888,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817718143,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817718650,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817718854,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817721348,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817723129,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817723180,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817723991,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817725009,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817725463,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817727491,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817727847,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817728203,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817729580,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817730139,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817731056,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
+📊 Sending game state to sMXp3IgqcvING-3xAAAB: {
+  players: 1,
+  walls: 12,
+  projectiles: 0,
+  timestamp: 1752817732023,
+  hasVision: true,
+  wallIds: [ 'wall_1', 'wall_2', 'wall_3' ]
+}
