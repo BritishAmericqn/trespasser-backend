@@ -959,7 +959,7 @@ export class VisibilityPolygonSystem {
 
   /**
    * Update player vision (main method called by GameStateSystem)
-   * Returns a Set of visible tile indices for compatibility with TileVisionSystem
+   * Returns a Set of visible tile indices for compatibility
    */
   updatePlayerVisionRaycast(player: PlayerState): Set<number> {
     const visibility = this.calculateTileVisibility(

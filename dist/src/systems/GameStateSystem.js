@@ -8,7 +8,6 @@ const constants_1 = require("../../shared/constants");
 const WeaponSystem_1 = require("./WeaponSystem");
 const ProjectileSystem_1 = require("./ProjectileSystem");
 const DestructionSystem_1 = require("./DestructionSystem");
-const TileVisionSystem_1 = require("./TileVisionSystem");
 const VisibilityPolygonSystem_1 = require("./VisibilityPolygonSystem");
 const matter_js_1 = __importDefault(require("matter-js"));
 const wallSliceHelpers_1 = require("../utils/wallSliceHelpers");
@@ -21,12 +20,10 @@ class GameStateSystem {
     projectileSystem;
     destructionSystem;
     visionSystem;
-    usePolygonVision = true; // Toggle between vision systems
     lastInputSequence = new Map();
     pendingWallDamageEvents = [];
     pendingReloadCompleteEvents = [];
     pendingProjectileEvents = [];
-    playerVisionTiles = new Map();
     wallsUpdatedThisTick = false;
     visionUpdateCounter = 0;
     spawnPositions = { red: [], blue: [] };
@@ -36,15 +33,8 @@ class GameStateSystem {
         this.destructionSystem = new DestructionSystem_1.DestructionSystem(physics);
         this.weaponSystem = new WeaponSystem_1.WeaponSystem();
         this.projectileSystem = new ProjectileSystem_1.ProjectileSystem(physics, this.weaponSystem, this.destructionSystem);
-        // Choose vision system based on toggle
-        if (this.usePolygonVision) {
-            this.visionSystem = new VisibilityPolygonSystem_1.VisibilityPolygonSystem();
-            // Removed verbose logging
-        }
-        else {
-            this.visionSystem = new TileVisionSystem_1.TileVisionSystem(constants_1.GAME_CONFIG.GAME_WIDTH, constants_1.GAME_CONFIG.GAME_HEIGHT);
-            // Removed verbose logging
-        }
+        // Initialize polygon vision system
+        this.visionSystem = new VisibilityPolygonSystem_1.VisibilityPolygonSystem();
         // Don't initialize walls here - will be done in initialize()
         // Set up reload complete callback
         this.weaponSystem.setReloadCompleteCallback((playerId, weapon) => {
@@ -181,7 +171,6 @@ class GameStateSystem {
         this.players.delete(id);
         this.lastInputSequence.delete(id);
         // Clean up vision state
-        this.playerVisionTiles.delete(id);
         this.visionSystem.removePlayer(id);
         // Clean up weapon system - only if method exists
         // this.weaponSystem.cleanupPlayer(id);
@@ -767,13 +756,7 @@ class GameStateSystem {
                 continue;
             // Update vision using raycast for better gap detection
             const visibleTilesSet = this.visionSystem.updatePlayerVisionRaycast(player);
-            // Convert Set to array of indices
-            const visibleTileIndices = new Uint16Array(visibleTilesSet.size);
-            let i = 0;
-            for (const tileIndex of visibleTilesSet) {
-                visibleTileIndices[i++] = tileIndex;
-            }
-            this.playerVisionTiles.set(playerId, visibleTileIndices);
+            // Vision data is now handled by polygon system
         }
     }
     // Check projectile collisions
@@ -911,10 +894,6 @@ class GameStateSystem {
     getDestructionSystem() {
         return this.destructionSystem;
     }
-    // Get vision tiles for a player
-    getPlayerVisionTiles(playerId) {
-        return this.playerVisionTiles.get(playerId);
-    }
     // Get filtered game state for a specific player based on vision
     getFilteredGameState(playerId) {
         // TEMP: Vision disabled - return all game state
@@ -962,29 +941,17 @@ class GameStateSystem {
             walls: wallsObject,
             timestamp: Date.now(),
             tickRate: constants_1.GAME_CONFIG.TICK_RATE,
-            // Include vision data - polygon if available, tiles as fallback
+            // Include polygon vision data
             vision: player ? (() => {
-                // Check if we're using polygon system with getVisibilityData
-                if (this.usePolygonVision && 'getVisibilityData' in this.visionSystem) {
-                    const visionData = this.visionSystem.getVisibilityData(player);
-                    return {
-                        type: 'polygon',
-                        polygon: visionData.polygon,
-                        viewAngle: visionData.viewAngle,
-                        viewDirection: visionData.viewDirection,
-                        viewDistance: visionData.viewDistance,
-                        position: player.transform.position
-                    };
-                }
-                else {
-                    // Fallback to tile-based vision
-                    return {
-                        type: 'tiles',
-                        visibleTiles: Array.from(this.playerVisionTiles.get(playerId) || []),
-                        viewAngle: constants_1.GAME_CONFIG.VISION_ANGLE,
-                        position: player.transform.position
-                    };
-                }
+                const visionData = this.visionSystem.getVisibilityData(player);
+                return {
+                    type: 'polygon',
+                    polygon: visionData.polygon,
+                    viewAngle: visionData.viewAngle,
+                    viewDirection: visionData.viewDirection,
+                    viewDistance: visionData.viewDistance,
+                    position: player.transform.position
+                };
             })() : undefined
         };
     }

@@ -778,7 +778,7 @@ class VisibilityPolygonSystem {
     }
     /**
      * Update player vision (main method called by GameStateSystem)
-     * Returns a Set of visible tile indices for compatibility with TileVisionSystem
+     * Returns a Set of visible tile indices for compatibility
      */
     updatePlayerVisionRaycast(player) {
         const visibility = this.calculateTileVisibility(player.transform.position, player.transform.rotation);
