@@ -87,7 +87,8 @@ class GameRoom {
                 isADS: event.isADS,
                 timestamp: event.timestamp,
                 sequence: event.sequence,
-                chargeLevel: event.chargeLevel // Pass through charge level for grenades
+                chargeLevel: event.chargeLevel, // Pass through charge level for grenades
+                pelletCount: event.pelletCount // Pass through pellet count for shotgun
             };
             const result = this.gameState.handleWeaponFire(weaponFireEvent);
             if (result.success) {
@@ -136,6 +137,103 @@ class GameRoom {
                 }
             }
         });
+        // Player join handler - NEW! Receives loadout from frontend after auth
+        socket.on('player:join', (data) => {
+            console.log(`🎮 Player ${socket.id} joining with loadout:`, data.loadout);
+            const player = this.gameState.getPlayer(socket.id);
+            if (!player) {
+                console.error(`❌ Player ${socket.id} not found`);
+                return;
+            }
+            // Set player team
+            if (data.loadout.team) {
+                player.team = data.loadout.team;
+            }
+            // Automatically equip the loadout weapons
+            const weaponSystem = this.gameState.getWeaponSystem();
+            // Clear existing weapons
+            player.weapons.clear();
+            // Equip primary weapon
+            if (data.loadout.primary) {
+                const config = weaponSystem.getWeaponConfig(data.loadout.primary);
+                if (config) {
+                    const weapon = weaponSystem.createWeapon(data.loadout.primary, config);
+                    player.weapons.set(data.loadout.primary, weapon);
+                    player.weaponId = data.loadout.primary; // Set as current weapon
+                    console.log(`✅ Equipped primary: ${data.loadout.primary}`);
+                }
+            }
+            // Equip secondary weapon
+            if (data.loadout.secondary) {
+                const config = weaponSystem.getWeaponConfig(data.loadout.secondary);
+                if (config) {
+                    const weapon = weaponSystem.createWeapon(data.loadout.secondary, config);
+                    player.weapons.set(data.loadout.secondary, weapon);
+                    console.log(`✅ Equipped secondary: ${data.loadout.secondary}`);
+                }
+            }
+            // Equip support weapons
+            if (data.loadout.support) {
+                for (const supportWeapon of data.loadout.support) {
+                    const config = weaponSystem.getWeaponConfig(supportWeapon);
+                    if (config) {
+                        const weapon = weaponSystem.createWeapon(supportWeapon, config);
+                        player.weapons.set(supportWeapon, weapon);
+                        console.log(`✅ Equipped support: ${supportWeapon}`);
+                    }
+                }
+            }
+            // Send confirmation
+            socket.emit('weapon:equipped', {
+                weapons: Array.from(player.weapons.keys()),
+                currentWeapon: player.weaponId
+            });
+        });
+        // Weapon equip handler - for when players select weapons before match
+        socket.on('weapon:equip', (weaponData) => {
+            const player = this.gameState.getPlayer(socket.id);
+            if (!player)
+                return;
+            console.log(`🎯 Equipping weapons for ${socket.id}: primary=${weaponData.primary}, secondary=${weaponData.secondary}, support=[${weaponData.support?.join(',')}]`);
+            // Clear existing weapons
+            player.weapons.clear();
+            const weaponSystem = this.gameState.getWeaponSystem();
+            // Equip primary weapon
+            if (weaponData.primary) {
+                const config = weaponSystem.getWeaponConfig(weaponData.primary);
+                if (config) {
+                    const weapon = weaponSystem.createWeapon(weaponData.primary, config);
+                    player.weapons.set(weaponData.primary, weapon);
+                    player.weaponId = weaponData.primary; // Set as current weapon
+                    console.log(`✅ Equipped primary: ${weaponData.primary}`);
+                }
+            }
+            // Equip secondary weapon
+            if (weaponData.secondary) {
+                const config = weaponSystem.getWeaponConfig(weaponData.secondary);
+                if (config) {
+                    const weapon = weaponSystem.createWeapon(weaponData.secondary, config);
+                    player.weapons.set(weaponData.secondary, weapon);
+                    console.log(`✅ Equipped secondary: ${weaponData.secondary}`);
+                }
+            }
+            // Equip support weapons
+            if (weaponData.support) {
+                for (const supportWeapon of weaponData.support) {
+                    const config = weaponSystem.getWeaponConfig(supportWeapon);
+                    if (config) {
+                        const weapon = weaponSystem.createWeapon(supportWeapon, config);
+                        player.weapons.set(supportWeapon, weapon);
+                        console.log(`✅ Equipped support: ${supportWeapon}`);
+                    }
+                }
+            }
+            // Send confirmation
+            socket.emit('weapon:equipped', {
+                weapons: Array.from(player.weapons.keys()),
+                currentWeapon: player.weaponId
+            });
+        });
         // Legacy events (keeping for compatibility)
         socket.on(constants_1.EVENTS.PLAYER_SHOOT, (data) => {
             this.gameState.handlePlayerShoot(socket.id, data);
@@ -157,6 +255,44 @@ class GameRoom {
         socket.on('debug:clear_projectiles', () => {
             this.gameState.getProjectileSystem().clear();
             // console.log('🧹 All projectiles cleared');
+        });
+        socket.on('debug:give_weapon', (weaponType) => {
+            const player = this.gameState.getPlayer(socket.id);
+            if (player && weaponType) {
+                const weaponSystem = this.gameState.getWeaponSystem();
+                const config = weaponSystem.getWeaponConfig(weaponType);
+                if (config) {
+                    const weapon = weaponSystem.createWeapon(weaponType, config);
+                    player.weapons.set(weaponType, weapon);
+                    player.weaponId = weaponType;
+                    console.log(`🎁 Gave ${weaponType} to player ${socket.id.substring(0, 8)}`);
+                    // Send weapon equipped event
+                    socket.emit('weapon:equipped', {
+                        weaponType: weaponType,
+                        weapon: weapon
+                    });
+                }
+            }
+        });
+        socket.on('debug:throw_grenade', () => {
+            // Debug command to manually throw a grenade
+            const throwPlayer = this.gameState.getPlayer(socket.id);
+            if (throwPlayer) {
+                const grenadeThrowEvent = {
+                    playerId: socket.id,
+                    position: { ...throwPlayer.transform.position },
+                    direction: throwPlayer.transform.rotation,
+                    chargeLevel: 3,
+                    timestamp: Date.now()
+                };
+                console.log(`🎯 DEBUG: Throwing grenade for player ${socket.id}`);
+                const throwResult = this.gameState.handleGrenadeThrow(grenadeThrowEvent);
+                if (throwResult.success) {
+                    for (const eventData of throwResult.events) {
+                        this.io.emit(eventData.type, eventData.data);
+                    }
+                }
+            }
         });
         // Listen for any events for debugging
         socket.onAny((eventName, ...args) => {
@@ -190,19 +326,7 @@ class GameRoom {
             // Send filtered game state to each player based on their vision
             for (const [playerId, socket] of this.players) {
                 const filteredState = this.gameState.getFilteredGameState(playerId);
-                // Debug: Log what we're sending every 5 seconds
-                if (Math.random() < 0.05) { // 5% chance = roughly every second at 20Hz
-                    console.log(`📊 Sending game state to ${playerId}:`, {
-                        players: Object.keys(filteredState.players).length,
-                        walls: Object.keys(filteredState.walls).length,
-                        projectiles: filteredState.projectiles.length,
-                        timestamp: filteredState.timestamp,
-                        hasVision: !!filteredState.vision,
-                        wallIds: Object.keys(filteredState.walls).slice(0, 3), // Show first 3 wall IDs
-                        socketConnected: socket.connected,
-                        socketId: socket.id
-                    });
-                }
+                // Debug logging removed - was causing console spam
                 if (!socket.connected) {
                     console.warn(`⚠️ Socket ${playerId} is disconnected but still in players map!`);
                     continue;

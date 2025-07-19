@@ -31,58 +31,212 @@ exports.GAME_CONFIG = {
     PHYSICS_STEP: 1000 / 60,
     // Weapon configurations
     WEAPONS: {
+        // Primary Weapons
         RIFLE: {
             TYPE: 'rifle',
             DAMAGE: 25,
             MAX_AMMO: 30,
-            MAX_RESERVE: 90,
+            MAX_RESERVE: 180, // 6 extra mags
             FIRE_RATE: 600, // rounds per minute
-            RELOAD_TIME: 2000, // milliseconds
+            RELOAD_TIME: 2500, // milliseconds
             ACCURACY: 0.9,
             RANGE: 300,
             HITSCAN: true,
             PROJECTILE_SPEED: 0 // instant
         },
+        SMG: {
+            TYPE: 'smg',
+            DAMAGE: 20,
+            MAX_AMMO: 35,
+            MAX_RESERVE: 210, // 6 extra mags
+            FIRE_RATE: 900,
+            RELOAD_TIME: 2000,
+            ACCURACY: 0.75,
+            RANGE: 200,
+            HITSCAN: true,
+            PROJECTILE_SPEED: 0
+        },
+        SHOTGUN: {
+            TYPE: 'shotgun',
+            DAMAGE: 120, // Total damage for all pellets
+            MAX_AMMO: 8,
+            MAX_RESERVE: 32,
+            FIRE_RATE: 70,
+            RELOAD_TIME: 3500, // Shell-by-shell
+            ACCURACY: 0.6,
+            RANGE: 100,
+            HITSCAN: true,
+            PROJECTILE_SPEED: 0,
+            PELLET_COUNT: 8,
+            SPREAD_ANGLE: 0.15 // radians
+        },
+        BATTLERIFLE: {
+            TYPE: 'battlerifle',
+            DAMAGE: 35,
+            MAX_AMMO: 20,
+            MAX_RESERVE: 120, // 6 extra mags
+            FIRE_RATE: 450,
+            RELOAD_TIME: 2800,
+            ACCURACY: 0.95,
+            RANGE: 400,
+            HITSCAN: true,
+            PROJECTILE_SPEED: 0
+        },
+        SNIPERRIFLE: {
+            TYPE: 'sniperrifle',
+            DAMAGE: 90,
+            MAX_AMMO: 5,
+            MAX_RESERVE: 30, // 6 extra mags
+            FIRE_RATE: 40,
+            RELOAD_TIME: 3500,
+            ACCURACY: 0.98,
+            RANGE: 600,
+            HITSCAN: true,
+            PROJECTILE_SPEED: 0
+        },
+        // Secondary Weapons
         PISTOL: {
             TYPE: 'pistol',
             DAMAGE: 35,
             MAX_AMMO: 12,
-            MAX_RESERVE: 60,
-            FIRE_RATE: 300,
+            MAX_RESERVE: 72, // 6 extra mags
+            FIRE_RATE: 450,
             RELOAD_TIME: 1500,
             ACCURACY: 0.8,
             RANGE: 200,
             HITSCAN: true,
             PROJECTILE_SPEED: 0
         },
+        REVOLVER: {
+            TYPE: 'revolver',
+            DAMAGE: 60,
+            MAX_AMMO: 6,
+            MAX_RESERVE: 36, // 6 extra cylinders
+            FIRE_RATE: 150,
+            RELOAD_TIME: 3000,
+            ACCURACY: 0.9,
+            RANGE: 250,
+            HITSCAN: true,
+            PROJECTILE_SPEED: 0
+        },
+        SUPPRESSEDPISTOL: {
+            TYPE: 'suppressedpistol',
+            DAMAGE: 30,
+            MAX_AMMO: 15,
+            MAX_RESERVE: 90, // 6 extra mags
+            FIRE_RATE: 450,
+            RELOAD_TIME: 1800,
+            ACCURACY: 0.85,
+            RANGE: 150,
+            HITSCAN: true,
+            PROJECTILE_SPEED: 0
+        },
+        // Support Weapons
+        GRENADELAUNCHER: {
+            TYPE: 'grenadelauncher',
+            DAMAGE: 100,
+            MAX_AMMO: 6,
+            MAX_RESERVE: 18, // 3 extra reloads
+            FIRE_RATE: 60,
+            RELOAD_TIME: 4000,
+            ACCURACY: 0.9,
+            RANGE: 300,
+            HITSCAN: false,
+            PROJECTILE_SPEED: 150,
+            EXPLOSION_RADIUS: 40,
+            ARC_GRAVITY: 300, // units/sec²
+            FUSE_TIME: 3000 // 3 seconds
+        },
+        MACHINEGUN: {
+            TYPE: 'machinegun',
+            DAMAGE: 30,
+            MAX_AMMO: 100,
+            MAX_RESERVE: 300, // 3 extra belts
+            FIRE_RATE: 800,
+            RELOAD_TIME: 5000,
+            ACCURACY: 0.7,
+            RANGE: 350,
+            HITSCAN: true,
+            PROJECTILE_SPEED: 0,
+            HEAT_GAIN_PER_SHOT: 5,
+            HEAT_COOLDOWN_RATE: 10, // per second
+            OVERHEAT_THRESHOLD: 100,
+            OVERHEAT_PENALTY_TIME: 3000 // milliseconds
+        },
+        ANTIMATERIALRIFLE: {
+            TYPE: 'antimaterialrifle',
+            DAMAGE: 120,
+            MAX_AMMO: 5,
+            MAX_RESERVE: 20, // 4 extra mags
+            FIRE_RATE: 30,
+            RELOAD_TIME: 4500,
+            ACCURACY: 0.99,
+            RANGE: 800,
+            HITSCAN: true,
+            PROJECTILE_SPEED: 0,
+            MAX_PENETRATIONS: 3,
+            PENETRATION_DAMAGE_LOSS: [0.2, 0.4, 0.6] // Damage loss per penetration
+        },
+        // Thrown Weapons
         GRENADE: {
             TYPE: 'grenade',
             DAMAGE: 100,
-            MAX_AMMO: 1,
-            MAX_RESERVE: 3,
+            MAX_AMMO: 2,
+            MAX_RESERVE: 2, // Total count
             FIRE_RATE: 60,
             RELOAD_TIME: 1000,
             ACCURACY: 1.0,
-            RANGE: 150, // Increased back to support faster speeds
+            RANGE: 150,
             HITSCAN: false,
-            PROJECTILE_SPEED: 200, // Legacy - not used with new system
-            BASE_THROW_SPEED: 12, // Base speed for 24 px/s at charge 1
-            CHARGE_SPEED_BONUS: 18, // Results in 24-96 px/s range
+            PROJECTILE_SPEED: 200,
+            BASE_THROW_SPEED: 12,
+            CHARGE_SPEED_BONUS: 18,
             EXPLOSION_RADIUS: 40,
             CHARGE_LEVELS: 5,
-            CHARGE_MULTIPLIER: 1.5
+            CHARGE_MULTIPLIER: 1.5,
+            FUSE_TIME: 3000 // milliseconds
+        },
+        SMOKEGRENADE: {
+            TYPE: 'smokegrenade',
+            DAMAGE: 0,
+            MAX_AMMO: 2,
+            MAX_RESERVE: 2,
+            FIRE_RATE: 60,
+            RELOAD_TIME: 1000,
+            ACCURACY: 1.0,
+            RANGE: 150,
+            HITSCAN: false,
+            PROJECTILE_SPEED: 180,
+            SMOKE_RADIUS: 60,
+            SMOKE_DURATION: 10000, // 10 seconds
+            FUSE_TIME: 2000 // milliseconds
+        },
+        FLASHBANG: {
+            TYPE: 'flashbang',
+            DAMAGE: 0,
+            MAX_AMMO: 2,
+            MAX_RESERVE: 2,
+            FIRE_RATE: 60,
+            RELOAD_TIME: 1000,
+            ACCURACY: 1.0,
+            RANGE: 150,
+            HITSCAN: false,
+            PROJECTILE_SPEED: 200,
+            EFFECT_RADIUS: 100,
+            MAX_EFFECT_DURATION: 2000, // 2 seconds at full intensity
+            FUSE_TIME: 1500 // milliseconds
         },
         ROCKET: {
             TYPE: 'rocket',
             DAMAGE: 100,
-            FIRE_RATE: 60, // 1 per second
+            FIRE_RATE: 30,
             RELOAD_TIME: 3000,
             MAX_AMMO: 1,
-            MAX_RESERVE: 10,
+            MAX_RESERVE: 3,
             ACCURACY: 0.95,
             RANGE: 400,
             HITSCAN: false,
-            PROJECTILE_SPEED: 200, // Reduced from 300 for better collision detection
+            PROJECTILE_SPEED: 200,
             EXPLOSION_RADIUS: 50
         }
     },
@@ -105,7 +259,23 @@ exports.GAME_CONFIG = {
         HEADSHOT_MULTIPLIER: 2.0,
         ADS_ACCURACY_BONUS: 0.2,
         MOVEMENT_ACCURACY_PENALTY: 0.3,
-        EXPLOSION_FALLOFF_POWER: 2.0
+        EXPLOSION_FALLOFF_POWER: 2.0,
+        // Shotgun damage falloff
+        SHOTGUN_FALLOFF_RANGES: [10, 20, 30], // meters
+        SHOTGUN_FALLOFF_MULTIPLIERS: [1.0, 0.5, 0.25]
+    },
+    // Weapon loadout system
+    LOADOUT: {
+        MAX_SUPPORT_SLOTS: 3,
+        WEAPON_SLOT_COSTS: {
+            grenade: 1,
+            smokegrenade: 1,
+            flashbang: 1,
+            grenadelauncher: 2,
+            rocket: 2, // Changed from 3 to 2
+            machinegun: 3, // Changed from 2 to 3
+            antimaterialrifle: 3 // Changed from 2 to 3
+        }
     }
 };
 exports.EVENTS = {
@@ -139,5 +309,10 @@ exports.EVENTS = {
     PROJECTILE_UPDATED: 'projectile:updated',
     PROJECTILE_EXPLODED: 'projectile:exploded',
     PROJECTILE_DESTROYED: 'projectile:destroyed',
-    EXPLOSION_CREATED: 'explosion:created'
+    EXPLOSION_CREATED: 'explosion:created',
+    // New weapon events
+    WEAPON_HEAT_UPDATE: 'weapon:heat:update',
+    SMOKE_DEPLOYED: 'backend:smoke:deployed',
+    FLASHBANG_DETONATED: 'backend:flashbang:detonated',
+    WALL_PENETRATED: 'backend:wall:penetrated'
 };

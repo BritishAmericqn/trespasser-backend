@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Weapon Debug Helper</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #0f0;
+            padding: 20px;
+        }
+        button {
+            background: #333;
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 10px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: monospace;
+        }
+        button:hover {
+            background: #444;
+        }
+        #log {
+            background: #000;
+            padding: 10px;
+            margin-top: 20px;
+            height: 400px;
+            overflow-y: scroll;
+            border: 1px solid #0f0;
+        }
+        .error { color: #f00; }
+        .success { color: #0f0; }
+        .info { color: #ff0; }
+        .section {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔫 Weapon System Debug Helper</h1>
+    
+    <div class="section">
+        <h2>Step 1: Connect</h2>
+        <input type="text" id="serverUrl" value="http://localhost:3000" style="width: 300px;">
+        <button onclick="connect()">Connect to Server</button>
+        <span id="status">Not connected</span>
+    </div>
+    
+    <div class="section">
+        <h2>Step 2: Equip Weapons</h2>
+        <button onclick="equipLoadout1()">Equip: Rifle + Pistol + Grenade</button>
+        <button onclick="equipLoadout2()">Equip: SMG + Revolver + Rocket</button>
+        <button onclick="equipLoadout3()">Equip: Shotgun + Pistol + Flashbang</button>
+    </div>
+    
+    <div class="section">
+        <h2>Step 3: Test Weapons</h2>
+        <button onclick="fireWeapon('rifle')">Fire Rifle</button>
+        <button onclick="fireWeapon('smg')">Fire SMG</button>
+        <button onclick="fireWeapon('shotgun')">Fire Shotgun</button>
+        <button onclick="fireWeapon('pistol')">Fire Pistol</button>
+        <button onclick="fireWeapon('revolver')">Fire Revolver</button>
+        <button onclick="fireWeapon('grenade')">Throw Grenade</button>
+        <button onclick="fireWeapon('rocket')">Fire Rocket</button>
+    </div>
+    
+    <div class="section">
+        <h2>Event Log</h2>
+        <button onclick="clearLog()">Clear Log</button>
+        <div id="log"></div>
+    </div>
+    
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        let socket = null;
+        let playerId = null;
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function connect() {
+            const url = document.getElementById('serverUrl').value;
+            log(`Connecting to ${url}...`);
+            
+            socket = io(url, {
+                auth: { password: 'MyGamePassword123' }
+            });
+            
+            // Connection events
+            socket.on('connect', () => {
+                log('✅ Connected!', 'success');
+                document.getElementById('status').textContent = 'Connected';
+                document.getElementById('status').style.color = '#0f0';
+            });
+            
+            socket.on('authenticated', () => {
+                log('✅ Authenticated!', 'success');
+                // Player is automatically added to game after auth
+            });
+            
+            socket.on('game:state', (data) => {
+                log(`✅ Received initial game state`, 'success');
+                // Extract our player ID from the game state
+                if (data.players) {
+                    playerId = Object.keys(data.players).find(id => id === socket.id) || socket.id;
+                }
+                
+                // Send default loadout (NEW!)
+                log('Sending player:join with default loadout...');
+                socket.emit('player:join', {
+                    loadout: {
+                        primary: 'rifle',
+                        secondary: 'pistol',
+                        support: ['grenade'],
+                        team: 'blue'
+                    },
+                    timestamp: Date.now()
+                });
+            });
+            
+            socket.on('disconnect', () => {
+                log('❌ Disconnected', 'error');
+                document.getElementById('status').textContent = 'Disconnected';
+                document.getElementById('status').style.color = '#f00';
+            });
+            
+            // Weapon events
+            socket.on('weapon:equipped', (data) => {
+                log(`📦 Weapons equipped: ${data.weapons.join(', ')}`, 'success');
+                log(`Current weapon: ${data.currentWeapon}`, 'info');
+            });
+            
+            socket.on('weapon:fired', (data) => {
+                log(`🔫 FIRED: ${data.weaponType} (ammo: ${data.ammoRemaining})`, 'success');
+            });
+            
+            socket.on('weapon:hit', (data) => {
+                log(`💥 HIT: ${data.weaponType} at (${data.position.x}, ${data.position.y})`, 'success');
+            });
+            
+            socket.on('weapon:miss', (data) => {
+                log(`❌ MISS: ${data.weaponType}`, 'info');
+            });
+            
+            socket.on('wall:damaged', (data) => {
+                log(`🧱 WALL HIT: ${data.weaponType} damaged ${data.material} wall`, 'success');
+            });
+            
+            socket.on('projectile:created', (data) => {
+                log(`🚀 PROJECTILE: ${data.type} created`, 'success');
+            });
+            
+            socket.on('error', (error) => {
+                log(`❌ Error: ${error}`, 'error');
+            });
+            
+            // Debug all events
+            socket.onAny((eventName, ...args) => {
+                if (!eventName.includes('game:state')) {
+                    log(`📨 Event: ${eventName}`, 'info');
+                }
+            });
+        }
+        
+        function equipLoadout1() {
+            if (!socket || !socket.connected) {
+                log('❌ Not connected!', 'error');
+                return;
+            }
+            
+            log('Equipping: Rifle + Pistol + Grenade');
+            socket.emit('weapon:equip', {
+                primary: 'rifle',
+                secondary: 'pistol',
+                support: ['grenade']
+            });
+        }
+        
+        function equipLoadout2() {
+            if (!socket || !socket.connected) {
+                log('❌ Not connected!', 'error');
+                return;
+            }
+            
+            log('Equipping: SMG + Revolver + Rocket');
+            socket.emit('weapon:equip', {
+                primary: 'smg',
+                secondary: 'revolver',
+                support: ['rocket']
+            });
+        }
+        
+        function equipLoadout3() {
+            if (!socket || !socket.connected) {
+                log('❌ Not connected!', 'error');
+                return;
+            }
+            
+            log('Equipping: Shotgun + Pistol + Flashbang');
+            socket.emit('weapon:equip', {
+                primary: 'shotgun',
+                secondary: 'pistol',
+                support: ['flashbang', 'smokegrenade']
+            });
+        }
+        
+        function fireWeapon(weaponType) {
+            if (!socket || !socket.connected || !playerId) {
+                log('❌ Not connected or not spawned!', 'error');
+                return;
+            }
+            
+            log(`Firing ${weaponType}...`);
+            
+            const fireData = {
+                weaponType: weaponType,
+                position: {x: 240, y: 135},
+                targetPosition: {x: 300, y: 135},
+                direction: 0,
+                isADS: false,
+                timestamp: Date.now(),
+                sequence: Date.now()
+            };
+            
+            // Special handling for specific weapons
+            if (weaponType === 'shotgun') {
+                fireData.pelletCount = 8;
+            } else if (['grenade', 'smokegrenade', 'flashbang'].includes(weaponType)) {
+                fireData.chargeLevel = weaponType === 'grenade' ? 3 : 1;
+            }
+            
+            socket.emit('weapon:fire', fireData);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+    </script>
+</body>
+</html> 

@@ -3,37 +3,75 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WeaponSystem = void 0;
 const constants_1 = require("../../shared/constants");
 const wallSliceHelpers_1 = require("../utils/wallSliceHelpers");
+const WeaponDiagnostics_1 = require("./WeaponDiagnostics");
 class WeaponSystem {
     weapons = new Map();
     projectileId = 0;
     constructor() {
         // console.log('WeaponSystem initialized');
     }
-    // Initialize player weapons
-    initializePlayerWeapons(playerId) {
+    // Initialize player weapons based on loadout
+    initializePlayerWeapons(playerId, loadout) {
         const playerWeapons = new Map();
-        // Create rifle (default weapon)
-        const rifle = this.createWeapon('rifle', constants_1.GAME_CONFIG.WEAPONS.RIFLE);
-        playerWeapons.set('rifle', rifle);
-        // Create pistol (secondary weapon)
-        const pistol = this.createWeapon('pistol', constants_1.GAME_CONFIG.WEAPONS.PISTOL);
-        playerWeapons.set('pistol', pistol);
-        // Create grenade (limited ammo)
-        const grenade = this.createWeapon('grenade', constants_1.GAME_CONFIG.WEAPONS.GRENADE);
-        playerWeapons.set('grenade', grenade);
-        // Create rocket (limited ammo)
-        const rocket = this.createWeapon('rocket', constants_1.GAME_CONFIG.WEAPONS.ROCKET);
-        playerWeapons.set('rocket', rocket);
+        // Default loadout if none provided
+        const defaultLoadout = {
+            primary: 'rifle',
+            secondary: 'pistol',
+            support: ['grenade']
+        };
+        const finalLoadout = loadout || defaultLoadout;
+        // Validate and create primary weapon
+        if (finalLoadout.primary) {
+            const config = this.getWeaponConfig(finalLoadout.primary);
+            if (config) {
+                const weapon = this.createWeapon(finalLoadout.primary, config);
+                playerWeapons.set(finalLoadout.primary, weapon);
+            }
+        }
+        // Validate and create secondary weapon
+        if (finalLoadout.secondary) {
+            const config = this.getWeaponConfig(finalLoadout.secondary);
+            if (config) {
+                const weapon = this.createWeapon(finalLoadout.secondary, config);
+                playerWeapons.set(finalLoadout.secondary, weapon);
+            }
+        }
+        // Validate and create support weapons
+        if (finalLoadout.support) {
+            const totalSlots = this.calculateSupportSlots(finalLoadout.support);
+            if (totalSlots <= constants_1.GAME_CONFIG.LOADOUT.MAX_SUPPORT_SLOTS) {
+                for (const supportWeapon of finalLoadout.support) {
+                    const config = this.getWeaponConfig(supportWeapon);
+                    if (config) {
+                        const weapon = this.createWeapon(supportWeapon, config);
+                        playerWeapons.set(supportWeapon, weapon);
+                    }
+                }
+            }
+            else {
+                console.warn(`Support loadout exceeds max slots (${totalSlots} > ${constants_1.GAME_CONFIG.LOADOUT.MAX_SUPPORT_SLOTS})`);
+            }
+        }
         return playerWeapons;
     }
+    // Calculate total support weapon slots used
+    calculateSupportSlots(supportWeapons) {
+        return supportWeapons.reduce((total, weapon) => {
+            const cost = constants_1.GAME_CONFIG.LOADOUT.WEAPON_SLOT_COSTS[weapon] || 0;
+            return total + cost;
+        }, 0);
+    }
     createWeapon(type, config) {
-        return {
+        // Thrown weapons have different ammo logic
+        const throwableWeapons = ['grenade', 'smokegrenade', 'flashbang'];
+        const isThrowable = throwableWeapons.includes(type);
+        const weapon = {
             id: `${type}_${Date.now()}`,
             type,
             currentAmmo: config.MAX_AMMO,
-            reserveAmmo: config.MAX_RESERVE,
+            reserveAmmo: isThrowable ? 0 : config.MAX_RESERVE, // Throwables have no reserve
             maxAmmo: config.MAX_AMMO,
-            maxReserve: config.MAX_RESERVE,
+            maxReserve: isThrowable ? 0 : config.MAX_RESERVE,
             damage: config.DAMAGE,
             fireRate: config.FIRE_RATE,
             reloadTime: config.RELOAD_TIME,
@@ -42,53 +80,107 @@ class WeaponSystem {
             accuracy: config.ACCURACY,
             range: config.RANGE
         };
+        // Add special properties for specific weapons
+        if (type === 'shotgun') {
+            weapon.pelletCount = config.PELLET_COUNT;
+        }
+        else if (type === 'machinegun') {
+            weapon.heatLevel = 0;
+            weapon.isOverheated = false;
+        }
+        return weapon;
     }
     // Handle weapon fire event
     handleWeaponFire(event, player) {
+        // Debug exactly what's being requested vs what's available
+        console.log(`\n🔍 [WEAPON LOOKUP] Searching for weapon...`);
+        console.log(`   Requested Type: "${event.weaponType}"`);
+        console.log(`   Player Weapon ID: "${player.weaponId}"`);
+        console.log(`   Available Weapons:`);
+        for (const [type, weapon] of player.weapons) {
+            console.log(`     - "${type}" (${weapon.currentAmmo}/${weapon.maxAmmo})`);
+        }
         const weapon = player.weapons.get(event.weaponType);
         if (!weapon) {
-            return { canFire: false, error: 'Weapon not found' };
+            const error = `Weapon not found: ${event.weaponType}`;
+            WeaponDiagnostics_1.WeaponDiagnostics.logError('handleWeaponFire', error);
+            WeaponDiagnostics_1.WeaponDiagnostics.logWeaponState(player);
+            return { canFire: false, error };
         }
         // Check if weapon is reloading
         if (weapon.isReloading) {
-            return { canFire: false, error: 'Weapon is reloading' };
+            const error = 'Weapon is reloading';
+            WeaponDiagnostics_1.WeaponDiagnostics.logWeaponFire(weapon, player, false, error);
+            return { canFire: false, error };
         }
         // Check ammo
         if (weapon.currentAmmo <= 0) {
-            return { canFire: false, error: 'No ammo' };
+            const error = 'No ammo';
+            WeaponDiagnostics_1.WeaponDiagnostics.logWeaponFire(weapon, player, false, error);
+            return { canFire: false, error };
         }
         // Check fire rate
         const now = Date.now();
         const fireInterval = (60 / weapon.fireRate) * 1000; // Convert RPM to milliseconds
         if (now - weapon.lastFireTime < fireInterval) {
-            return { canFire: false, error: 'Fire rate exceeded' };
+            const error = 'Fire rate exceeded';
+            WeaponDiagnostics_1.WeaponDiagnostics.logWeaponFire(weapon, player, false, error);
+            return { canFire: false, error };
         }
         // Validate event timestamp
         if (Math.abs(now - event.timestamp) > 1000) {
-            return { canFire: false, error: 'Invalid timestamp' };
+            const error = 'Invalid timestamp';
+            WeaponDiagnostics_1.WeaponDiagnostics.logWeaponFire(weapon, player, false, error);
+            return { canFire: false, error };
+        }
+        // Check machine gun overheat
+        if (weapon.type === 'machinegun' && weapon.isOverheated) {
+            const error = 'Weapon overheated';
+            WeaponDiagnostics_1.WeaponDiagnostics.logWeaponFire(weapon, player, false, error);
+            return { canFire: false, error };
         }
         // Fire the weapon
         weapon.currentAmmo--;
         weapon.lastFireTime = now;
+        // Handle machine gun heat
+        if (weapon.type === 'machinegun') {
+            this.updateMachineGunHeat(weapon, true);
+        }
+        WeaponDiagnostics_1.WeaponDiagnostics.logWeaponFire(weapon, player, true);
         return { canFire: true, weapon };
     }
     // Handle weapon reload
     handleWeaponReload(event, player) {
         const weapon = player.weapons.get(event.weaponType);
         if (!weapon) {
-            return { canReload: false, error: 'Weapon not found' };
+            const error = 'Weapon not found';
+            WeaponDiagnostics_1.WeaponDiagnostics.logError('handleWeaponReload', error);
+            return { canReload: false, error };
+        }
+        // Thrown weapons can't be reloaded
+        const throwableWeapons = ['grenade', 'smokegrenade', 'flashbang'];
+        if (throwableWeapons.includes(weapon.type)) {
+            const error = 'Thrown weapons cannot be reloaded';
+            WeaponDiagnostics_1.WeaponDiagnostics.logWeaponReload(weapon, player, false, error);
+            return { canReload: false, error };
         }
         // Check if already reloading
         if (weapon.isReloading) {
-            return { canReload: false, error: 'Already reloading' };
+            const error = 'Already reloading';
+            WeaponDiagnostics_1.WeaponDiagnostics.logWeaponReload(weapon, player, false, error);
+            return { canReload: false, error };
         }
         // Check if ammo is already full
         if (weapon.currentAmmo >= weapon.maxAmmo) {
-            return { canReload: false, error: 'Ammo already full' };
+            const error = 'Ammo already full';
+            WeaponDiagnostics_1.WeaponDiagnostics.logWeaponReload(weapon, player, false, error);
+            return { canReload: false, error };
         }
         // Check if has reserve ammo
         if (weapon.reserveAmmo <= 0) {
-            return { canReload: false, error: 'No reserve ammo' };
+            const error = 'No reserve ammo';
+            WeaponDiagnostics_1.WeaponDiagnostics.logWeaponReload(weapon, player, false, error);
+            return { canReload: false, error };
         }
         // Start reload
         weapon.isReloading = true;
@@ -96,6 +188,7 @@ class WeaponSystem {
         setTimeout(() => {
             this.completeReload(weapon, event.playerId);
         }, weapon.reloadTime);
+        WeaponDiagnostics_1.WeaponDiagnostics.logWeaponReload(weapon, player, true);
         return { canReload: true, weapon, playerId: event.playerId };
     }
     completeReload(weapon, playerId) {
@@ -130,19 +223,25 @@ class WeaponSystem {
     }
     // Handle grenade throw
     handleGrenadeThrow(event, player) {
-        const weapon = player.weapons.get('grenade');
+        // Get the currently equipped weapon
+        const weapon = player.weapons.get(player.weaponId);
         if (!weapon) {
-            return { canThrow: false, error: 'Grenade not found' };
+            return { canThrow: false, error: 'No weapon equipped' };
         }
-        // Check if has grenades
+        // Check if it's a throwable weapon
+        const throwableWeapons = ['grenade', 'smokegrenade', 'flashbang'];
+        if (!throwableWeapons.includes(weapon.type)) {
+            return { canThrow: false, error: 'Current weapon is not throwable' };
+        }
+        // Check if has ammo
         if (weapon.currentAmmo <= 0) {
-            return { canThrow: false, error: 'No grenades' };
+            return { canThrow: false, error: `No ${weapon.type}s available` };
         }
-        // Validate charge level
-        if (event.chargeLevel < 1 || event.chargeLevel > constants_1.GAME_CONFIG.WEAPONS.GRENADE.CHARGE_LEVELS) {
+        // Validate charge level for regular grenades
+        if (weapon.type === 'grenade' && (event.chargeLevel < 1 || event.chargeLevel > constants_1.GAME_CONFIG.WEAPONS.GRENADE.CHARGE_LEVELS)) {
             return { canThrow: false, error: 'Invalid charge level' };
         }
-        // Use grenade
+        // Use ammo
         weapon.currentAmmo--;
         weapon.lastFireTime = Date.now();
         return { canThrow: true, weapon };
@@ -166,6 +265,18 @@ class WeaponSystem {
     }
     // Calculate damage with falloff
     calculateDamage(weapon, distance) {
+        // Special falloff for shotgun
+        if (weapon.type === 'shotgun') {
+            const ranges = constants_1.GAME_CONFIG.COMBAT.SHOTGUN_FALLOFF_RANGES;
+            const multipliers = constants_1.GAME_CONFIG.COMBAT.SHOTGUN_FALLOFF_MULTIPLIERS;
+            for (let i = 0; i < ranges.length; i++) {
+                if (distance <= ranges[i]) {
+                    return weapon.damage * multipliers[i];
+                }
+            }
+            return weapon.damage * multipliers[multipliers.length - 1];
+        }
+        // Standard falloff for other weapons
         const falloffStart = weapon.range * constants_1.GAME_CONFIG.COMBAT.DAMAGE_FALLOFF_START;
         if (distance <= falloffStart) {
             return weapon.damage;
@@ -211,7 +322,11 @@ class WeaponSystem {
             x: startPos.x + Math.cos(finalDirection) * range,
             y: startPos.y + Math.sin(finalDirection) * range
         };
-        // Check for hits along the ray with penetration
+        // Use special penetration logic for anti-material rifle
+        if (weapon.type === 'antimaterialrifle') {
+            return this.raycastAntiMaterialPenetration(startPos, endPos, walls, players, player.id, weapon.damage);
+        }
+        // Check for hits along the ray with standard penetration
         const hits = this.raycastWithPenetration(startPos, endPos, walls, players, player.id, weapon.damage);
         return hits;
     }
@@ -573,20 +688,240 @@ class WeaponSystem {
     generateProjectileId() {
         return `projectile_${++this.projectileId}`;
     }
+    // Update machine gun heat level
+    updateMachineGunHeat(weapon, isFiring) {
+        if (!weapon.heatLevel)
+            weapon.heatLevel = 0;
+        const config = constants_1.GAME_CONFIG.WEAPONS.MACHINEGUN;
+        if (isFiring) {
+            // Increase heat when firing
+            weapon.heatLevel = Math.min(100, weapon.heatLevel + config.HEAT_GAIN_PER_SHOT);
+            // Check for overheat
+            if (weapon.heatLevel >= config.OVERHEAT_THRESHOLD) {
+                weapon.isOverheated = true;
+                // Schedule cooldown
+                setTimeout(() => {
+                    weapon.isOverheated = false;
+                    weapon.heatLevel = 50; // Reset to 50% after overheat
+                    // Emit heat update
+                    if (this.heatUpdateCallback) {
+                        this.heatUpdateCallback({
+                            weaponType: 'machinegun',
+                            heatLevel: weapon.heatLevel,
+                            isOverheated: false
+                        });
+                    }
+                }, config.OVERHEAT_PENALTY_TIME);
+            }
+        }
+        // Emit heat update
+        if (this.heatUpdateCallback) {
+            this.heatUpdateCallback({
+                weaponType: 'machinegun',
+                heatLevel: weapon.heatLevel,
+                isOverheated: !!weapon.isOverheated
+            });
+        }
+    }
+    // Cool down machine gun over time
+    cooldownMachineGuns(weapons, deltaTime) {
+        for (const [weaponId, weapon] of weapons) {
+            if (weapon.type === 'machinegun' && weapon.heatLevel && weapon.heatLevel > 0 && !weapon.isOverheated) {
+                const config = constants_1.GAME_CONFIG.WEAPONS.MACHINEGUN;
+                const cooldownAmount = config.HEAT_COOLDOWN_RATE * (deltaTime / 1000);
+                weapon.heatLevel = Math.max(0, weapon.heatLevel - cooldownAmount);
+                // Emit periodic heat updates
+                if (this.heatUpdateCallback && Math.floor(weapon.heatLevel) % 10 === 0) {
+                    this.heatUpdateCallback({
+                        weaponType: 'machinegun',
+                        heatLevel: weapon.heatLevel,
+                        isOverheated: false
+                    });
+                }
+            }
+        }
+    }
+    // Generate shotgun pellet spread
+    generateShotgunPellets(baseDirection, pelletCount = 8) {
+        const config = constants_1.GAME_CONFIG.WEAPONS.SHOTGUN;
+        const spreadAngle = config.SPREAD_ANGLE;
+        const directions = [];
+        for (let i = 0; i < pelletCount; i++) {
+            // Random spread within the cone
+            const spread = (Math.random() - 0.5) * spreadAngle;
+            directions.push(baseDirection + spread);
+        }
+        return directions;
+    }
+    // Callback for heat updates
+    heatUpdateCallback;
+    setHeatUpdateCallback(callback) {
+        this.heatUpdateCallback = callback;
+    }
+    // Raycast for anti-material rifle with multi-target penetration
+    raycastAntiMaterialPenetration(start, end, walls, players, shooterId, initialDamage) {
+        const direction = {
+            x: end.x - start.x,
+            y: end.y - start.y
+        };
+        const distance = Math.sqrt(direction.x * direction.x + direction.y * direction.y);
+        // Normalize direction
+        direction.x /= distance;
+        direction.y /= distance;
+        const config = constants_1.GAME_CONFIG.WEAPONS.ANTIMATERIALRIFLE;
+        const hits = [];
+        let currentDamage = initialDamage;
+        let currentStart = { ...start };
+        let remainingDistance = distance;
+        let penetrationCount = 0;
+        let wallPenetrations = 0;
+        let playerPenetrations = 0;
+        // Keep searching until we run out of penetrations or distance
+        while (penetrationCount < config.MAX_PENETRATIONS && remainingDistance > 0 && currentDamage > 0) {
+            let closestHit = null;
+            // Check all walls
+            for (const [wallId, wall] of walls) {
+                const wallHit = this.checkWallHit(currentStart, direction, remainingDistance, wall);
+                if (wallHit) {
+                    if (!closestHit || wallHit.distance < closestHit.distance) {
+                        closestHit = {
+                            type: 'wall',
+                            id: wallId,
+                            hitPoint: wallHit.hitPoint,
+                            distance: wallHit.distance,
+                            sliceIndex: wallHit.sliceIndex,
+                            wall: wall
+                        };
+                    }
+                }
+            }
+            // Check all players
+            for (const [playerId, player] of players) {
+                if (playerId === shooterId || !player.isAlive)
+                    continue;
+                const playerHit = this.checkPlayerHit(currentStart, direction, remainingDistance, player);
+                if (playerHit) {
+                    if (!closestHit || playerHit.distance < closestHit.distance) {
+                        closestHit = {
+                            type: 'player',
+                            id: playerId,
+                            hitPoint: playerHit.hitPoint,
+                            distance: playerHit.distance
+                        };
+                    }
+                }
+            }
+            // If no hit, we're done
+            if (!closestHit)
+                break;
+            // Process the hit
+            if (closestHit.type === 'player') {
+                // Player hit - can penetrate up to 2 players
+                if (playerPenetrations >= 2) {
+                    // Can't penetrate more players
+                    hits.push({
+                        targetType: 'player',
+                        targetId: closestHit.id,
+                        hitPoint: closestHit.hitPoint,
+                        distance: closestHit.distance,
+                        damage: currentDamage,
+                        remainingDamage: 0
+                    });
+                    break;
+                }
+                // Apply damage reduction for player penetration
+                const damageReduction = config.PENETRATION_DAMAGE_LOSS[Math.min(penetrationCount, 2)];
+                const damageDealt = currentDamage * (1 - damageReduction);
+                currentDamage *= damageReduction;
+                hits.push({
+                    targetType: 'player',
+                    targetId: closestHit.id,
+                    hitPoint: closestHit.hitPoint,
+                    distance: closestHit.distance,
+                    damage: damageDealt,
+                    remainingDamage: currentDamage
+                });
+                playerPenetrations++;
+                penetrationCount++;
+            }
+            else {
+                // Wall hit
+                const wall = closestHit.wall;
+                const sliceIndex = closestHit.sliceIndex;
+                // Check if slice is already destroyed
+                if (wall.destructionMask && wall.destructionMask[sliceIndex] === 1) {
+                    // Slice is destroyed - ray continues without damage reduction
+                    const epsilon = 0.1;
+                    currentStart = {
+                        x: closestHit.hitPoint.x + direction.x * epsilon,
+                        y: closestHit.hitPoint.y + direction.y * epsilon
+                    };
+                    remainingDistance -= (closestHit.distance + epsilon);
+                    continue;
+                }
+                // Can't penetrate more than 3 walls
+                if (wallPenetrations >= 3) {
+                    hits.push({
+                        targetType: 'wall',
+                        targetId: closestHit.id,
+                        hitPoint: closestHit.hitPoint,
+                        distance: closestHit.distance,
+                        wallSliceIndex: sliceIndex,
+                        damage: currentDamage,
+                        remainingDamage: 0
+                    });
+                    break;
+                }
+                // Apply damage reduction for wall penetration
+                const damageReduction = config.PENETRATION_DAMAGE_LOSS[Math.min(penetrationCount, 2)];
+                const damageToWall = currentDamage * (1 - damageReduction);
+                currentDamage *= (1 - damageReduction);
+                hits.push({
+                    targetType: 'wall',
+                    targetId: closestHit.id,
+                    hitPoint: closestHit.hitPoint,
+                    distance: closestHit.distance,
+                    wallSliceIndex: sliceIndex,
+                    damage: damageToWall,
+                    remainingDamage: currentDamage
+                });
+                wallPenetrations++;
+                penetrationCount++;
+            }
+            // Move start point slightly past the hit
+            const epsilon = 0.1;
+            currentStart = {
+                x: closestHit.hitPoint.x + direction.x * epsilon,
+                y: closestHit.hitPoint.y + direction.y * epsilon
+            };
+            remainingDistance -= (closestHit.distance + epsilon);
+        }
+        return hits;
+    }
     // Get weapon configuration
     getWeaponConfig(weaponType) {
-        switch (weaponType) {
-            case 'rifle':
-                return constants_1.GAME_CONFIG.WEAPONS.RIFLE;
-            case 'pistol':
-                return constants_1.GAME_CONFIG.WEAPONS.PISTOL;
-            case 'grenade':
-                return constants_1.GAME_CONFIG.WEAPONS.GRENADE;
-            case 'rocket':
-                return constants_1.GAME_CONFIG.WEAPONS.ROCKET;
-            default:
-                return constants_1.GAME_CONFIG.WEAPONS.RIFLE;
-        }
+        const weaponMap = {
+            // Primary
+            rifle: constants_1.GAME_CONFIG.WEAPONS.RIFLE,
+            smg: constants_1.GAME_CONFIG.WEAPONS.SMG,
+            shotgun: constants_1.GAME_CONFIG.WEAPONS.SHOTGUN,
+            battlerifle: constants_1.GAME_CONFIG.WEAPONS.BATTLERIFLE,
+            sniperrifle: constants_1.GAME_CONFIG.WEAPONS.SNIPERRIFLE,
+            // Secondary
+            pistol: constants_1.GAME_CONFIG.WEAPONS.PISTOL,
+            revolver: constants_1.GAME_CONFIG.WEAPONS.REVOLVER,
+            suppressedpistol: constants_1.GAME_CONFIG.WEAPONS.SUPPRESSEDPISTOL,
+            // Support
+            grenadelauncher: constants_1.GAME_CONFIG.WEAPONS.GRENADELAUNCHER,
+            machinegun: constants_1.GAME_CONFIG.WEAPONS.MACHINEGUN,
+            antimaterialrifle: constants_1.GAME_CONFIG.WEAPONS.ANTIMATERIALRIFLE,
+            // Thrown
+            grenade: constants_1.GAME_CONFIG.WEAPONS.GRENADE,
+            smokegrenade: constants_1.GAME_CONFIG.WEAPONS.SMOKEGRENADE,
+            flashbang: constants_1.GAME_CONFIG.WEAPONS.FLASHBANG,
+            rocket: constants_1.GAME_CONFIG.WEAPONS.ROCKET
+        };
+        return weaponMap[weaponType] || constants_1.GAME_CONFIG.WEAPONS.RIFLE;
     }
 }
 exports.WeaponSystem = WeaponSystem;

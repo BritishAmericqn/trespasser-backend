@@ -10,9 +10,30 @@ export interface Transform {
 }
 
 // Extended weapon and ammo types
+export type WeaponType = 
+  // Primary Weapons
+  | 'rifle' 
+  | 'smg' 
+  | 'shotgun' 
+  | 'battlerifle' 
+  | 'sniperrifle'
+  // Secondary Weapons
+  | 'pistol' 
+  | 'revolver' 
+  | 'suppressedpistol'
+  // Support Weapons
+  | 'grenadelauncher' 
+  | 'machinegun' 
+  | 'antimaterialrifle'
+  // Thrown Weapons
+  | 'grenade' 
+  | 'smokegrenade' 
+  | 'flashbang' 
+  | 'rocket';
+
 export interface WeaponState {
   id: string;
-  type: 'rifle' | 'pistol' | 'grenade' | 'rocket';
+  type: WeaponType;
   currentAmmo: number;
   reserveAmmo: number;
   maxAmmo: number;
@@ -24,6 +45,10 @@ export interface WeaponState {
   lastFireTime: number;
   accuracy: number; // 0-1, affects spread
   range: number; // pixels
+  // Special weapon properties
+  heatLevel?: number; // For machine gun overheating (0-100)
+  isOverheated?: boolean; // Machine gun overheat state
+  pelletCount?: number; // For shotgun
 }
 
 export interface PlayerState {
@@ -60,7 +85,7 @@ export interface ProjectileState {
   id: string;
   position: Vector2;
   velocity: Vector2;
-  type: 'bullet' | 'rocket' | 'grenade';
+  type: 'bullet' | 'rocket' | 'grenade' | 'grenadelauncher' | 'smokegrenade' | 'flashbang';
   ownerId: string;
   damage: number;
   timestamp: number;
@@ -69,6 +94,7 @@ export interface ProjectileState {
   isExploded: boolean;
   explosionRadius?: number;
   chargeLevel?: number; // for grenades
+  fuseTime?: number; // for timed explosives
 }
 
 export interface GameState {
@@ -127,13 +153,14 @@ export interface InputState {
 // Weapon event types
 export interface WeaponFireEvent {
   playerId: string;
-  weaponType: 'rifle' | 'pistol' | 'grenade' | 'rocket';
+  weaponType: WeaponType;
   position: Vector2;
   direction: number; // rotation in radians
   isADS: boolean;
   timestamp: number;
   sequence: number;
   chargeLevel?: number; // For grenades: 1-5
+  pelletCount?: number; // For shotgun: 8
 }
 
 export interface WeaponHitEvent {
@@ -214,4 +241,46 @@ export interface PenetrationHit {
   wallSliceIndex?: number;
   damage: number; // Damage dealt to this target
   remainingDamage: number; // Damage remaining after this hit
+}
+
+// Machine gun heat update event
+export interface WeaponHeatUpdateEvent {
+  weaponType: 'machinegun';
+  heatLevel: number; // 0-100
+  isOverheated: boolean;
+}
+
+// Smoke grenade deployment event
+export interface SmokeDeployedEvent {
+  id: string;
+  position: Vector2;
+  radius: number;
+  duration: number;
+}
+
+// Flashbang detonation event
+export interface FlashbangDetonatedEvent {
+  position: Vector2;
+  affected: Array<{
+    playerId: string;
+    intensity: number; // 0-1
+    duration: number; // milliseconds
+  }>;
+}
+
+// Wall penetration event for anti-material rifle
+export interface WallPenetratedEvent {
+  wallIds: string[];
+  positions: Vector2[];
+  remainingDamage: number;
+}
+
+// Smoke zone for vision blocking
+export interface SmokeZone {
+  id: string;
+  position: Vector2;
+  radius: number;
+  createdAt: number;
+  duration: number;
+  type: 'smoke';
 }

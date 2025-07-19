@@ -49,8 +49,19 @@ class ProjectileSystem {
             traveledDistance: 0,
             isExploded: false,
             explosionRadius: options.explosionRadius,
-            chargeLevel: options.chargeLevel
+            chargeLevel: options.chargeLevel,
+            fuseTime: options.fuseTime
         };
+        // Debug grenade creation
+        if (type === 'grenade' || type === 'smokegrenade' || type === 'flashbang') {
+            const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+            console.log(`💣 ${type.toUpperCase()} CREATED:`);
+            console.log(`   ID: ${projectileId}`);
+            console.log(`   Position: (${position.x.toFixed(1)}, ${position.y.toFixed(1)})`);
+            console.log(`   Velocity: (${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}) = ${speed.toFixed(1)} px/s`);
+            console.log(`   Fuse Time: ${options.fuseTime}ms`);
+            console.log(`   Explosion Radius: ${options.explosionRadius}`);
+        }
         // Debug rocket creation
         if (type === 'rocket') {
             const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
@@ -59,12 +70,14 @@ class ProjectileSystem {
             console.log(`   Position: (${position.x.toFixed(1)}, ${position.y.toFixed(1)})`);
             console.log(`   Velocity: (${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}) = ${speed.toFixed(1)} px/s`);
             console.log(`   Range: ${projectile.range}`);
+            console.log(`   Damage: ${damage}`);
+            console.log(`   Explosion Radius: ${options.explosionRadius || 50}`);
         }
         this.projectiles.set(projectileId, projectile);
         this.recentCollisions.set(projectileId, new Map());
-        // Only create physics bodies for grenades
+        // Only create physics bodies for grenades and thrown weapons
         // Rockets and bullets use manual physics for reliable collision detection
-        if (type === 'grenade') {
+        if (type === 'grenade' || type === 'grenadelauncher' || type === 'smokegrenade' || type === 'flashbang') {
             const body = this.createProjectileBody(projectile);
             this.projectileBodies.set(projectileId, body);
             this.physics.addActiveBody(projectileId);
@@ -120,12 +133,16 @@ class ProjectileSystem {
             // Get physics body if it exists (only for grenades now)
             const body = this.projectileBodies.get(projectileId);
             // Update position based on projectile type
-            if (projectile.type === 'grenade') {
+            if (projectile.type === 'grenade' || projectile.type === 'smokegrenade' || projectile.type === 'flashbang') {
                 // Manual physics for grenades with bouncing
                 this.updateGrenade(projectile, deltaTime, walls);
             }
+            else if (projectile.type === 'grenadelauncher') {
+                // Arc trajectory with gravity for grenade launcher
+                this.updateGrenadelauncherProjectile(projectile, deltaTime, walls);
+            }
             else if (body) {
-                // Sync position from Matter.js physics body (grenades only)
+                // Sync position from Matter.js physics body
                 projectile.position.x = body.position.x;
                 projectile.position.y = body.position.y;
                 projectile.velocity.x = body.velocity.x;
@@ -143,17 +160,45 @@ class ProjectileSystem {
                     position: { x: projectile.position.x, y: projectile.position.y }
                 });
             }
-            // Check for grenade timer explosion
-            if (projectile.type === 'grenade') {
-                const fuseTime = 3000; // 3 seconds
+            // Check for fuse timer explosion
+            if (projectile.fuseTime && (projectile.type === 'grenade' || projectile.type === 'grenadelauncher' ||
+                projectile.type === 'smokegrenade' || projectile.type === 'flashbang')) {
                 const timeAlive = Date.now() - projectile.timestamp;
-                if (timeAlive >= fuseTime) {
+                // Debug log for grenades approaching explosion
+                if (projectile.type === 'grenade' && timeAlive > projectile.fuseTime - 500 && timeAlive < projectile.fuseTime) {
+                    console.log(`💣 Grenade ${projectile.id} about to explode: ${timeAlive}ms / ${projectile.fuseTime}ms`);
+                }
+                if (timeAlive >= projectile.fuseTime) {
+                    console.log(`💥 ${projectile.type} ${projectile.id} exploding! Time alive: ${timeAlive}ms, Fuse time: ${projectile.fuseTime}ms`);
                     this.explodeProjectile(projectile);
-                    explodeEvents.push({
-                        id: projectile.id,
-                        position: { x: projectile.position.x, y: projectile.position.y },
-                        radius: projectile.explosionRadius || 40
-                    });
+                    // Different explosion events based on type
+                    if (projectile.type === 'smokegrenade') {
+                        // Smoke grenades create smoke zones instead of damage explosions
+                        explodeEvents.push({
+                            id: projectile.id,
+                            type: 'smoke',
+                            position: { x: projectile.position.x, y: projectile.position.y },
+                            radius: constants_1.GAME_CONFIG.WEAPONS.SMOKEGRENADE.SMOKE_RADIUS
+                        });
+                    }
+                    else if (projectile.type === 'flashbang') {
+                        // Flashbangs create flash effects
+                        explodeEvents.push({
+                            id: projectile.id,
+                            type: 'flash',
+                            position: { x: projectile.position.x, y: projectile.position.y },
+                            radius: constants_1.GAME_CONFIG.WEAPONS.FLASHBANG.EFFECT_RADIUS
+                        });
+                    }
+                    else {
+                        // Regular explosion
+                        explodeEvents.push({
+                            id: projectile.id,
+                            type: 'explosion',
+                            position: { x: projectile.position.x, y: projectile.position.y },
+                            radius: projectile.explosionRadius || 40
+                        });
+                    }
                     projectilesToRemove.push(projectileId);
                     continue;
                 }
@@ -231,6 +276,74 @@ class ProjectileSystem {
             this.removeProjectile(projectileId);
         }
         return { updateEvents, explodeEvents };
+    }
+    // Arc trajectory update for grenade launcher projectiles
+    updateGrenadelauncherProjectile(projectile, deltaTime, walls) {
+        const deltaSeconds = deltaTime / 1000;
+        const gravity = constants_1.GAME_CONFIG.WEAPONS.GRENADELAUNCHER.ARC_GRAVITY;
+        // Apply gravity to velocity
+        projectile.velocity.y += gravity * deltaSeconds;
+        // Update position
+        const newX = projectile.position.x + projectile.velocity.x * deltaSeconds;
+        const newY = projectile.position.y + projectile.velocity.y * deltaSeconds;
+        // Check for wall collision
+        if (walls) {
+            const collision = this.checkSimpleWallCollision({ x: projectile.position.x, y: projectile.position.y }, { x: newX, y: newY }, walls);
+            if (collision) {
+                // Grenade launcher projectiles bounce with reduced velocity
+                const bounceDamping = 0.4;
+                // Reflect velocity off the normal
+                const dot = projectile.velocity.x * collision.normal.x + projectile.velocity.y * collision.normal.y;
+                projectile.velocity.x = (projectile.velocity.x - 2 * dot * collision.normal.x) * bounceDamping;
+                projectile.velocity.y = (projectile.velocity.y - 2 * dot * collision.normal.y) * bounceDamping;
+                // Position at collision point
+                projectile.position.x = collision.point.x + collision.normal.x * 2;
+                projectile.position.y = collision.point.y + collision.normal.y * 2;
+            }
+            else {
+                // No collision, update position
+                projectile.position.x = newX;
+                projectile.position.y = newY;
+            }
+        }
+        else {
+            // No walls, just update position
+            projectile.position.x = newX;
+            projectile.position.y = newY;
+        }
+        // Check boundary collision
+        if (projectile.position.x < 0 || projectile.position.x > constants_1.GAME_CONFIG.GAME_WIDTH ||
+            projectile.position.y < 0 || projectile.position.y > constants_1.GAME_CONFIG.GAME_HEIGHT) {
+            // Explode on boundary hit
+            projectile.velocity.x = 0;
+            projectile.velocity.y = 0;
+        }
+    }
+    // Simple projectile-wall collision check
+    checkSimpleWallCollision(from, to, walls) {
+        for (const [wallId, wall] of walls) {
+            // Simple AABB check
+            if (to.x >= wall.position.x && to.x <= wall.position.x + wall.width &&
+                to.y >= wall.position.y && to.y <= wall.position.y + wall.height) {
+                // Check if slice is destroyed
+                const sliceIndex = (0, wallSliceHelpers_1.calculateSliceIndex)(wall, to);
+                if (wall.destructionMask && wall.destructionMask[sliceIndex] === 1) {
+                    continue; // Pass through destroyed slice
+                }
+                // Calculate collision normal based on which edge we hit
+                const dx = to.x - from.x;
+                const dy = to.y - from.y;
+                let normal = { x: 0, y: 0 };
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    normal.x = dx > 0 ? -1 : 1;
+                }
+                else {
+                    normal.y = dy > 0 ? -1 : 1;
+                }
+                return { normal, point: to };
+            }
+        }
+        return null;
     }
     // Manual physics update for grenades
     updateGrenade(grenade, deltaTime, walls) {
@@ -706,6 +819,9 @@ class ProjectileSystem {
         const playerDamageEvents = [];
         const wallDamageEvents = [];
         const explosions = [...this.explosionQueue];
+        if (this.explosionQueue.length > 0) {
+            console.log(`💥 Processing ${this.explosionQueue.length} explosions`);
+        }
         for (const explosion of this.explosionQueue) {
             // Add null check for explosion
             if (!explosion || !explosion.position) {
@@ -714,19 +830,20 @@ class ProjectileSystem {
             }
             // Damage players in explosion radius
             for (const [playerId, player] of players) {
-                if (!player || !player.isAlive || !player.position)
+                if (!player || !player.isAlive || !player.transform?.position)
                     continue;
-                const distance = Math.sqrt(Math.pow(player.position.x - explosion.position.x, 2) +
-                    Math.pow(player.position.y - explosion.position.y, 2));
+                const distance = Math.sqrt(Math.pow(player.transform.position.x - explosion.position.x, 2) +
+                    Math.pow(player.transform.position.y - explosion.position.y, 2));
                 if (distance <= explosion.radius) {
                     const damageMultiplier = 1 - (distance / explosion.radius);
                     const damage = Math.floor(explosion.damage * damageMultiplier);
+                    console.log(`💥 Explosion damages player ${playerId}: ${damage} damage at distance ${distance.toFixed(1)}`);
                     playerDamageEvents.push({
                         playerId,
                         damage,
                         damageType: 'explosion',
                         sourcePlayerId: explosion.sourcePlayerId,
-                        position: { ...player.position },
+                        position: { ...player.transform.position },
                         newHealth: Math.max(0, player.health - damage),
                         isKilled: player.health - damage <= 0,
                         timestamp: Date.now()

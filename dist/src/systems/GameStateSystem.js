@@ -9,6 +9,7 @@ const WeaponSystem_1 = require("./WeaponSystem");
 const ProjectileSystem_1 = require("./ProjectileSystem");
 const DestructionSystem_1 = require("./DestructionSystem");
 const VisibilityPolygonSystem_1 = require("./VisibilityPolygonSystem");
+const WeaponDiagnostics_1 = require("./WeaponDiagnostics");
 const matter_js_1 = __importDefault(require("matter-js"));
 const wallSliceHelpers_1 = require("../utils/wallSliceHelpers");
 class GameStateSystem {
@@ -46,6 +47,13 @@ class GameStateSystem {
                     currentAmmo: weapon.currentAmmo,
                     reserveAmmo: weapon.reserveAmmo
                 }
+            });
+        });
+        // Set up machine gun heat update callback
+        this.weaponSystem.setHeatUpdateCallback((event) => {
+            this.pendingProjectileEvents.push({
+                type: constants_1.EVENTS.WEAPON_HEAT_UPDATE,
+                data: event
             });
         });
         // console.log('GameStateSystem initialized with weapon and vision systems');
@@ -93,6 +101,7 @@ class GameStateSystem {
         console.log(`📍 Set spawn positions - Red: ${this.spawnPositions.red.length}, Blue: ${this.spawnPositions.blue.length}`);
     }
     createPlayer(id) {
+        // Don't create default weapons - frontend will send weapon:equip event
         const player = {
             id,
             transform: {
@@ -104,8 +113,8 @@ class GameStateSystem {
             health: constants_1.GAME_CONFIG.PLAYER_HEALTH,
             armor: 0,
             team: Math.random() > 0.5 ? 'red' : 'blue',
-            weaponId: 'rifle',
-            weapons: this.weaponSystem.initializePlayerWeapons(id),
+            weaponId: '', // No default weapon
+            weapons: new Map(), // Empty weapons map - will be populated by weapon:equip
             isAlive: true,
             movementState: 'idle',
             isADS: false,
@@ -113,6 +122,9 @@ class GameStateSystem {
             kills: 0,
             deaths: 0
         };
+        // Debug weapon initialization
+        console.log(`\n🎮 [PLAYER CREATED] ${id}`);
+        console.log(`   No default weapons - waiting for weapon:equip event from frontend`);
         // Try to use spawn positions from map if available
         const teamSpawns = this.spawnPositions[player.team];
         if (teamSpawns && teamSpawns.length > 0) {
@@ -218,6 +230,8 @@ class GameStateSystem {
             return;
         // Handle weapon firing
         if (input.mouse.leftPressed) {
+            // Debug current weapon state before firing
+            WeaponDiagnostics_1.WeaponDiagnostics.logWeaponState(player);
             const weaponFireEvent = {
                 playerId,
                 weaponType: player.weaponId,
@@ -225,38 +239,53 @@ class GameStateSystem {
                 direction: player.transform.rotation,
                 isADS: player.isADS,
                 timestamp: Date.now(),
-                sequence: input.sequence
+                sequence: input.sequence,
+                pelletCount: player.weaponId === 'shotgun' ? 8 : undefined
             };
             this.handleWeaponFire(weaponFireEvent);
         }
         // Handle weapon switching
-        if (input.keys['1'] && player.weaponId !== 'rifle') {
-            this.handleWeaponSwitch(playerId, 'rifle');
+        // Try to switch to primary weapon (key 1)
+        if (input.keys['1']) {
+            const primary = Array.from(player.weapons.keys()).find(w => ['rifle', 'smg', 'shotgun', 'battlerifle', 'sniperrifle'].includes(w));
+            if (primary && player.weaponId !== primary) {
+                this.handleWeaponSwitch(playerId, primary);
+            }
         }
-        if (input.keys['2'] && player.weaponId !== 'pistol') {
-            this.handleWeaponSwitch(playerId, 'pistol');
+        // Try to switch to secondary weapon (key 2)
+        if (input.keys['2']) {
+            const secondary = Array.from(player.weapons.keys()).find(w => ['pistol', 'revolver', 'suppressedpistol'].includes(w));
+            if (secondary && player.weaponId !== secondary) {
+                this.handleWeaponSwitch(playerId, secondary);
+            }
         }
-        if (input.keys['3'] && player.weaponId !== 'grenade') {
-            this.handleWeaponSwitch(playerId, 'grenade');
+        // Cycle through support weapons with keys 3-4
+        const supportWeapons = Array.from(player.weapons.keys()).filter(w => ['grenade', 'smokegrenade', 'flashbang', 'grenadelauncher', 'machinegun', 'antimaterialrifle', 'rocket'].includes(w));
+        if (input.keys['3'] && supportWeapons[0] && player.weaponId !== supportWeapons[0]) {
+            this.handleWeaponSwitch(playerId, supportWeapons[0]);
         }
-        if (input.keys['4'] && player.weaponId !== 'rocket') {
-            this.handleWeaponSwitch(playerId, 'rocket');
+        if (input.keys['4'] && supportWeapons[1] && player.weaponId !== supportWeapons[1]) {
+            this.handleWeaponSwitch(playerId, supportWeapons[1]);
         }
         // Handle reload
         if (input.keys.r) {
             this.handleWeaponReload(playerId);
         }
         // Handle grenade throwing
-        if (input.keys.g && player.weaponId === 'grenade') {
-            // For now, treat G key as instant throw with charge level 3
-            const grenadeThrowEvent = {
-                playerId,
-                position: { ...player.transform.position },
-                direction: player.transform.rotation,
-                chargeLevel: 3,
-                timestamp: Date.now()
-            };
-            this.handleGrenadeThrow(grenadeThrowEvent);
+        if (input.keys.g) {
+            const weapon = player.weapons.get(player.weaponId);
+            if (weapon && ['grenade', 'smokegrenade', 'flashbang'].includes(weapon.type)) {
+                // For now, treat G key as instant throw with charge level 3 for grenades, 1 for others
+                const chargeLevel = weapon.type === 'grenade' ? 3 : 1;
+                const grenadeThrowEvent = {
+                    playerId,
+                    position: { ...player.transform.position },
+                    direction: player.transform.rotation,
+                    chargeLevel: chargeLevel,
+                    timestamp: Date.now()
+                };
+                this.handleGrenadeThrow(grenadeThrowEvent);
+            }
         }
     }
     handleMovementInputs(playerId, input) {
@@ -342,66 +371,165 @@ class GameStateSystem {
     handleWeaponFire(event) {
         const player = this.players.get(event.playerId);
         if (!player) {
+            WeaponDiagnostics_1.WeaponDiagnostics.logError('handleWeaponFire', `Player not found: ${event.playerId}`);
             return { success: false, events: [] };
         }
+        WeaponDiagnostics_1.WeaponDiagnostics.logEventSent('weapon:fire request', event);
         const fireResult = this.weaponSystem.handleWeaponFire(event, player);
         if (!fireResult.canFire) {
-            // console.log(`🔫 Fire failed for ${event.playerId}: ${fireResult.error}`);
             return { success: false, events: [] };
         }
         const weapon = fireResult.weapon;
         const weaponConfig = this.weaponSystem.getWeaponConfig(weapon.type);
         const events = [];
-        // Handle hitscan weapons (rifle, pistol)
+        // Check if this is a throwable weapon that should be converted to a throw event
+        const throwableWeapons = ['grenade', 'smokegrenade', 'flashbang'];
+        if (throwableWeapons.includes(weapon.type)) {
+            console.log(`🔄 Converting fire event to throw event for ${weapon.type}`);
+            // Convert to a grenade throw event with default charge level
+            const grenadeThrowEvent = {
+                playerId: event.playerId,
+                position: event.position,
+                direction: event.direction,
+                chargeLevel: weapon.type === 'grenade' ? 3 : 1, // Default charge levels
+                timestamp: event.timestamp
+            };
+            const throwResult = this.handleGrenadeThrow(grenadeThrowEvent);
+            // Add weapon:fired event to the throw result events for frontend compatibility
+            if (throwResult.success) {
+                throwResult.events.push({
+                    type: constants_1.EVENTS.WEAPON_FIRED,
+                    data: {
+                        playerId: event.playerId,
+                        weaponType: weapon.type,
+                        position: event.position,
+                        direction: event.direction,
+                        ammoRemaining: weapon.currentAmmo // Already decremented in handleGrenadeThrow
+                    }
+                });
+            }
+            return throwResult;
+        }
+        // Handle hitscan weapons
         if (weaponConfig.HITSCAN) {
-            const penetrationHits = this.weaponSystem.performHitscanWithPenetration(event.position, event.direction, weapon.range, weapon, player, this.destructionSystem.getWalls(), this.players);
-            // Process all hits from penetration
-            if (penetrationHits.length > 0) {
-                for (const hit of penetrationHits) {
-                    if (hit.targetType === 'player') {
-                        // Player hit
-                        const targetPlayer = this.players.get(hit.targetId);
-                        if (targetPlayer) {
-                            const damageEvent = this.applyPlayerDamage(targetPlayer, hit.damage, 'bullet', event.playerId, hit.hitPoint);
-                            events.push({ type: constants_1.EVENTS.PLAYER_DAMAGED, data: damageEvent });
-                            if (damageEvent.isKilled) {
-                                player.kills++;
-                                events.push({ type: constants_1.EVENTS.PLAYER_KILLED, data: damageEvent });
+            // Special handling for shotgun
+            if (weapon.type === 'shotgun') {
+                const pelletCount = weaponConfig.PELLET_COUNT || 8;
+                const pelletDirections = this.weaponSystem.generateShotgunPellets(event.direction, pelletCount);
+                const damagePerPellet = weapon.damage / pelletCount;
+                // Track all pellet hits for the event
+                const allPelletHits = [];
+                for (const pelletDirection of pelletDirections) {
+                    const pelletHits = this.weaponSystem.performHitscanWithPenetration(event.position, pelletDirection, weapon.range, { ...weapon, damage: damagePerPellet }, // Temporary weapon with reduced damage
+                    player, this.destructionSystem.getWalls(), this.players);
+                    // Process each pellet's hits
+                    for (const hit of pelletHits) {
+                        allPelletHits.push(hit);
+                        if (hit.targetType === 'player') {
+                            const targetPlayer = this.players.get(hit.targetId);
+                            if (targetPlayer) {
+                                const damageEvent = this.applyPlayerDamage(targetPlayer, hit.damage, 'bullet', event.playerId, hit.hitPoint);
+                                events.push({ type: constants_1.EVENTS.PLAYER_DAMAGED, data: damageEvent });
+                                if (damageEvent.isKilled) {
+                                    player.kills++;
+                                    events.push({ type: constants_1.EVENTS.PLAYER_KILLED, data: damageEvent });
+                                }
                             }
                         }
-                    }
-                    else if (hit.targetType === 'wall' && hit.wallSliceIndex !== undefined) {
-                        // Wall hit
-                        const wall = this.destructionSystem.getWall(hit.targetId);
-                        if (wall) {
-                            const damageEvent = this.destructionSystem.applyDamage(hit.targetId, hit.wallSliceIndex, hit.damage);
-                            if (damageEvent) {
-                                events.push({ type: constants_1.EVENTS.WALL_DAMAGED, data: damageEvent });
-                                // Notify vision system of wall destruction
-                                this.visionSystem.onWallDestroyed(hit.targetId, wall, damageEvent.sliceIndex);
-                                if (damageEvent.isDestroyed) {
-                                    events.push({ type: constants_1.EVENTS.WALL_DESTROYED, data: damageEvent });
+                        else if (hit.targetType === 'wall' && hit.wallSliceIndex !== undefined) {
+                            const wall = this.destructionSystem.getWall(hit.targetId);
+                            if (wall) {
+                                const damageEvent = this.destructionSystem.applyDamage(hit.targetId, hit.wallSliceIndex, hit.damage);
+                                if (damageEvent) {
+                                    events.push({ type: constants_1.EVENTS.WALL_DAMAGED, data: {
+                                            ...damageEvent,
+                                            weaponType: weapon.type, // Frontend requires this
+                                            material: wall.material || 'concrete' // Frontend requires this
+                                        } });
+                                    this.visionSystem.onWallDestroyed(hit.targetId, wall, damageEvent.sliceIndex);
+                                    if (damageEvent.isDestroyed) {
+                                        events.push({ type: constants_1.EVENTS.WALL_DESTROYED, data: {
+                                                ...damageEvent,
+                                                weaponType: weapon.type
+                                            } });
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                // Use the first hit for the hit event
-                const firstHit = penetrationHits[0];
-                events.push({ type: constants_1.EVENTS.WEAPON_HIT, data: {
+                // Send shotgun-specific hit event
+                events.push({
+                    type: constants_1.EVENTS.WEAPON_HIT,
+                    data: {
                         playerId: event.playerId,
-                        position: firstHit.hitPoint,
-                        targetType: firstHit.targetType,
-                        targetId: firstHit.targetId,
-                        penetrationCount: penetrationHits.length
-                    } });
+                        weaponType: weapon.type, // Frontend requires this
+                        position: event.position, // Add position
+                        pelletHits: allPelletHits.length,
+                        totalPellets: pelletCount
+                    }
+                });
             }
             else {
-                events.push({ type: constants_1.EVENTS.WEAPON_MISS, data: {
-                        playerId: event.playerId,
-                        position: event.position,
-                        direction: event.direction
-                    } });
+                // Regular hitscan handling for other weapons
+                const penetrationHits = this.weaponSystem.performHitscanWithPenetration(event.position, event.direction, weapon.range, weapon, player, this.destructionSystem.getWalls(), this.players);
+                // Process all hits from penetration
+                if (penetrationHits.length > 0) {
+                    for (const hit of penetrationHits) {
+                        if (hit.targetType === 'player') {
+                            // Player hit
+                            const targetPlayer = this.players.get(hit.targetId);
+                            if (targetPlayer) {
+                                const damageEvent = this.applyPlayerDamage(targetPlayer, hit.damage, 'bullet', event.playerId, hit.hitPoint);
+                                events.push({ type: constants_1.EVENTS.PLAYER_DAMAGED, data: damageEvent });
+                                if (damageEvent.isKilled) {
+                                    player.kills++;
+                                    events.push({ type: constants_1.EVENTS.PLAYER_KILLED, data: damageEvent });
+                                }
+                            }
+                        }
+                        else if (hit.targetType === 'wall' && hit.wallSliceIndex !== undefined) {
+                            // Wall hit
+                            const wall = this.destructionSystem.getWall(hit.targetId);
+                            if (wall) {
+                                const damageEvent = this.destructionSystem.applyDamage(hit.targetId, hit.wallSliceIndex, hit.damage);
+                                if (damageEvent) {
+                                    events.push({ type: constants_1.EVENTS.WALL_DAMAGED, data: {
+                                            ...damageEvent,
+                                            weaponType: weapon.type, // Frontend requires this
+                                            material: wall.material || 'concrete' // Frontend requires this
+                                        } });
+                                    // Notify vision system of wall destruction
+                                    this.visionSystem.onWallDestroyed(hit.targetId, wall, damageEvent.sliceIndex);
+                                    if (damageEvent.isDestroyed) {
+                                        events.push({ type: constants_1.EVENTS.WALL_DESTROYED, data: {
+                                                ...damageEvent,
+                                                weaponType: weapon.type
+                                            } });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // Use the first hit for the hit event
+                    const firstHit = penetrationHits[0];
+                    events.push({ type: constants_1.EVENTS.WEAPON_HIT, data: {
+                            playerId: event.playerId,
+                            weaponType: weapon.type, // Frontend requires this
+                            position: firstHit.hitPoint,
+                            targetType: firstHit.targetType,
+                            targetId: firstHit.targetId,
+                            penetrationCount: penetrationHits.length
+                        } });
+                }
+                else {
+                    events.push({ type: constants_1.EVENTS.WEAPON_MISS, data: {
+                            playerId: event.playerId,
+                            weaponType: weapon.type, // Frontend requires this
+                            position: event.position,
+                            direction: event.direction
+                        } });
+                }
             }
         }
         else {
@@ -411,29 +539,16 @@ class GameStateSystem {
                 range: weapon.range,
                 explosionRadius: weaponConfig.EXPLOSION_RADIUS
             };
-            if (weapon.type === 'grenade') {
-                // console.log(`🎯 Grenade fire event - chargeLevel: ${event.chargeLevel}`);
-                if (event.chargeLevel) {
-                    // Use new grenade velocity system with charge levels
-                    const baseSpeed = constants_1.GAME_CONFIG.WEAPONS.GRENADE.BASE_THROW_SPEED;
-                    const chargeBonus = constants_1.GAME_CONFIG.WEAPONS.GRENADE.CHARGE_SPEED_BONUS;
-                    const speed = baseSpeed + (event.chargeLevel * chargeBonus); // 8-32 px/s range
-                    velocity = this.calculateProjectileVelocity(event.direction, speed);
-                    // Apply charge multiplier to range
-                    const chargeMultiplier = 1 + ((event.chargeLevel - 1) * 0.5);
-                    projectileOptions.range = weapon.range * chargeMultiplier;
-                    projectileOptions.chargeLevel = event.chargeLevel;
-                    // console.log(`💣 Grenade throw: charge=${event.chargeLevel}, speed=${speed}, range=${projectileOptions.range}`);
-                }
-                else {
-                    // Fallback to default speed if no charge level
-                    // console.log('⚠️  No charge level provided, using default speed');
-                    velocity = this.calculateProjectileVelocity(event.direction, weaponConfig.PROJECTILE_SPEED);
-                }
+            if (weapon.type === 'grenadelauncher') {
+                // Grenade launcher uses arc trajectory
+                velocity = this.calculateProjectileVelocity(event.direction, weaponConfig.PROJECTILE_SPEED);
+                projectileOptions.fuseTime = constants_1.GAME_CONFIG.WEAPONS.GRENADELAUNCHER.FUSE_TIME || 3000;
+                projectileOptions.explosionRadius = weaponConfig.EXPLOSION_RADIUS;
             }
             else {
                 // Regular projectile (rocket)
                 velocity = this.calculateProjectileVelocity(event.direction, weaponConfig.PROJECTILE_SPEED);
+                console.log(`🚀 Creating rocket projectile - speed: ${weaponConfig.PROJECTILE_SPEED}, damage: ${weapon.damage}`);
             }
             const projectile = this.projectileSystem.createProjectile(weapon.type, event.position, velocity, event.playerId, weapon.damage, projectileOptions);
             events.push({
@@ -489,6 +604,8 @@ class GameStateSystem {
         if (!player) {
             return { success: false, events: [] };
         }
+        console.log(`🔄 Weapon switch attempt - player: ${playerId.substring(0, 8)}, from: ${player.weaponId}, to: ${weaponType}`);
+        console.log(`   Available weapons: [${Array.from(player.weapons.keys()).join(', ')}]`);
         const switchEvent = {
             playerId,
             fromWeapon: player.weaponId,
@@ -497,9 +614,10 @@ class GameStateSystem {
         };
         const switchResult = this.weaponSystem.handleWeaponSwitch(switchEvent, player);
         if (!switchResult.canSwitch) {
-            // console.log(`🔄 Switch failed for ${playerId}: ${switchResult.error}`);
+            console.log(`❌ Switch failed for ${playerId}: ${switchResult.error}`);
             return { success: false, events: [] };
         }
+        console.log(`✅ Weapon switched successfully to ${weaponType}`);
         const events = [
             { type: constants_1.EVENTS.WEAPON_SWITCHED, data: { playerId, fromWeapon: switchEvent.fromWeapon, toWeapon: switchEvent.toWeapon } }
         ];
@@ -517,21 +635,50 @@ class GameStateSystem {
             return { success: false, events: [] };
         }
         const weapon = throwResult.weapon;
-        // Use new grenade velocity system with charge levels
-        const baseSpeed = constants_1.GAME_CONFIG.WEAPONS.GRENADE.BASE_THROW_SPEED;
-        const chargeBonus = constants_1.GAME_CONFIG.WEAPONS.GRENADE.CHARGE_SPEED_BONUS;
-        const speed = baseSpeed + (event.chargeLevel * chargeBonus); // 8-32 px/s range
-        const velocity = this.calculateProjectileVelocity(event.direction, speed);
-        // Apply charge multiplier to range only (velocity already includes charge)
-        const chargeMultiplier = 1 + ((event.chargeLevel - 1) * 0.5);
-        const projectile = this.projectileSystem.createProjectile('grenade', event.position, velocity, event.playerId, weapon.damage, {
-            range: weapon.range * chargeMultiplier,
-            explosionRadius: constants_1.GAME_CONFIG.WEAPONS.GRENADE.EXPLOSION_RADIUS,
-            chargeLevel: event.chargeLevel
-        });
+        const weaponConfig = this.weaponSystem.getWeaponConfig(weapon.type);
+        // Calculate velocity based on weapon type
+        let velocity;
+        let projectileOptions = {
+            explosionRadius: weaponConfig.EXPLOSION_RADIUS
+        };
+        if (weapon.type === 'grenade') {
+            // Use charge system for regular grenades - don't set fuseTime!
+            const baseSpeed = constants_1.GAME_CONFIG.WEAPONS.GRENADE.BASE_THROW_SPEED;
+            const chargeBonus = constants_1.GAME_CONFIG.WEAPONS.GRENADE.CHARGE_SPEED_BONUS;
+            const speed = baseSpeed + (event.chargeLevel * chargeBonus);
+            velocity = this.calculateProjectileVelocity(event.direction, speed);
+            // Apply charge multiplier to range
+            const chargeMultiplier = 1 + ((event.chargeLevel - 1) * 0.5);
+            projectileOptions.range = weapon.range * chargeMultiplier;
+            projectileOptions.chargeLevel = event.chargeLevel;
+            projectileOptions.fuseTime = weaponConfig.FUSE_TIME; // 3 seconds
+        }
+        else {
+            // Smoke grenades and flashbangs use fixed speed and fuse time
+            velocity = this.calculateProjectileVelocity(event.direction, weaponConfig.PROJECTILE_SPEED);
+            projectileOptions.range = weapon.range;
+            projectileOptions.fuseTime = weaponConfig.FUSE_TIME;
+        }
+        const projectile = this.projectileSystem.createProjectile(weapon.type, event.position, velocity, event.playerId, weapon.damage, projectileOptions);
+        // Debug log for grenades
+        if (weapon.type === 'grenade') {
+            console.log(`💣 Grenade created with fuseTime: ${projectileOptions.fuseTime}ms, range: ${projectileOptions.range}, damage: ${weapon.damage}`);
+        }
         const events = [
-            { type: constants_1.EVENTS.GRENADE_THROWN, data: { playerId: event.playerId, chargeLevel: event.chargeLevel, ammoRemaining: weapon.currentAmmo } },
-            { type: constants_1.EVENTS.PROJECTILE_CREATED, data: projectile }
+            { type: constants_1.EVENTS.GRENADE_THROWN, data: {
+                    playerId: event.playerId,
+                    weaponType: weapon.type,
+                    chargeLevel: event.chargeLevel,
+                    ammoRemaining: weapon.currentAmmo
+                } },
+            { type: constants_1.EVENTS.PROJECTILE_CREATED, data: {
+                    id: projectile.id,
+                    type: projectile.type,
+                    playerId: projectile.ownerId,
+                    position: { x: projectile.position.x, y: projectile.position.y },
+                    velocity: { x: projectile.velocity.x, y: projectile.velocity.y },
+                    timestamp: projectile.timestamp
+                } }
         ];
         return { success: true, events };
     }
@@ -716,6 +863,12 @@ class GameStateSystem {
         this.lastUpdateTime = now;
         // Reset wall update flag
         this.wallsUpdatedThisTick = false;
+        // Update machine gun cooling for all players
+        for (const [playerId, player] of this.players) {
+            if (player.isAlive) {
+                this.weaponSystem.cooldownMachineGuns(player.weapons, deltaTime);
+            }
+        }
         // Update projectile system - now with wall collision checking
         const projectileEvents = this.projectileSystem.update(deltaTime, this.destructionSystem.getWalls());
         // Queue projectile update events
@@ -815,6 +968,7 @@ class GameStateSystem {
         const explosionResults = this.projectileSystem.processExplosions(this.players, this.destructionSystem.getWalls());
         // Queue player damage events
         for (const damageEvent of explosionResults.playerDamageEvents) {
+            console.log(`🎯 Applying explosion damage to player ${damageEvent.playerId}: ${damageEvent.damage} damage`);
             this.applyPlayerDamage(this.players.get(damageEvent.playerId), damageEvent.damage, damageEvent.damageType, damageEvent.sourcePlayerId, damageEvent.position);
         }
         // Queue wall damage events
