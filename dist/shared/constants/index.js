@@ -28,6 +28,12 @@ exports.GAME_CONFIG = {
         VIEW_ANGLE_DEGREES: 90,
         TILE_SIZE: 8, // For tile-based vision fallback
     },
+    // Death and respawn configuration
+    DEATH: {
+        RESPAWN_DELAY: 5000, // 5 seconds
+        INVULNERABILITY_TIME: 2000, // 2 seconds after respawn
+        DEATH_CAM_DURATION: 3000, // 3 seconds to show death cam
+    },
     WEAPON_BULLET_SPEED: 500,
     WEAPON_BULLET_DAMAGE: 25,
     WEAPON_ROCKET_SPEED: 200,
@@ -311,6 +317,8 @@ exports.EVENTS = {
     GRENADE_EXPLODED: 'grenade:exploded',
     PLAYER_DAMAGED: 'player:damaged',
     PLAYER_KILLED: 'player:killed',
+    PLAYER_DIED: 'player:died',
+    PLAYER_RESPAWNED: 'player:respawned',
     WALL_DESTROYED: 'wall:destroyed',
     PROJECTILE_CREATED: 'projectile:created',
     PROJECTILE_UPDATED: 'projectile:updated',

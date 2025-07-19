@@ -67,6 +67,11 @@ export interface PlayerState {
   kills: number;
   deaths: number;
   lastProcessedInput?: number; // For client-side prediction
+  // Death and respawn system
+  deathTime?: number; // When player died
+  respawnTime?: number; // When player will respawn
+  invulnerableUntil?: number; // Invulnerability after respawn
+  killerId?: string; // Who killed this player
 }
 
 export interface WallState {

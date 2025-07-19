@@ -25,6 +25,7 @@ class GameStateSystem {
     pendingWallDamageEvents = [];
     pendingReloadCompleteEvents = [];
     pendingProjectileEvents = [];
+    pendingDeathEvents = [];
     wallsUpdatedThisTick = false;
     visionUpdateCounter = 0;
     spawnPositions = { red: [], blue: [] };
@@ -85,6 +86,12 @@ class GameStateSystem {
         if (spawns.length > 0) {
             this.setSpawnPositions(spawns);
         }
+        // CRITICAL: Get team-specific spawn positions
+        const teamSpawns = this.destructionSystem.getTeamSpawnPositions();
+        if (teamSpawns.red.length > 0 || teamSpawns.blue.length > 0) {
+            this.spawnPositions = teamSpawns;
+            console.log(`📍 Set team spawn positions - Red: ${teamSpawns.red.length}, Blue: ${teamSpawns.blue.length}`);
+        }
     }
     setSpawnPositions(spawns) {
         // Reset spawn arrays
@@ -113,7 +120,7 @@ class GameStateSystem {
             velocity: { x: 0, y: 0 },
             health: constants_1.GAME_CONFIG.PLAYER_HEALTH,
             armor: 0,
-            team: Math.random() > 0.5 ? 'red' : 'blue',
+            team: 'red', // Default to red, will be updated by frontend in player:join
             weaponId: '', // No default weapon
             weapons: new Map(), // Empty weapons map - will be populated by weapon:equip
             isAlive: true,
@@ -126,15 +133,20 @@ class GameStateSystem {
         // Debug weapon initialization
         console.log(`\n🎮 [PLAYER CREATED] ${id}`);
         console.log(`   No default weapons - waiting for weapon:equip event from frontend`);
+        console.log(`🎨 [TEAM DEBUG] Player ${id.substring(0, 8)} created with default team: ${player.team}`);
         // Try to use spawn positions from map if available
         const teamSpawns = this.spawnPositions[player.team];
+        console.log(`📍 [SPAWN] Player ${id.substring(0, 8)} team: ${player.team}`);
+        console.log(`   Available spawns: Red=${this.spawnPositions.red.length}, Blue=${this.spawnPositions.blue.length}`);
         if (teamSpawns && teamSpawns.length > 0) {
             // Pick a random spawn from team spawns
             const spawn = teamSpawns[Math.floor(Math.random() * teamSpawns.length)];
-            player.transform.position = { ...spawn };
-            console.log(`🎯 Spawning ${id} at team ${player.team} spawn: (${spawn.x}, ${spawn.y})`);
+            // CRITICAL: Create proper deep copy to prevent reference sharing
+            player.transform.position = { x: spawn.x, y: spawn.y };
+            console.log(`   ✅ Using ${player.team} team spawn: (${spawn.x}, ${spawn.y})`);
         }
         else {
+            console.log(`   ⚠️ No ${player.team} team spawns available, using random position`);
             // Fall back to finding a safe spawn position
             let spawnAttempts = 0;
             while (spawnAttempts < 10 && !this.canPlayerMoveTo(id, player.transform.position)) {
@@ -144,7 +156,10 @@ class GameStateSystem {
                 spawnAttempts++;
             }
             if (spawnAttempts >= 10) {
-                console.warn(`⚠️ Could not find valid spawn position for ${id} after 10 attempts!`);
+                console.warn(`   ❌ Could not find valid spawn position after 10 attempts!`);
+            }
+            else {
+                console.log(`   📍 Using random spawn: (${player.transform.position.x.toFixed(0)}, ${player.transform.position.y.toFixed(0)})`);
             }
         }
         // Create physics body for the player
@@ -185,20 +200,109 @@ class GameStateSystem {
             this.physics.removeBody(body);
             this.playerBodies.delete(id);
         }
+        // Get player before removing for cleanup
+        const player = this.players.get(id);
+        // Clean up all player-related state
         this.players.delete(id);
         this.lastInputSequence.delete(id);
         // Clean up vision state
         this.visionSystem.removePlayer(id);
-        // Clean up weapon system - only if method exists
-        // this.weaponSystem.cleanupPlayer(id);
-        // Clean up projectiles owned by this player - only if method exists
-        // this.projectileSystem.removePlayerProjectiles(id);
+        // CRITICAL FIX: Clean up weapon system state
+        if (player) {
+            // Clear the player's weapons Map completely to prevent reference sharing
+            player.weapons.clear();
+        }
+        // CRITICAL FIX: Clean up projectiles owned by this player
+        const projectiles = this.projectileSystem.getProjectiles();
+        for (let i = projectiles.length - 1; i >= 0; i--) {
+            const projectile = projectiles[i];
+            if (projectile.ownerId === id) {
+                this.projectileSystem.removeProjectile(projectile.id);
+            }
+        }
+        console.log(`🧹 [CLEANUP] Player ${id.substring(0, 8)} completely removed with all associated state`);
+    }
+    // Respawn player at correct team spawn position
+    respawnPlayerAtTeamSpawn(playerId) {
+        const player = this.players.get(playerId);
+        if (!player)
+            return;
+        // 🎨 DEBUG: Verify team persistence
+        console.log(`🎨 [TEAM SPAWN] Player ${playerId.substring(0, 8)} respawning:`);
+        console.log(`   Stored team: ${player.team}`);
+        console.log(`   Available spawns: Red=${this.spawnPositions.red.length}, Blue=${this.spawnPositions.blue.length}`);
+        const teamSpawns = this.spawnPositions[player.team];
+        if (teamSpawns && teamSpawns.length > 0) {
+            // Pick a random spawn from team spawns
+            const spawn = teamSpawns[Math.floor(Math.random() * teamSpawns.length)];
+            player.transform.position = { x: spawn.x, y: spawn.y };
+            // Update physics body position
+            const body = this.playerBodies.get(playerId);
+            if (body) {
+                matter_js_1.default.Body.setPosition(body, { x: spawn.x, y: spawn.y });
+            }
+            console.log(`🎯 Respawned ${playerId.substring(0, 8)} at team ${player.team} spawn: (${spawn.x}, ${spawn.y})`);
+        }
+        else {
+            console.warn(`⚠️ No ${player.team} team spawns available for player ${playerId.substring(0, 8)}`);
+        }
+    }
+    // Handle player respawning
+    handleRespawning() {
+        const now = Date.now();
+        for (const [playerId, player] of this.players) {
+            if (!player.isAlive && player.respawnTime && now >= player.respawnTime) {
+                // Time to respawn
+                this.respawnPlayer(playerId);
+            }
+        }
+    }
+    // Respawn a dead player
+    respawnPlayer(playerId) {
+        const player = this.players.get(playerId);
+        if (!player || player.isAlive)
+            return;
+        const now = Date.now();
+        // Reset player state
+        player.isAlive = true;
+        player.health = constants_1.GAME_CONFIG.PLAYER_HEALTH;
+        player.deathTime = undefined;
+        player.respawnTime = undefined;
+        player.killerId = undefined;
+        player.invulnerableUntil = now + constants_1.GAME_CONFIG.DEATH.INVULNERABILITY_TIME;
+        // Respawn at team spawn
+        this.respawnPlayerAtTeamSpawn(playerId);
+        console.log(`🔄 Player ${playerId.substring(0, 8)} respawned with ${constants_1.GAME_CONFIG.DEATH.INVULNERABILITY_TIME}ms invulnerability`);
+        // Queue respawn event
+        this.pendingDeathEvents.push({
+            type: constants_1.EVENTS.PLAYER_RESPAWNED,
+            data: {
+                playerId: player.id,
+                position: { ...player.transform.position },
+                team: player.team,
+                invulnerableUntil: player.invulnerableUntil,
+                timestamp: now
+            }
+        });
+    }
+    // Debug method to kill a player for testing
+    debugKillPlayer(playerId) {
+        const player = this.players.get(playerId);
+        if (player && player.isAlive) {
+            this.applyPlayerDamage(player, 999, 'explosion', 'debug', player.transform.position);
+        }
     }
     handlePlayerInput(playerId, input) {
         const player = this.players.get(playerId);
         const body = this.playerBodies.get(playerId);
-        if (!player || !body || !player.isAlive)
+        if (!player || !body)
             return;
+        // Allow some input from dead players (for spectating, respawn requests)
+        if (!player.isAlive) {
+            // Dead players can still rotate camera/aim
+            this.updatePlayerRotation(player, input);
+            return;
+        }
         // Debug: Log input details
         const beforePos = { ...player.transform.position };
         // Input validation - prevent cheating
@@ -438,65 +542,88 @@ class GameStateSystem {
                     const pelletHits = this.weaponSystem.performHitscanWithPenetration(offsetPosition, // Use offset position instead of player center
                     pelletDirection, weapon.range, { ...weapon, damage: damagePerPellet }, // Temporary weapon with reduced damage
                     player, this.destructionSystem.getWalls(), this.players);
+                    console.log(`  🎯 Pellet ${pelletIndex}: Direction ${pelletDirection.toFixed(3)}, ${pelletHits.length} hits`);
+                    // Track if this pellet hit anything at all
+                    let pelletHitSomething = false;
                     // Process each pellet's hits
                     for (const hit of pelletHits) {
                         allPelletHits.push(hit);
-                        // Check for self-hits in debug
+                        pelletHitSomething = true;
+                        // Check for self-hit (debugging)
                         if (hit.targetType === 'player' && hit.targetId === event.playerId) {
                             selfHitCount++;
-                            console.log(`🚨 SELF-HIT DETECTED! Pellet direction: ${pelletDirection.toFixed(3)}, hit point: (${hit.hitPoint.x.toFixed(2)}, ${hit.hitPoint.y.toFixed(2)})`);
+                            console.log(`🚨 SELF-HIT DETECTED! Pellet ${pelletIndex}, hit point: (${hit.hitPoint.x.toFixed(1)}, ${hit.hitPoint.y.toFixed(1)})`);
                         }
+                        // Send individual pellet event based on hit type
                         if (hit.targetType === 'player') {
+                            // Apply damage to the player
                             const targetPlayer = this.players.get(hit.targetId);
                             if (targetPlayer) {
-                                const damageEvent = this.applyPlayerDamage(targetPlayer, hit.damage, 'bullet', event.playerId, hit.hitPoint);
+                                const damageEvent = this.applyPlayerDamage(targetPlayer, damagePerPellet, 'bullet', event.playerId, hit.hitPoint);
                                 events.push({ type: constants_1.EVENTS.PLAYER_DAMAGED, data: damageEvent });
                                 if (damageEvent.isKilled) {
                                     player.kills++;
                                     events.push({ type: constants_1.EVENTS.PLAYER_KILLED, data: damageEvent });
                                 }
                             }
-                            // Send individual pellet hit event for frontend trails
+                            // Send weapon:hit event for frontend trail
                             events.push({
                                 type: constants_1.EVENTS.WEAPON_HIT,
                                 data: {
                                     playerId: event.playerId,
                                     weaponType: weapon.type,
                                     position: hit.hitPoint,
-                                    targetType: hit.targetType,
+                                    targetType: 'player',
                                     targetId: hit.targetId,
-                                    pelletIndex: pelletIndex // Add pellet index for frontend
+                                    pelletIndex: pelletIndex // Frontend needs this!
                                 }
                             });
                         }
-                        else if (hit.targetType === 'wall' && hit.wallSliceIndex !== undefined) {
-                            const wall = this.destructionSystem.getWall(hit.targetId);
-                            if (wall) {
-                                const damageEvent = this.destructionSystem.applyDamage(hit.targetId, hit.wallSliceIndex, hit.damage);
-                                if (damageEvent) {
-                                    events.push({ type: constants_1.EVENTS.WALL_DAMAGED, data: {
-                                            ...damageEvent,
-                                            weaponType: weapon.type, // Frontend requires this
-                                            material: wall.material || 'concrete', // Frontend requires this
-                                            playerId: event.playerId, // Add shooter ID for frontend trails
-                                            pelletIndex: pelletIndex // Add pellet index for frontend
-                                        } });
-                                    this.visionSystem.onWallDestroyed(hit.targetId, wall, damageEvent.sliceIndex);
-                                    if (damageEvent.isDestroyed) {
-                                        events.push({ type: constants_1.EVENTS.WALL_DESTROYED, data: {
+                        else if (hit.targetType === 'wall') {
+                            // Apply damage to the wall
+                            if (hit.wallSliceIndex !== undefined) {
+                                const wall = this.destructionSystem.getWall(hit.targetId);
+                                if (wall) {
+                                    const damageEvent = this.destructionSystem.applyDamage(hit.targetId, hit.wallSliceIndex, damagePerPellet);
+                                    if (damageEvent) {
+                                        // Send wall:damaged event for destruction system
+                                        events.push({ type: constants_1.EVENTS.WALL_DAMAGED, data: {
                                                 ...damageEvent,
-                                                weaponType: weapon.type
+                                                weaponType: weapon.type,
+                                                material: wall.material || 'concrete',
+                                                playerId: event.playerId,
+                                                pelletIndex: pelletIndex
                                             } });
+                                        this.visionSystem.onWallDestroyed(hit.targetId, wall, damageEvent.sliceIndex);
+                                        if (damageEvent.isDestroyed) {
+                                            events.push({ type: constants_1.EVENTS.WALL_DESTROYED, data: {
+                                                    ...damageEvent,
+                                                    weaponType: weapon.type
+                                                } });
+                                        }
                                     }
                                 }
                             }
+                            // Send weapon:hit event for frontend trail
+                            events.push({
+                                type: constants_1.EVENTS.WEAPON_HIT,
+                                data: {
+                                    playerId: event.playerId,
+                                    weaponType: weapon.type,
+                                    position: hit.hitPoint,
+                                    targetType: 'wall',
+                                    targetId: hit.targetId,
+                                    pelletIndex: pelletIndex // Frontend needs this!
+                                }
+                            });
                         }
-                        // Break after first hit per pellet (pellets don't penetrate)
+                        // Pellets don't penetrate - break after first hit
                         break;
                     }
-                    // If no hits for this pellet, send miss event
-                    if (pelletHits.length === 0) {
-                        const missEndPoint = {
+                    // If this pellet didn't hit anything, send weapon:miss event
+                    if (!pelletHitSomething) {
+                        // Calculate where the pellet would end up if it traveled max range
+                        const missPosition = {
                             x: offsetPosition.x + Math.cos(pelletDirection) * weapon.range,
                             y: offsetPosition.y + Math.sin(pelletDirection) * weapon.range
                         };
@@ -505,11 +632,12 @@ class GameStateSystem {
                             data: {
                                 playerId: event.playerId,
                                 weaponType: weapon.type,
-                                position: missEndPoint,
+                                position: missPosition,
                                 direction: pelletDirection,
-                                pelletIndex: pelletIndex // Add pellet index for frontend
+                                pelletIndex: pelletIndex // Frontend needs this!
                             }
                         });
+                        console.log(`  🎯 Pellet ${pelletIndex}: MISS - ended at (${missPosition.x.toFixed(1)}, ${missPosition.y.toFixed(1)})`);
                     }
                 }
                 console.log(`🔫 SHOTGUN SUMMARY: ${allPelletHits.length} total hits, ${selfHitCount} self-hits`);
@@ -733,13 +861,51 @@ class GameStateSystem {
     }
     // Apply damage to player
     applyPlayerDamage(player, damage, damageType, sourcePlayerId, position) {
+        // Check invulnerability after respawn
+        const now = Date.now();
+        if (player.invulnerableUntil && now < player.invulnerableUntil) {
+            console.log(`🛡️ Player ${player.id.substring(0, 8)} is invulnerable (${player.invulnerableUntil - now}ms remaining)`);
+            return {
+                playerId: player.id,
+                damage: 0,
+                damageType,
+                sourcePlayerId,
+                position,
+                newHealth: player.health,
+                isKilled: false,
+                timestamp: now
+            };
+        }
         const newHealth = Math.max(0, player.health - damage);
         const isKilled = newHealth <= 0;
         player.health = newHealth;
-        player.lastDamageTime = Date.now();
-        if (isKilled) {
+        player.lastDamageTime = now;
+        if (isKilled && player.isAlive) {
+            // Mark player as dead
             player.isAlive = false;
             player.deaths++;
+            player.deathTime = now;
+            player.killerId = sourcePlayerId;
+            player.respawnTime = now + constants_1.GAME_CONFIG.DEATH.RESPAWN_DELAY;
+            console.log(`💀 Player ${player.id.substring(0, 8)} killed by ${sourcePlayerId.substring(0, 8)} - respawn in ${constants_1.GAME_CONFIG.DEATH.RESPAWN_DELAY}ms`);
+            // Queue death event
+            this.pendingDeathEvents.push({
+                type: constants_1.EVENTS.PLAYER_DIED,
+                data: {
+                    playerId: player.id,
+                    killerId: sourcePlayerId,
+                    position: { ...position },
+                    damageType,
+                    team: player.team, // 🎨 Include team for frontend team damage rules
+                    timestamp: now
+                }
+            });
+            // Award kill to source player
+            const killer = this.players.get(sourcePlayerId);
+            if (killer && killer.id !== player.id) {
+                killer.kills++;
+                console.log(`🎯 Kill credit: ${sourcePlayerId.substring(0, 8)} now has ${killer.kills} kills`);
+            }
         }
         return {
             playerId: player.id,
@@ -918,6 +1084,8 @@ class GameStateSystem {
                 this.weaponSystem.cooldownMachineGuns(player.weapons, deltaTime);
             }
         }
+        // Handle player respawning
+        this.handleRespawning();
         // Update projectile system - now with wall collision checking
         const projectileEvents = this.projectileSystem.update(deltaTime, this.destructionSystem.getWalls());
         // Queue projectile update events
@@ -956,7 +1124,7 @@ class GameStateSystem {
             }
             // console.log(`🔍 FINAL PLAYER POSITION for ${playerId}: (${player.transform.position.x.toFixed(2)}, ${player.transform.position.y.toFixed(2)}) | velocity=(${player.velocity.x.toFixed(2)}, ${player.velocity.y.toFixed(2)})`);
         }
-        // Update vision with new tile-based system
+        // Update vision with new tile-based system (only for alive players)
         for (const [playerId, player] of this.players) {
             if (!player.isAlive)
                 continue;
@@ -1048,11 +1216,13 @@ class GameStateSystem {
         const events = [
             ...this.pendingWallDamageEvents,
             ...this.pendingReloadCompleteEvents,
-            ...this.pendingProjectileEvents
+            ...this.pendingProjectileEvents,
+            ...this.pendingDeathEvents
         ];
         this.pendingWallDamageEvents = [];
         this.pendingReloadCompleteEvents = [];
         this.pendingProjectileEvents = [];
+        this.pendingDeathEvents = [];
         return events;
     }
     getState() {
@@ -1065,9 +1235,31 @@ class GameStateSystem {
                 weaponsObject[weaponId] = weapon;
             }
             playersObject[id] = {
-                ...player,
-                weapons: weaponsObject, // Cast to maintain interface compatibility
-                lastProcessedInput: player.lastProcessedInput || 0 // Include for client prediction
+                id: player.id,
+                // CRITICAL: Flatten transform for frontend compatibility
+                position: player.transform.position,
+                rotation: player.transform.rotation,
+                scale: player.transform.scale,
+                velocity: player.velocity,
+                health: player.health,
+                armor: player.armor,
+                team: player.team,
+                weaponId: player.weaponId,
+                weapons: weaponsObject,
+                isAlive: player.isAlive,
+                movementState: player.movementState,
+                isADS: player.isADS,
+                lastDamageTime: player.lastDamageTime,
+                kills: player.kills,
+                deaths: player.deaths,
+                lastProcessedInput: player.lastProcessedInput || 0,
+                // Death and respawn fields
+                deathTime: player.deathTime,
+                respawnTime: player.respawnTime,
+                invulnerableUntil: player.invulnerableUntil,
+                killerId: player.killerId,
+                // Keep transform for backward compatibility
+                transform: player.transform
             };
         }
         // Convert walls Map to plain object
@@ -1117,19 +1309,47 @@ class GameStateSystem {
         }
         // TEMP: Return all players since vision is disabled
         const visiblePlayersObject = {};
-        // Include all alive players
+        // 🎨 DEBUG: Track team data being sent
+        let teamDataDebugLog = `🎨 Game state for ${playerId.substring(0, 8)} - Team data:`;
+        // Include all players (alive and dead - dead players shown as corpses/ghosts)
         for (const [pid, p] of this.players) {
-            if (!p.isAlive)
-                continue;
             const weaponsObject = {};
             for (const [weaponId, weapon] of p.weapons) {
                 weaponsObject[weaponId] = weapon;
             }
             visiblePlayersObject[pid] = {
-                ...p,
+                id: p.id,
+                // CRITICAL: Flatten transform for frontend compatibility
+                position: p.transform.position,
+                rotation: p.transform.rotation,
+                scale: p.transform.scale,
+                velocity: p.velocity,
+                health: p.health,
+                armor: p.armor,
+                team: p.team,
+                weaponId: p.weaponId,
                 weapons: weaponsObject,
-                lastProcessedInput: p.lastProcessedInput || 0
+                isAlive: p.isAlive,
+                movementState: p.movementState,
+                isADS: p.isADS,
+                lastDamageTime: p.lastDamageTime,
+                kills: p.kills,
+                deaths: p.deaths,
+                lastProcessedInput: p.lastProcessedInput || 0,
+                // Death and respawn fields
+                deathTime: p.deathTime,
+                respawnTime: p.respawnTime,
+                invulnerableUntil: p.invulnerableUntil,
+                killerId: p.killerId,
+                // Keep transform for backward compatibility
+                transform: p.transform
             };
+            // 🎨 DEBUG: Add to team data log
+            teamDataDebugLog += ` ${pid.substring(0, 8)}=${p.team}`;
+        }
+        // 🎨 DEBUG: Log team data every 100th update to avoid spam
+        if (Math.random() < 0.01) { // 1% chance to log
+            console.log(teamDataDebugLog);
         }
         // TEMP: Return all projectiles since vision is disabled
         const allProjectiles = this.projectileSystem.getProjectiles();

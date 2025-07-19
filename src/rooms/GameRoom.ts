@@ -24,10 +24,6 @@ export class GameRoom {
     this.initialize();
   }
   
-  isInitialized(): boolean {
-    return this.initialized;
-  }
-  
   getGameState(): GameStateSystem {
     return this.gameState;
   }
@@ -78,7 +74,33 @@ export class GameRoom {
     }
     
     socket.emit(EVENTS.GAME_STATE, filteredState);
-    socket.broadcast.emit(EVENTS.PLAYER_JOINED, playerState);
+    
+    // CRITICAL: Send flattened player state for frontend compatibility
+    const flattenedPlayerState = {
+      id: playerState.id,
+      position: playerState.transform.position,
+      rotation: playerState.transform.rotation,
+      scale: playerState.transform.scale,
+      velocity: playerState.velocity,
+      health: playerState.health,
+      armor: playerState.armor,
+      team: playerState.team,
+      weaponId: playerState.weaponId,
+      weapons: playerState.weapons,
+      isAlive: playerState.isAlive,
+      movementState: playerState.movementState,
+      isADS: playerState.isADS,
+      lastDamageTime: playerState.lastDamageTime,
+      kills: playerState.kills,
+      deaths: playerState.deaths,
+      // Keep transform for backward compatibility
+      transform: playerState.transform
+    };
+    
+    // 🎨 DEBUG: Verify team data in PLAYER_JOINED broadcast
+    console.log(`🎨 [PLAYER_JOINED] Broadcasting player ${playerState.id.substring(0, 8)} with team: ${flattenedPlayerState.team}`);
+    
+    socket.broadcast.emit(EVENTS.PLAYER_JOINED, flattenedPlayerState);
     
     // Player input handling
     socket.on(EVENTS.PLAYER_INPUT, (input) => {
@@ -177,23 +199,50 @@ export class GameRoom {
       
       // Set player team
       if (data.loadout.team) {
+        const previousTeam = player.team;
         player.team = data.loadout.team as 'red' | 'blue';
+        
+        // 🎨 DEBUG: Team data logging for frontend
+        console.log(`🎨 Player ${socket.id.substring(0, 8)} team assignment:`);
+        console.log(`   Previous team: ${previousTeam}`);
+        console.log(`   Loadout team: ${data.loadout.team}`);
+        console.log(`   Final team: ${player.team}`);
+        
+        // 🎨 VALIDATION: Ensure team was set correctly
+        if (player.team !== data.loadout.team) {
+          console.error(`❌ Team assignment failed! Expected: ${data.loadout.team}, Actual: ${player.team}`);
+        } else {
+          console.log(`✅ Team assignment confirmed: ${player.team}`);
+        }
+        
+        // CRITICAL: Respawn player at correct team spawn after team is set
+        this.gameState.respawnPlayerAtTeamSpawn(socket.id);
+        
+        // 🎨 VERIFY: Check team after respawn
+        const playerAfterRespawn = this.gameState.getPlayer(socket.id);
+        if (playerAfterRespawn) {
+          console.log(`🎨 Post-respawn verification: Player ${socket.id.substring(0, 8)} team is still: ${playerAfterRespawn.team}`);
+        }
+      } else {
+        console.warn(`⚠️ Player ${socket.id.substring(0, 8)} loadout missing team data - keeping default: ${player.team}`);
       }
       
       // Automatically equip the loadout weapons
       const weaponSystem = this.gameState.getWeaponSystem();
       
-      // Clear existing weapons
+      // CRITICAL: Clear existing weapons completely to prevent contamination
       player.weapons.clear();
+      player.weaponId = ''; // Reset current weapon
       
       // Equip primary weapon
       if (data.loadout.primary) {
         const config = weaponSystem.getWeaponConfig(data.loadout.primary as any);
         if (config) {
+          // CRITICAL: Create fresh weapon instance for this player
           const weapon = weaponSystem.createWeapon(data.loadout.primary as any, config);
           player.weapons.set(data.loadout.primary, weapon);
           player.weaponId = data.loadout.primary; // Set as current weapon
-          console.log(`✅ Equipped primary: ${data.loadout.primary}`);
+          console.log(`✅ Equipped primary: ${data.loadout.primary} for ${socket.id.substring(0, 8)}`);
         }
       }
       
@@ -201,9 +250,10 @@ export class GameRoom {
       if (data.loadout.secondary) {
         const config = weaponSystem.getWeaponConfig(data.loadout.secondary as any);
         if (config) {
+          // CRITICAL: Create fresh weapon instance for this player
           const weapon = weaponSystem.createWeapon(data.loadout.secondary as any, config);
           player.weapons.set(data.loadout.secondary, weapon);
-          console.log(`✅ Equipped secondary: ${data.loadout.secondary}`);
+          console.log(`✅ Equipped secondary: ${data.loadout.secondary} for ${socket.id.substring(0, 8)}`);
         }
       }
       
@@ -212,9 +262,10 @@ export class GameRoom {
         for (const supportWeapon of data.loadout.support) {
           const config = weaponSystem.getWeaponConfig(supportWeapon as any);
           if (config) {
+            // CRITICAL: Create fresh weapon instance for this player
             const weapon = weaponSystem.createWeapon(supportWeapon as any, config);
             player.weapons.set(supportWeapon, weapon);
-            console.log(`✅ Equipped support: ${supportWeapon}`);
+            console.log(`✅ Equipped support: ${supportWeapon} for ${socket.id.substring(0, 8)}`);
           }
         }
       }
@@ -231,10 +282,11 @@ export class GameRoom {
       const player = this.gameState.getPlayer(socket.id);
       if (!player) return;
       
-      console.log(`🎯 Equipping weapons for ${socket.id}: primary=${weaponData.primary}, secondary=${weaponData.secondary}, support=[${weaponData.support?.join(',')}]`);
+      console.log(`🎯 Equipping weapons for ${socket.id.substring(0, 8)}: primary=${weaponData.primary}, secondary=${weaponData.secondary}, support=[${weaponData.support?.join(',')}]`);
       
-      // Clear existing weapons
+      // CRITICAL: Clear existing weapons completely to prevent contamination
       player.weapons.clear();
+      player.weaponId = ''; // Reset current weapon
       
       const weaponSystem = this.gameState.getWeaponSystem();
       
@@ -242,10 +294,11 @@ export class GameRoom {
       if (weaponData.primary) {
         const config = weaponSystem.getWeaponConfig(weaponData.primary as any);
         if (config) {
+          // CRITICAL: Create fresh weapon instance for this player
           const weapon = weaponSystem.createWeapon(weaponData.primary as any, config);
           player.weapons.set(weaponData.primary, weapon);
           player.weaponId = weaponData.primary; // Set as current weapon
-          console.log(`✅ Equipped primary: ${weaponData.primary}`);
+          console.log(`✅ Equipped primary: ${weaponData.primary} for ${socket.id.substring(0, 8)}`);
         }
       }
       
@@ -253,9 +306,10 @@ export class GameRoom {
       if (weaponData.secondary) {
         const config = weaponSystem.getWeaponConfig(weaponData.secondary as any);
         if (config) {
+          // CRITICAL: Create fresh weapon instance for this player
           const weapon = weaponSystem.createWeapon(weaponData.secondary as any, config);
           player.weapons.set(weaponData.secondary, weapon);
-          console.log(`✅ Equipped secondary: ${weaponData.secondary}`);
+          console.log(`✅ Equipped secondary: ${weaponData.secondary} for ${socket.id.substring(0, 8)}`);
         }
       }
       
@@ -264,9 +318,10 @@ export class GameRoom {
         for (const supportWeapon of weaponData.support) {
           const config = weaponSystem.getWeaponConfig(supportWeapon as any);
           if (config) {
+            // CRITICAL: Create fresh weapon instance for this player
             const weapon = weaponSystem.createWeapon(supportWeapon as any, config);
             player.weapons.set(supportWeapon, weapon);
-            console.log(`✅ Equipped support: ${supportWeapon}`);
+            console.log(`✅ Equipped support: ${supportWeapon} for ${socket.id.substring(0, 8)}`);
           }
         }
       }
@@ -286,6 +341,24 @@ export class GameRoom {
     socket.on('disconnect', () => {
       // console.log(`👋 Player ${socket.id} left the game`);
       this.removePlayer(socket.id);
+    });
+    
+    // Manual respawn handler
+    socket.on('player:respawn', () => {
+      const player = this.gameState.getPlayer(socket.id);
+      if (player && !player.isAlive && player.deathTime) {
+        const now = Date.now();
+        const timeSinceDeath = now - player.deathTime;
+        
+        // Allow respawn after minimum death time
+        if (timeSinceDeath >= GAME_CONFIG.DEATH.DEATH_CAM_DURATION) {
+          console.log(`🔄 Manual respawn requested by ${socket.id.substring(0, 8)}`);
+          this.gameState.respawnPlayer(socket.id);
+        } else {
+          const remainingTime = GAME_CONFIG.DEATH.DEATH_CAM_DURATION - timeSinceDeath;
+          console.log(`⏰ Respawn denied for ${socket.id.substring(0, 8)} - ${remainingTime}ms remaining`);
+        }
+      }
     });
     
     // Debug events (for testing)
@@ -347,6 +420,33 @@ export class GameRoom {
       }
     });
     
+    socket.on('debug:kill_player', () => {
+      // Debug command to instantly kill a player for testing death system
+      console.log(`💀 DEBUG: Killing player ${socket.id.substring(0, 8)} for testing`);
+      this.gameState.debugKillPlayer(socket.id);
+    });
+    
+    socket.on('debug:verify_team', () => {
+      // Debug command to verify team data consistency
+      const player = this.gameState.getPlayer(socket.id);
+      if (player) {
+        console.log(`🎨 [TEAM VERIFICATION] Player ${socket.id.substring(0, 8)}:`);
+        console.log(`   Stored team: ${player.team}`);
+        console.log(`   Position: (${player.transform.position.x.toFixed(1)}, ${player.transform.position.y.toFixed(1)})`);
+        console.log(`   Is alive: ${player.isAlive}`);
+        
+        // Send current team data back to client
+        socket.emit('debug:team_data', {
+          playerId: socket.id,
+          team: player.team,
+          position: player.transform.position,
+          isAlive: player.isAlive
+        });
+      } else {
+        console.error(`❌ Player ${socket.id} not found for team verification`);
+      }
+    });
+    
     // Listen for any events for debugging
     socket.onAny((eventName: string, ...args: any[]) => {
       if (!eventName.includes('player:input') && 
@@ -394,6 +494,10 @@ export class GameRoom {
         socket.emit(EVENTS.GAME_STATE, filteredState);
       }
     }, 1000 / GAME_CONFIG.NETWORK_RATE);
+  }
+  
+  isInitialized(): boolean {
+    return this.initialized;
   }
   
   destroy(): void {

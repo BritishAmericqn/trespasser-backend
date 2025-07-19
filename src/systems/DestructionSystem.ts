@@ -16,6 +16,7 @@ export class DestructionSystem {
   private wallBodies: Map<string, Matter.Body> = new Map();
   private wallIdCounter: number = 0;
   private spawnPositions: Vector2[] = [];
+  private teamSpawnPositions: { red: Vector2[], blue: Vector2[] } = { red: [], blue: [] };
   
   constructor(private physics?: PhysicsSystem) {
     // Don't initialize in constructor - will be called separately
@@ -38,6 +39,8 @@ export class DestructionSystem {
         
         // Store spawn positions from the map
         this.spawnPositions = mapLoader.getSpawnPositions();
+        this.teamSpawnPositions = mapLoader.getTeamSpawnPositions();
+        console.log(`📍 Loaded spawn positions - Red: ${this.teamSpawnPositions.red.length}, Blue: ${this.teamSpawnPositions.blue.length}`);
         
       } catch (error) {
         console.error(`Failed to load map file, falling back to test walls:`, error);
@@ -554,5 +557,13 @@ export class DestructionSystem {
   // Get spawn positions from loaded map
   getSpawnPositions(): Vector2[] {
     return [...this.spawnPositions];
+  }
+  
+  // Get team-specific spawn positions from loaded map
+  getTeamSpawnPositions(): { red: Vector2[], blue: Vector2[] } {
+    return {
+      red: [...this.teamSpawnPositions.red],
+      blue: [...this.teamSpawnPositions.blue]
+    };
   }
 } 

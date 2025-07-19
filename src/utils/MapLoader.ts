@@ -56,7 +56,9 @@ export class MapLoader {
   
   private destructionSystem: DestructionSystem;
   private grid: GridCell[][] = [];
-  private spawns: Vector2[] = [];
+  private spawns: Vector2[] = []; // Keep for backward compatibility
+  private redSpawns: Vector2[] = [];
+  private blueSpawns: Vector2[] = [];
   private lights: Vector2[] = [];
   
   constructor(destructionSystem: DestructionSystem) {
@@ -90,6 +92,8 @@ export class MapLoader {
   private imageToGrid(image: Jimp): void {
     this.grid = [];
     this.spawns = [];
+    this.redSpawns = [];
+    this.blueSpawns = [];
     this.lights = [];
     
     for (let y = 0; y < 27; y++) {
@@ -112,8 +116,13 @@ export class MapLoader {
         this.grid[y][x] = cell;
         
         // Track special cells
-        if (cellType === 'spawn_red' || cellType === 'spawn_blue') {
-          this.spawns.push({ 
+        if (cellType === 'spawn_red') {
+          this.redSpawns.push({ 
+            x: x * MapLoader.GRID_SIZE + MapLoader.GRID_SIZE / 2, 
+            y: y * MapLoader.GRID_SIZE + MapLoader.GRID_SIZE / 2 
+          });
+        } else if (cellType === 'spawn_blue') {
+          this.blueSpawns.push({ 
             x: x * MapLoader.GRID_SIZE + MapLoader.GRID_SIZE / 2, 
             y: y * MapLoader.GRID_SIZE + MapLoader.GRID_SIZE / 2 
           });
@@ -382,7 +391,14 @@ export class MapLoader {
   
   // Getters for game systems that need spawn/light positions
   getSpawnPositions(): Vector2[] {
-    return [...this.spawns];
+    return [...this.redSpawns, ...this.blueSpawns];
+  }
+  
+  getTeamSpawnPositions(): { red: Vector2[], blue: Vector2[] } {
+    return {
+      red: [...this.redSpawns],
+      blue: [...this.blueSpawns]
+    };
   }
   
   getLightPositions(): Vector2[] {
