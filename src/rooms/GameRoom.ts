@@ -108,8 +108,13 @@ export class GameRoom {
       
       const result = this.gameState.handleWeaponFire(weaponFireEvent);
       if (result.success) {
+        console.log(`📤 BROADCASTING ${result.events.length} weapon events to ALL players:`);
         // Broadcast all events to all players
         for (const eventData of result.events) {
+          console.log(`   Event: ${eventData.type} from player ${weaponFireEvent.playerId.substring(0, 8)}`);
+          if (eventData.type === 'weapon:hit') {
+            console.log(`   🎯 HIT EVENT DATA:`, JSON.stringify(eventData.data, null, 2));
+          }
           this.io.emit(eventData.type, eventData.data);
         }
       }

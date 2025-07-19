@@ -85,7 +85,8 @@ export class GameStateSystem {
       height: wall.height,
       material: wall.material,
       sliceHealth: [...wall.sliceHealth],
-      maxHealth: wall.maxHealth
+      maxHealth: wall.maxHealth,
+      destructionMask: Array.from(wall.destructionMask) // Pass destruction mask for partial walls
     }));
     this.visionSystem.initializeWalls(wallData);
     
@@ -496,12 +497,28 @@ export class GameStateSystem {
         const pelletDirections = this.weaponSystem.generateShotgunPellets(event.direction, pelletCount);
         const damagePerPellet = weapon.damage / pelletCount;
         
+        // Calculate offset position in front of player to prevent self-hits
+        const playerRadius = GAME_CONFIG.PLAYER_SIZE / 2;
+        const offsetDistance = playerRadius + 2; // Start pellets 2 pixels beyond player edge
+        const offsetPosition = {
+          x: event.position.x + Math.cos(event.direction) * offsetDistance,
+          y: event.position.y + Math.sin(event.direction) * offsetDistance
+        };
+        
+        console.log(`🔫 SHOTGUN DEBUG: Player ${event.playerId.substring(0, 8)}`);
+        console.log(`   Player position: (${event.position.x.toFixed(2)}, ${event.position.y.toFixed(2)})`);
+        console.log(`   Offset position: (${offsetPosition.x.toFixed(2)}, ${offsetPosition.y.toFixed(2)})`);
+        console.log(`   Direction: ${event.direction.toFixed(3)} rad`);
+        console.log(`   Offset distance: ${offsetDistance} pixels`);
+        
         // Track all pellet hits for the event
         const allPelletHits: any[] = [];
+        let selfHitCount = 0;
         
-        for (const pelletDirection of pelletDirections) {
+        for (let pelletIndex = 0; pelletIndex < pelletDirections.length; pelletIndex++) {
+          const pelletDirection = pelletDirections[pelletIndex];
           const pelletHits = this.weaponSystem.performHitscanWithPenetration(
-            event.position,
+            offsetPosition, // Use offset position instead of player center
             pelletDirection,
             weapon.range,
             { ...weapon, damage: damagePerPellet }, // Temporary weapon with reduced damage
@@ -510,14 +527,28 @@ export class GameStateSystem {
             this.players
           );
           
+          console.log(`  🎯 Pellet ${pelletIndex}: Direction ${pelletDirection.toFixed(3)}, ${pelletHits.length} hits`);
+          
+          // Track if this pellet hit anything at all
+          let pelletHitSomething = false;
+          
           // Process each pellet's hits
           for (const hit of pelletHits) {
             allPelletHits.push(hit);
+            pelletHitSomething = true;
             
+            // Check for self-hit (debugging)
+            if (hit.targetType === 'player' && hit.targetId === event.playerId) {
+              selfHitCount++;
+              console.log(`🚨 SELF-HIT DETECTED! Pellet ${pelletIndex}, hit point: (${hit.hitPoint.x.toFixed(1)}, ${hit.hitPoint.y.toFixed(1)})`);
+            }
+            
+            // Send individual pellet event based on hit type
             if (hit.targetType === 'player') {
+              // Apply damage to the player
               const targetPlayer = this.players.get(hit.targetId);
               if (targetPlayer) {
-                const damageEvent = this.applyPlayerDamage(targetPlayer, hit.damage, 'bullet', event.playerId, hit.hitPoint);
+                const damageEvent = this.applyPlayerDamage(targetPlayer, damagePerPellet, 'bullet', event.playerId, hit.hitPoint);
                 events.push({ type: EVENTS.PLAYER_DAMAGED, data: damageEvent });
                 
                 if (damageEvent.isKilled) {
@@ -525,42 +556,96 @@ export class GameStateSystem {
                   events.push({ type: EVENTS.PLAYER_KILLED, data: damageEvent });
                 }
               }
-            } else if (hit.targetType === 'wall' && hit.wallSliceIndex !== undefined) {
-              const wall = this.destructionSystem.getWall(hit.targetId);
-              if (wall) {
-                const damageEvent = this.destructionSystem.applyDamage(hit.targetId, hit.wallSliceIndex, hit.damage);
-                
-                if (damageEvent) {
-                  events.push({ type: EVENTS.WALL_DAMAGED, data: {
-                    ...damageEvent,
-                    weaponType: weapon.type,  // Frontend requires this
-                    material: wall.material || 'concrete'  // Frontend requires this
-                  }});
-                  this.visionSystem.onWallDestroyed(hit.targetId, wall, damageEvent.sliceIndex);
+              
+              // Send weapon:hit event for frontend trail
+              events.push({
+                type: EVENTS.WEAPON_HIT,
+                data: {
+                  playerId: event.playerId,
+                  weaponType: weapon.type,
+                  position: hit.hitPoint,
+                  targetType: 'player',
+                  targetId: hit.targetId,
+                  pelletIndex: pelletIndex // Frontend needs this!
+                }
+              });
+            } else if (hit.targetType === 'wall') {
+              // Apply damage to the wall
+              if (hit.wallSliceIndex !== undefined) {
+                const wall = this.destructionSystem.getWall(hit.targetId);
+                if (wall) {
+                  const damageEvent = this.destructionSystem.applyDamage(hit.targetId, hit.wallSliceIndex, damagePerPellet);
                   
-                  if (damageEvent.isDestroyed) {
-                    events.push({ type: EVENTS.WALL_DESTROYED, data: {
+                  if (damageEvent) {
+                    // Send wall:damaged event for destruction system
+                    events.push({ type: EVENTS.WALL_DAMAGED, data: {
                       ...damageEvent,
-                      weaponType: weapon.type
+                      weaponType: weapon.type,
+                      material: wall.material || 'concrete',
+                      playerId: event.playerId,
+                      pelletIndex: pelletIndex
                     }});
+                    
+                    this.visionSystem.onWallDestroyed(hit.targetId, wall, damageEvent.sliceIndex);
+                    
+                    if (damageEvent.isDestroyed) {
+                      events.push({ type: EVENTS.WALL_DESTROYED, data: {
+                        ...damageEvent,
+                        weaponType: weapon.type
+                      }});
+                    }
                   }
                 }
               }
+              
+              // Send weapon:hit event for frontend trail
+              events.push({
+                type: EVENTS.WEAPON_HIT,
+                data: {
+                  playerId: event.playerId,
+                  weaponType: weapon.type,
+                  position: hit.hitPoint,
+                  targetType: 'wall',
+                  targetId: hit.targetId,
+                  pelletIndex: pelletIndex // Frontend needs this!
+                }
+              });
             }
+            
+            // Pellets don't penetrate - break after first hit
+            break;
+          }
+          
+          // If this pellet didn't hit anything, send weapon:miss event
+          if (!pelletHitSomething) {
+            // Calculate where the pellet would end up if it traveled max range
+            const missPosition = {
+              x: offsetPosition.x + Math.cos(pelletDirection) * weapon.range,
+              y: offsetPosition.y + Math.sin(pelletDirection) * weapon.range
+            };
+            
+            events.push({
+              type: EVENTS.WEAPON_MISS,
+              data: {
+                playerId: event.playerId,
+                weaponType: weapon.type,
+                position: missPosition,
+                direction: pelletDirection,
+                pelletIndex: pelletIndex // Frontend needs this!
+              }
+            });
+            
+            console.log(`  🎯 Pellet ${pelletIndex}: MISS - ended at (${missPosition.x.toFixed(1)}, ${missPosition.y.toFixed(1)})`);
           }
         }
         
-        // Send shotgun-specific hit event
-        events.push({ 
-          type: EVENTS.WEAPON_HIT, 
-          data: { 
-            playerId: event.playerId, 
-            weaponType: weapon.type,  // Frontend requires this
-            position: event.position,  // Add position
-            pelletHits: allPelletHits.length,
-            totalPellets: pelletCount
-          }
-        });
+        console.log(`🔫 SHOTGUN SUMMARY: ${allPelletHits.length} total hits, ${selfHitCount} self-hits`);
+        if (selfHitCount > 0) {
+          console.log(`🚨 WARNING: Shotgun self-hit detected despite offset position!`);
+        }
+        
+        // Individual pellet events are now sent above - no need for summary event
+        console.log(`📤 SENT ${pelletCount} INDIVIDUAL PELLET EVENTS instead of summary event`);
       } else {
         // Regular hitscan handling for other weapons
         const penetrationHits = this.weaponSystem.performHitscanWithPenetration(
@@ -1359,7 +1444,8 @@ export class GameStateSystem {
           viewAngle: visionData.viewAngle,
           viewDirection: visionData.viewDirection,
           viewDistance: visionData.viewDistance,
-          position: player.transform.position
+          position: player.transform.position,
+          fogOpacity: GAME_CONFIG.VISION.FOG_OPACITY // Send fog opacity to frontend
         };
       })() : undefined
     };

@@ -76,7 +76,8 @@ class GameStateSystem {
             height: wall.height,
             material: wall.material,
             sliceHealth: [...wall.sliceHealth],
-            maxHealth: wall.maxHealth
+            maxHealth: wall.maxHealth,
+            destructionMask: Array.from(wall.destructionMask) // Pass destruction mask for partial walls
         }));
         this.visionSystem.initializeWalls(wallData);
         // Get spawn positions from destruction system (if loaded from map)
@@ -417,14 +418,34 @@ class GameStateSystem {
                 const pelletCount = weaponConfig.PELLET_COUNT || 8;
                 const pelletDirections = this.weaponSystem.generateShotgunPellets(event.direction, pelletCount);
                 const damagePerPellet = weapon.damage / pelletCount;
+                // Calculate offset position in front of player to prevent self-hits
+                const playerRadius = constants_1.GAME_CONFIG.PLAYER_SIZE / 2;
+                const offsetDistance = playerRadius + 2; // Start pellets 2 pixels beyond player edge
+                const offsetPosition = {
+                    x: event.position.x + Math.cos(event.direction) * offsetDistance,
+                    y: event.position.y + Math.sin(event.direction) * offsetDistance
+                };
+                console.log(`🔫 SHOTGUN DEBUG: Player ${event.playerId.substring(0, 8)}`);
+                console.log(`   Player position: (${event.position.x.toFixed(2)}, ${event.position.y.toFixed(2)})`);
+                console.log(`   Offset position: (${offsetPosition.x.toFixed(2)}, ${offsetPosition.y.toFixed(2)})`);
+                console.log(`   Direction: ${event.direction.toFixed(3)} rad`);
+                console.log(`   Offset distance: ${offsetDistance} pixels`);
                 // Track all pellet hits for the event
                 const allPelletHits = [];
-                for (const pelletDirection of pelletDirections) {
-                    const pelletHits = this.weaponSystem.performHitscanWithPenetration(event.position, pelletDirection, weapon.range, { ...weapon, damage: damagePerPellet }, // Temporary weapon with reduced damage
+                let selfHitCount = 0;
+                for (let pelletIndex = 0; pelletIndex < pelletDirections.length; pelletIndex++) {
+                    const pelletDirection = pelletDirections[pelletIndex];
+                    const pelletHits = this.weaponSystem.performHitscanWithPenetration(offsetPosition, // Use offset position instead of player center
+                    pelletDirection, weapon.range, { ...weapon, damage: damagePerPellet }, // Temporary weapon with reduced damage
                     player, this.destructionSystem.getWalls(), this.players);
                     // Process each pellet's hits
                     for (const hit of pelletHits) {
                         allPelletHits.push(hit);
+                        // Check for self-hits in debug
+                        if (hit.targetType === 'player' && hit.targetId === event.playerId) {
+                            selfHitCount++;
+                            console.log(`🚨 SELF-HIT DETECTED! Pellet direction: ${pelletDirection.toFixed(3)}, hit point: (${hit.hitPoint.x.toFixed(2)}, ${hit.hitPoint.y.toFixed(2)})`);
+                        }
                         if (hit.targetType === 'player') {
                             const targetPlayer = this.players.get(hit.targetId);
                             if (targetPlayer) {
@@ -435,6 +456,18 @@ class GameStateSystem {
                                     events.push({ type: constants_1.EVENTS.PLAYER_KILLED, data: damageEvent });
                                 }
                             }
+                            // Send individual pellet hit event for frontend trails
+                            events.push({
+                                type: constants_1.EVENTS.WEAPON_HIT,
+                                data: {
+                                    playerId: event.playerId,
+                                    weaponType: weapon.type,
+                                    position: hit.hitPoint,
+                                    targetType: hit.targetType,
+                                    targetId: hit.targetId,
+                                    pelletIndex: pelletIndex // Add pellet index for frontend
+                                }
+                            });
                         }
                         else if (hit.targetType === 'wall' && hit.wallSliceIndex !== undefined) {
                             const wall = this.destructionSystem.getWall(hit.targetId);
@@ -444,7 +477,9 @@ class GameStateSystem {
                                     events.push({ type: constants_1.EVENTS.WALL_DAMAGED, data: {
                                             ...damageEvent,
                                             weaponType: weapon.type, // Frontend requires this
-                                            material: wall.material || 'concrete' // Frontend requires this
+                                            material: wall.material || 'concrete', // Frontend requires this
+                                            playerId: event.playerId, // Add shooter ID for frontend trails
+                                            pelletIndex: pelletIndex // Add pellet index for frontend
                                         } });
                                     this.visionSystem.onWallDestroyed(hit.targetId, wall, damageEvent.sliceIndex);
                                     if (damageEvent.isDestroyed) {
@@ -456,19 +491,33 @@ class GameStateSystem {
                                 }
                             }
                         }
+                        // Break after first hit per pellet (pellets don't penetrate)
+                        break;
+                    }
+                    // If no hits for this pellet, send miss event
+                    if (pelletHits.length === 0) {
+                        const missEndPoint = {
+                            x: offsetPosition.x + Math.cos(pelletDirection) * weapon.range,
+                            y: offsetPosition.y + Math.sin(pelletDirection) * weapon.range
+                        };
+                        events.push({
+                            type: constants_1.EVENTS.WEAPON_MISS,
+                            data: {
+                                playerId: event.playerId,
+                                weaponType: weapon.type,
+                                position: missEndPoint,
+                                direction: pelletDirection,
+                                pelletIndex: pelletIndex // Add pellet index for frontend
+                            }
+                        });
                     }
                 }
-                // Send shotgun-specific hit event
-                events.push({
-                    type: constants_1.EVENTS.WEAPON_HIT,
-                    data: {
-                        playerId: event.playerId,
-                        weaponType: weapon.type, // Frontend requires this
-                        position: event.position, // Add position
-                        pelletHits: allPelletHits.length,
-                        totalPellets: pelletCount
-                    }
-                });
+                console.log(`🔫 SHOTGUN SUMMARY: ${allPelletHits.length} total hits, ${selfHitCount} self-hits`);
+                if (selfHitCount > 0) {
+                    console.log(`🚨 WARNING: Shotgun self-hit detected despite offset position!`);
+                }
+                // Individual pellet events are now sent above - no need for summary event
+                console.log(`📤 SENT ${pelletCount} INDIVIDUAL PELLET EVENTS instead of summary event`);
             }
             else {
                 // Regular hitscan handling for other weapons
@@ -1108,7 +1157,8 @@ class GameStateSystem {
                     viewAngle: visionData.viewAngle,
                     viewDirection: visionData.viewDirection,
                     viewDistance: visionData.viewDistance,
-                    position: player.transform.position
+                    position: player.transform.position,
+                    fogOpacity: constants_1.GAME_CONFIG.VISION.FOG_OPACITY // Send fog opacity to frontend
                 };
             })() : undefined
         };

@@ -34,7 +34,7 @@ interface Wall {
 export class VisibilityPolygonSystem {
   private walls: Map<string, Wall> = new Map();
   private viewAngle: number = (120 * Math.PI) / 180; // 120 degrees in radians
-  private viewDistance: number = 150; // Maximum view distance
+  private viewDistance: number = 160; // Maximum view distance
   
   constructor() {
     console.log('VisibilityPolygonSystem initialized');
@@ -43,17 +43,29 @@ export class VisibilityPolygonSystem {
   /**
    * Initialize walls from destruction system format
    */
-  initializeWalls(wallData: Array<{id: string, x: number, y: number, width: number, height: number, material: string, sliceHealth: number[], maxHealth: number}>) {
+  initializeWalls(wallData: Array<{id: string, x: number, y: number, width: number, height: number, material: string, sliceHealth: number[], maxHealth: number, destructionMask?: Uint8Array | number[]}>) {
     this.walls.clear();
     
     wallData.forEach((wall) => {
+      // Convert destructionMask array to bitmask
+      let destroyedSlices = 0;
+      if (wall.destructionMask) {
+        const mask = Array.isArray(wall.destructionMask) ? wall.destructionMask : Array.from(wall.destructionMask);
+        for (let i = 0; i < 5; i++) {
+          if (mask[i] === 1) {
+            destroyedSlices |= (1 << i);
+          }
+        }
+
+      }
+      
       this.walls.set(wall.id, {
         id: wall.id,
         position: { x: wall.x, y: wall.y },
         width: wall.width,
         height: wall.height,
         orientation: wall.width > wall.height ? 'horizontal' : 'vertical',
-        destroyedSlices: 0,
+        destroyedSlices: destroyedSlices,
         material: wall.material,
         sliceHealth: [...wall.sliceHealth],
         maxHealth: wall.maxHealth
@@ -249,7 +261,7 @@ export class VisibilityPolygonSystem {
     // Debug: Log basic info about the polygon (temporarily increased for testing)
     if (finalPoints.length > 10) { // Log more frequently for testing
       const arcPointCount = pointsOnArc.filter(p => p).length;
-      // console.log(`[VisibilityPolygon] Created polygon with ${finalPoints.length} points (${arcPointCount} original arc points), direction: ${(viewDirection * 180 / Math.PI).toFixed(1)}°`);
+      // Removed debug logging - vision system working perfectly
     }
     
     return finalPoints;
@@ -279,17 +291,94 @@ export class VisibilityPolygonSystem {
   }
 
   /**
+   * Calculate the actual bounds of a wall based on intact slices
+   */
+  private getActualWallBounds(wall: Wall): { minX: number, maxX: number, minY: number, maxY: number } {
+    // If wall is fully intact, return full bounds
+    if (wall.destroyedSlices === 0) {
+      return {
+        minX: wall.position.x,
+        maxX: wall.position.x + wall.width,
+        minY: wall.position.y,
+        maxY: wall.position.y + wall.height
+      };
+    }
+    
+    // If wall is fully destroyed, return empty bounds
+    if (wall.destroyedSlices === 0b11111) {
+      return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+    }
+    
+    // Find first and last intact slices
+    let firstIntactSlice = -1;
+    let lastIntactSlice = -1;
+    
+    for (let i = 0; i < 5; i++) {
+      const isDestroyed = (wall.destroyedSlices >> i) & 1;
+      if (!isDestroyed) {
+        if (firstIntactSlice === -1) firstIntactSlice = i;
+        lastIntactSlice = i;
+      }
+    }
+    
+    // If no intact slices found, return empty bounds
+    if (firstIntactSlice === -1) {
+      return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+    }
+    
+    const sliceDimension = getSliceDimension(wall as any);
+    
+    if (wall.orientation === 'horizontal') {
+      // For horizontal walls, adjust X bounds based on intact slices
+      const minX = wall.position.x + (firstIntactSlice * sliceDimension);
+      const maxX = wall.position.x + ((lastIntactSlice + 1) * sliceDimension);
+      
+
+      
+      return {
+        minX: minX,
+        maxX: maxX,
+        minY: wall.position.y,
+        maxY: wall.position.y + wall.height
+      };
+    } else {
+      // For vertical walls, adjust Y bounds based on intact slices
+      const minY = wall.position.y + (firstIntactSlice * sliceDimension);
+      const maxY = wall.position.y + ((lastIntactSlice + 1) * sliceDimension);
+      
+
+      
+      return {
+        minX: wall.position.x,
+        maxX: wall.position.x + wall.width,
+        minY: minY,
+        maxY: maxY
+      };
+    }
+  }
+
+  /**
    * Get all wall corners for visibility calculation
    * Let FOV filtering and ray casting determine actual visibility
    */
   private getAllWallCorners(wall: Wall, viewerPos: Vector2): Vector2[] {
     const corners: Vector2[] = [];
     
-    // Return all four corners of the wall
-    corners.push({ x: wall.position.x, y: wall.position.y });                          // Top-left
-    corners.push({ x: wall.position.x + wall.width, y: wall.position.y });            // Top-right
-    corners.push({ x: wall.position.x, y: wall.position.y + wall.height });           // Bottom-left
-    corners.push({ x: wall.position.x + wall.width, y: wall.position.y + wall.height }); // Bottom-right
+
+    
+    // Get actual bounds based on intact slices
+    const bounds = this.getActualWallBounds(wall);
+    
+    // If wall has no intact slices, return no corners
+    if (bounds.minX === bounds.maxX || bounds.minY === bounds.maxY) {
+      return corners;
+    }
+    
+    // Add corners based on actual bounds (not full wall dimensions)
+    corners.push({ x: bounds.minX, y: bounds.minY });   // Top-left of intact area
+    corners.push({ x: bounds.maxX, y: bounds.minY });   // Top-right of intact area
+    corners.push({ x: bounds.minX, y: bounds.maxY });   // Bottom-left of intact area
+    corners.push({ x: bounds.maxX, y: bounds.maxY });   // Bottom-right of intact area
     
     // Also add corners created by destruction if the wall is partially destroyed
     if (wall.destroyedSlices !== 0 && wall.destroyedSlices !== 0b11111) {
@@ -340,32 +429,25 @@ export class VisibilityPolygonSystem {
     const leftBound = viewDirection - this.viewAngle / 2;
     const rightBound = viewDirection + this.viewAngle / 2;
     
-    // Debug: Track corner collection
-    let totalCornersFound = 0;
-    let cornersFilteredByDistance = 0;
-    let cornersFilteredByFOV = 0;
-    let wallsProcessed = 0;
-    let arcIntersectionsFound = 0;
-    
     // First, collect all potential corners
     this.walls.forEach((wall) => {
       // Skip fully destroyed walls
       if (wall.destroyedSlices === 0b11111) return;
-      wallsProcessed++;
       
       // Get all corners of the wall (no filtering)
       const wallCorners = this.getAllWallCorners(wall, viewerPos);
       
-      // Also check for arc-edge intersections
+      // Also check for arc-edge intersections using actual wall bounds
+      const bounds = this.getActualWallBounds(wall);
       const edges = [
-        { start: { x: wall.position.x, y: wall.position.y }, 
-          end: { x: wall.position.x + wall.width, y: wall.position.y } }, // Top
-        { start: { x: wall.position.x + wall.width, y: wall.position.y }, 
-          end: { x: wall.position.x + wall.width, y: wall.position.y + wall.height } }, // Right
-        { start: { x: wall.position.x + wall.width, y: wall.position.y + wall.height }, 
-          end: { x: wall.position.x, y: wall.position.y + wall.height } }, // Bottom
-        { start: { x: wall.position.x, y: wall.position.y + wall.height }, 
-          end: { x: wall.position.x, y: wall.position.y } } // Left
+        { start: { x: bounds.minX, y: bounds.minY }, 
+          end: { x: bounds.maxX, y: bounds.minY } }, // Top
+        { start: { x: bounds.maxX, y: bounds.minY }, 
+          end: { x: bounds.maxX, y: bounds.maxY } }, // Right
+        { start: { x: bounds.maxX, y: bounds.maxY }, 
+          end: { x: bounds.minX, y: bounds.maxY } }, // Bottom
+        { start: { x: bounds.minX, y: bounds.maxY }, 
+          end: { x: bounds.minX, y: bounds.minY } } // Left
       ];
       
       // Find arc intersections for each edge
@@ -373,20 +455,17 @@ export class VisibilityPolygonSystem {
         const arcIntersections = this.findArcEdgeIntersections(edge, viewerPos, viewDirection);
         for (const intersection of arcIntersections) {
           wallCorners.push(intersection);
-          arcIntersectionsFound++;
         }
       }
       
       // Process all corners (wall corners + arc intersections)
       for (const corner of wallCorners) {
-        totalCornersFound++;
         const dx = corner.x - viewerPos.x;
         const dy = corner.y - viewerPos.y;
         const distance = Math.hypot(dx, dy);
         
         // Skip if beyond view distance
         if (distance > this.viewDistance) {
-          cornersFilteredByDistance++;
           continue;
         }
         
@@ -395,7 +474,6 @@ export class VisibilityPolygonSystem {
         
         // Use the same wraparound-aware FOV check as isAngleInViewCone
         if (!this.isAngleInViewCone(angle, leftBound, rightBound)) {
-          cornersFilteredByFOV++;
           continue;
         }
         
@@ -415,18 +493,6 @@ export class VisibilityPolygonSystem {
     
     // Convert map to array
     const validCorners: Corner[] = Array.from(cornerMap.values());
-    
-    // Debug output when we have many corners or arc intersections
-    if (validCorners.length > 0) { // Always log for testing
-      // console.log(`[CornerDebug] Visibility calculation:`);
-      // console.log(`  - Walls processed: ${wallsProcessed}`);
-      // console.log(`  - Total corners found: ${totalCornersFound}`);
-      // console.log(`  - Arc intersections found: ${arcIntersectionsFound}`);
-      // console.log(`  - Filtered by distance: ${cornersFilteredByDistance}`);
-      // console.log(`  - Filtered by FOV: ${cornersFilteredByFOV}`);
-      // console.log(`  - Final corners: ${validCorners.length}`);
-      // console.log(`  - Viewer at: (${viewerPos.x.toFixed(0)}, ${viewerPos.y.toFixed(0)}), looking ${(viewDirection * 180 / Math.PI).toFixed(1)}°`);
-    }
     
     return validCorners;
   }

@@ -484,8 +484,9 @@ class WeaponSystem {
             }
             // Check all players
             for (const [playerId, player] of players) {
-                if (playerId === shooterId || !player.isAlive)
+                if (playerId === shooterId || !player.isAlive) {
                     continue;
+                }
                 const playerHit = this.checkPlayerHit(currentStart, direction, remainingDistance, player);
                 if (playerHit) {
                     if (!closestHit || playerHit.distance < closestHit.distance) {

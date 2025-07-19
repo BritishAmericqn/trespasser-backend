@@ -623,7 +623,9 @@ export class WeaponSystem {
       
       // Check all players
       for (const [playerId, player] of players) {
-        if (playerId === shooterId || !player.isAlive) continue;
+        if (playerId === shooterId || !player.isAlive) {
+          continue;
+        }
         
         const playerHit = this.checkPlayerHit(currentStart, direction, remainingDistance, player);
         if (playerHit) {

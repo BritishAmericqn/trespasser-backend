@@ -107,6 +107,7 @@ export interface GameState {
     type: 'tiles' | 'polygon';
     viewAngle: number;
     position: Vector2;
+    fogOpacity?: number; // Fog of war darkness level (0.0 = transparent, 1.0 = black)
   } & (
     | {
         type: 'tiles';
