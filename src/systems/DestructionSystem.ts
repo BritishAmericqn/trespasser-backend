@@ -7,8 +7,7 @@ import {
   getSlicePosition as getSlicePositionHelper,
   isPointInSlice,
   calculateSliceIndex,
-  shouldSliceAllowVision,
-  isSlicePhysicallyIntact
+  shouldSliceAllowVision
 } from '../utils/wallSliceHelpers';
 import { MapLoader } from '../utils/MapLoader';
 
@@ -338,8 +337,8 @@ export class DestructionSystem {
       return false;
     }
     
-    // 🔧 FIX: Check actual slice health for consistency across all systems
-    if (!isSlicePhysicallyIntact(wall.sliceHealth[sliceIndex])) {
+    // Check if slice is destroyed
+    if (wall.sliceHealth[sliceIndex] <= 0) {
       return false;
     }
     

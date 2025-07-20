@@ -6,8 +6,7 @@ import { WeaponSystem } from './WeaponSystem';
 import { DestructionSystem } from './DestructionSystem';
 import { 
   calculateSliceIndex,
-  getSliceDimension,
-  shouldSliceAllowPenetration
+  getSliceDimension
 } from '../utils/wallSliceHelpers';
 
 export class ProjectileSystem {
@@ -399,10 +398,10 @@ export class ProjectileSystem {
       if (to.x >= wall.position.x && to.x <= wall.position.x + wall.width &&
           to.y >= wall.position.y && to.y <= wall.position.y + wall.height) {
         
-        // 🔧 PIERCING FIX: Check if slice allows penetration based on health
+        // Check if slice is destroyed
         const sliceIndex = calculateSliceIndex(wall, to);
-        if (shouldSliceAllowPenetration(wall.material, wall.sliceHealth[sliceIndex], wall.maxHealth)) {
-          continue; // Pass through slice that allows penetration
+        if (wall.sliceHealth[sliceIndex] <= 0) {
+          continue; // Pass through destroyed slice
         }
         
         // Calculate collision normal based on which edge we hit
@@ -507,12 +506,12 @@ export class ProjectileSystem {
           const distSq = distX * distX + distY * distY;
           
           if (distSq < this.GRENADE_RADIUS * this.GRENADE_RADIUS) {
-            // 🔧 PIERCING FIX: Check if slice allows penetration based on health
+            // Check if slice is destroyed
             const sliceIndex = calculateSliceIndex(wall, { x: closestX, y: closestY });
             
-            // If this slice allows penetration, grenade should pass through
-            if (shouldSliceAllowPenetration(wall.material, wall.sliceHealth[sliceIndex], wall.maxHealth)) {
-              continue; // Skip this collision, grenade passes through slice that allows penetration
+            // If this slice is destroyed, grenade should pass through
+            if (wall.sliceHealth[sliceIndex] <= 0) {
+              continue; // Skip this collision, grenade passes through destroyed slice
             }
             
             // Slice is intact - proceed with normal collision
@@ -693,7 +692,7 @@ export class ProjectileSystem {
         if (collision.hit) {
           // Debug: Log collision detection
           if (projectile.type === 'rocket') {
-            console.log(`🚀 Rocket hit wall ${wallId} at step ${step}/${steps}, slice ${collision.sliceIndex}`);
+            // Rocket hit debug removed for performance
           }
           return {
             hit: true,
@@ -783,9 +782,9 @@ export class ProjectileSystem {
       // Calculate which slice was hit (using original wall position, not expanded bounds)
       const sliceIndex = calculateSliceIndex(wall, { x: hitX, y: hitY });
       
-      // 🔧 PIERCING FIX: Check if slice allows penetration based on health
-      if (shouldSliceAllowPenetration(wall.material, wall.sliceHealth[sliceIndex], wall.maxHealth)) {
-        return { hit: false }; // Rocket passes through slice that allows penetration
+      // Check if slice is destroyed
+      if (wall.sliceHealth[sliceIndex] <= 0) {
+        return { hit: false }; // Rocket passes through destroyed slice
       }
       
       // Slice is intact - proceed with normal collision
@@ -996,9 +995,7 @@ export class ProjectileSystem {
     const wallDamageEvents: WallDamageEvent[] = [];
     const explosions: ExplosionEvent[] = [...this.explosionQueue];
     
-    if (this.explosionQueue.length > 0) {
-      console.log(`💥 Processing ${this.explosionQueue.length} explosions`);
-    }
+    // Explosion queue debug removed for performance
     
     for (const explosion of this.explosionQueue) {
       // Add null check for explosion
@@ -1020,7 +1017,7 @@ export class ProjectileSystem {
           const damageMultiplier = 1 - (distance / explosion.radius);
           const damage = Math.floor(explosion.damage * damageMultiplier);
           
-          console.log(`💥 Explosion damages player ${playerId}: ${damage} damage at distance ${distance.toFixed(1)}`);
+          // Explosion damage debug removed for performance
           
           playerDamageEvents.push({
             playerId,

@@ -72,7 +72,7 @@ export class VisibilityPolygonSystem {
       });
     });
     
-    console.log(`Initialized ${this.walls.size} walls for visibility polygon`);
+    // Wall initialization debug removed for performance
   }
 
   /**

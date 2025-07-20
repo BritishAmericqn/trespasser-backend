@@ -1,5 +1,7 @@
 # 🔧 Partial Wall Bullet Pass-Through Fix
 
+> **UPDATE**: The initial fix using `isSlicePhysicallyIntact()` was incorrect. The real issue was that pre-destroyed slices (health = 0) were being treated as "penetrable obstacles" instead of empty space.
+
 ## Problem Summary
 
 **Issue**: Bullets were passing through some soft walls without registering hits or damage, particularly:

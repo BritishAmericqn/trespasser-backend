@@ -18,7 +18,6 @@ import {
   calculateSliceIndex,
   getSliceDimension,
   isHardWall,
-  shouldSliceAllowPenetration,
   isSlicePhysicallyIntact
 } from '../utils/wallSliceHelpers';
 import { WeaponDiagnostics } from './WeaponDiagnostics';
@@ -483,9 +482,9 @@ export class WeaponSystem {
       // Check if this hit is closer than our current closest hit
       if (hit.distance >= closestHit.distance) continue;
       
-      // 🔧 PIERCING FIX: Check if slice allows penetration based on health, not vision logic
-      if (shouldSliceAllowPenetration(hit.wall.material, hit.wall.sliceHealth[hit.sliceIndex], hit.wall.maxHealth)) {
-        // This slice allows penetration - check for solid slices within this wall
+      // Check if the slice is destroyed
+      if (hit.wall.sliceHealth[hit.sliceIndex] <= 0) {
+        // This slice is destroyed - check for intact slices within this wall
         const sliceDimension = getSliceDimension(hit.wall);
         let foundIntactSlice = false;
         
@@ -663,9 +662,9 @@ export class WeaponSystem {
         const wall = closestHit.wall!;
         const sliceIndex = closestHit.sliceIndex!;
         
-        // 🔧 PIERCING FIX: Check if slice allows penetration based on health
-        if (shouldSliceAllowPenetration(wall.material, wall.sliceHealth[sliceIndex], wall.maxHealth)) {
-          // Slice allows penetration - ray continues without damage reduction
+        // Check if slice is already destroyed (health = 0)
+        if (wall.sliceHealth[sliceIndex] <= 0) {
+          // Slice is destroyed - ray continues without damage reduction
           // Move start point slightly past the hit to avoid re-hitting the same wall
           const epsilon = 0.1;
           currentStart = {
@@ -1052,9 +1051,9 @@ export class WeaponSystem {
         const wall = closestHit.wall!;
         const sliceIndex = closestHit.sliceIndex!;
         
-        // 🔧 PIERCING FIX: Check if slice allows penetration based on health
-        if (shouldSliceAllowPenetration(wall.material, wall.sliceHealth[sliceIndex], wall.maxHealth)) {
-          // Slice allows penetration - ray continues without damage reduction
+        // Check if slice is already destroyed (health = 0)
+        if (wall.sliceHealth[sliceIndex] <= 0) {
+          // Slice is destroyed - ray continues without damage reduction
           const epsilon = 0.1;
           currentStart = {
             x: closestHit.hitPoint.x + direction.x * epsilon,

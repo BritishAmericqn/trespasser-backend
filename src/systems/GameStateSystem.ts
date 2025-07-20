@@ -7,7 +7,7 @@ import { DestructionSystem } from './DestructionSystem';
 import { VisibilityPolygonSystem } from './VisibilityPolygonSystem';
 import { WeaponDiagnostics } from './WeaponDiagnostics';
 import Matter from 'matter-js';
-import { calculateSliceIndex, isPointInSlice, isSlicePhysicallyIntact } from '../utils/wallSliceHelpers';
+import { calculateSliceIndex, isPointInSlice } from '../utils/wallSliceHelpers';
 
 export class GameStateSystem {
   private players: Map<string, PlayerState> = new Map();
@@ -76,7 +76,7 @@ export class GameStateSystem {
   private initializeWalls(): void {
     // Get walls from destruction system and pass to vision system
     const walls = this.destructionSystem.getWalls();
-    console.log(`🧱 Initializing ${walls.size} walls for GameStateSystem`);
+    // Wall initialization debug removed for performance
     
     const wallData = Array.from(walls.entries()).map(([id, wall]) => ({
       id: id,
@@ -316,7 +316,7 @@ export class GameStateSystem {
         Matter.Body.setPosition(body, { x: spawn.x, y: spawn.y });
       }
       
-      console.log(`🎯 Respawned ${playerId.substring(0, 8)} at team ${player.team} spawn: (${spawn.x}, ${spawn.y})`);
+                // Respawn debug removed for performance
     } else {
       console.warn(`⚠️ No ${player.team} team spawns available for player ${playerId.substring(0, 8)}`);
     }
@@ -659,11 +659,7 @@ export class GameStateSystem {
           y: event.position.y + Math.sin(event.direction) * offsetDistance
         };
         
-        console.log(`🔫 SHOTGUN DEBUG: Player ${event.playerId.substring(0, 8)}`);
-        console.log(`   Player position: (${event.position.x.toFixed(2)}, ${event.position.y.toFixed(2)})`);
-        console.log(`   Offset position: (${offsetPosition.x.toFixed(2)}, ${offsetPosition.y.toFixed(2)})`);
-        console.log(`   Direction: ${event.direction.toFixed(3)} rad`);
-        console.log(`   Offset distance: ${offsetDistance} pixels`);
+        // Shotgun debug removed for performance
         
         // Track all pellet hits for the event
         const allPelletHits: any[] = [];
@@ -681,7 +677,7 @@ export class GameStateSystem {
             this.players
           );
           
-          console.log(`  🎯 Pellet ${pelletIndex}: Direction ${pelletDirection.toFixed(3)}, ${pelletHits.length} hits`);
+          // Pellet debug removed for performance
           
           // Track if this pellet hit anything at all
           let pelletHitSomething = false;
@@ -694,7 +690,7 @@ export class GameStateSystem {
             // Check for self-hit (debugging)
             if (hit.targetType === 'player' && hit.targetId === event.playerId) {
               selfHitCount++;
-              console.log(`🚨 SELF-HIT DETECTED! Pellet ${pelletIndex}, hit point: (${hit.hitPoint.x.toFixed(1)}, ${hit.hitPoint.y.toFixed(1)})`);
+              // Self-hit debug removed for performance
             }
             
             // Send individual pellet event based on hit type
@@ -789,17 +785,11 @@ export class GameStateSystem {
               }
             });
             
-            console.log(`  🎯 Pellet ${pelletIndex}: MISS - ended at (${missPosition.x.toFixed(1)}, ${missPosition.y.toFixed(1)})`);
+            // Pellet miss debug removed for performance
           }
         }
         
-        console.log(`🔫 SHOTGUN SUMMARY: ${allPelletHits.length} total hits, ${selfHitCount} self-hits`);
-        if (selfHitCount > 0) {
-          console.log(`🚨 WARNING: Shotgun self-hit detected despite offset position!`);
-        }
-        
-        // Individual pellet events are now sent above - no need for summary event
-        console.log(`📤 SENT ${pelletCount} INDIVIDUAL PELLET EVENTS instead of summary event`);
+        // Shotgun summary debug removed for performance
       } else {
         // Regular hitscan handling for other weapons
         const penetrationHits = this.weaponSystem.performHitscanWithPenetration(
@@ -1118,7 +1108,7 @@ export class GameStateSystem {
       const killer = this.players.get(sourcePlayerId);
       if (killer && killer.id !== player.id) {
         killer.kills++;
-        console.log(`🎯 Kill credit: ${sourcePlayerId.substring(0, 8)} now has ${killer.kills} kills`);
+                  // Kill credit debug removed for performance
       }
     }
     
@@ -1269,16 +1259,15 @@ export class GameStateSystem {
         // Find which slice the collision point is in
         const sliceIndex = calculateSliceIndex(wall, closestPoint);
         
-        // 🔧 FIX: Check actual slice health for movement collision
-        // This ensures consistency with weapon system
+        // Check if slice has health > 0
         if (sliceIndex >= 0 && sliceIndex < GAME_CONFIG.DESTRUCTION.WALL_SLICES && 
-            isSlicePhysicallyIntact(wall.sliceHealth[sliceIndex])) {
+            wall.sliceHealth[sliceIndex] > 0) {
           return false; // Collision detected with intact slice
         }
         
         // Also check adjacent slices for edge cases
         for (let i = Math.max(0, sliceIndex - 1); i <= Math.min(GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, sliceIndex + 1); i++) {
-          if (isSlicePhysicallyIntact(wall.sliceHealth[i]) && isPointInSlice(wall, closestPoint, i)) {
+          if (wall.sliceHealth[i] > 0 && isPointInSlice(wall, closestPoint, i)) {
             return false; // Collision with adjacent intact slice
           }
         }
@@ -1467,7 +1456,7 @@ export class GameStateSystem {
     
     // Queue player damage events
     for (const damageEvent of explosionResults.playerDamageEvents) {
-      console.log(`🎯 Applying explosion damage to player ${damageEvent.playerId}: ${damageEvent.damage} damage`);
+      // Explosion damage debug removed for performance
       this.applyPlayerDamage(
         this.players.get(damageEvent.playerId)!,
         damageEvent.damage,
@@ -1712,3 +1701,4 @@ export class GameStateSystem {
     return this.getState();
   }
 }
+
