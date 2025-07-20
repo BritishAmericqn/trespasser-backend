@@ -134,7 +134,41 @@ io.on('connection', (socket) => {
   console.log(`🔌 Origin: ${socket.handshake.headers.origin || 'no origin header'}`);
   console.log(`🔌 Transport: ${socket.conn.transport.name}`);
   
-  // DEBUG: Log all events received from this socket
+  // CRITICAL: Register authenticate handler IMMEDIATELY before any other setup
+  if (REQUIRE_PASSWORD) {
+    socket.on('authenticate', (data: any) => {
+      console.log(`🔐 Authenticate event received for ${socket.id}`);
+      const timeout = authTimeouts.get(socket.id);
+      if (timeout) {
+        clearTimeout(timeout);
+        authTimeouts.delete(socket.id);
+        console.log(`✅ Cleared auth timeout for ${socket.id}`);
+      } else {
+        console.log(`⚠️ No timeout found for ${socket.id} during auth`);
+      }
+      
+      // Handle both string and object formats
+      const password = typeof data === 'string' ? data : data?.password;
+      
+      if (password === GAME_PASSWORD) {
+        authenticatedPlayers.add(socket.id);
+        console.log(`✅ Player authenticated: ${socket.id} from ${ip}`);
+        socket.emit('authenticated');
+        console.log(`📤 Sent 'authenticated' event to ${socket.id}`);
+        
+        // RESTORE: Call joinGame to register event handlers (including player:join)
+        console.log(`🎮 About to call joinGame for ${socket.id}`);
+        joinGame(socket);
+        console.log(`🎮 Finished calling joinGame for ${socket.id}`);
+      } else {
+        socket.emit('auth-failed', 'Invalid password');
+        socket.disconnect();
+        console.log(`❌ Failed auth from ${ip}: wrong password`);
+      }
+    });
+  }
+  
+  // DEBUG: Log all events received from this socket (AFTER auth handler is registered)
   const originalOn = socket.on.bind(socket);
   socket.on = function(event: string, handler: Function) {
     return originalOn(event, (...args: any[]) => {
@@ -166,38 +200,6 @@ io.on('connection', (socket) => {
     
     authTimeouts.set(socket.id, timeout);
     console.log(`⏰ Set auth timeout for ${socket.id}`);
-    
-    // Wait for password
-    socket.on('authenticate', (data: any) => {
-      console.log(`🔐 Authenticate event received for ${socket.id}`);
-      const timeout = authTimeouts.get(socket.id);
-      if (timeout) {
-        clearTimeout(timeout);
-        authTimeouts.delete(socket.id);
-        console.log(`✅ Cleared auth timeout for ${socket.id}`);
-      } else {
-        console.log(`⚠️ No timeout found for ${socket.id} during auth`);
-      }
-      
-      // Handle both string and object formats
-      const password = typeof data === 'string' ? data : data?.password;
-      
-      if (password === GAME_PASSWORD) {
-        authenticatedPlayers.add(socket.id);
-        console.log(`✅ Player authenticated: ${socket.id} from ${ip}`);
-        socket.emit('authenticated');
-        console.log(`📤 Sent 'authenticated' event to ${socket.id}`);
-        
-        // RESTORE: Call joinGame to register event handlers (including player:join)
-        console.log(`🎮 About to call joinGame for ${socket.id}`);
-        joinGame(socket);
-        console.log(`🎮 Finished calling joinGame for ${socket.id}`);
-      } else {
-        socket.emit('auth-failed', 'Invalid password');
-        socket.disconnect();
-        console.log(`❌ Failed auth from ${ip}: wrong password`);
-      }
-    });
   } else {
     // No password required, join immediately
     joinGame(socket);

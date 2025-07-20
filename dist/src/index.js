@@ -153,37 +153,8 @@ io.on('connection', (socket) => {
     console.log(`🔌 Connection attempt from ${ip} (${socket.id})`);
     console.log(`🔌 Origin: ${socket.handshake.headers.origin || 'no origin header'}`);
     console.log(`🔌 Transport: ${socket.conn.transport.name}`);
-    // DEBUG: Log all events received from this socket
-    const originalOn = socket.on.bind(socket);
-    socket.on = function (event, handler) {
-        return originalOn(event, (...args) => {
-            console.log(`📡 [${socket.id.substring(0, 8)}] Received event: "${event}"`, args.length > 0 ? 'with data' : 'no data');
-            handler(...args);
-        });
-    };
-    // Check player limit
-    if (authenticatedPlayers.size >= MAX_PLAYERS) {
-        socket.emit('error', 'Server is full');
-        socket.disconnect();
-        console.log(`❌ Server full, rejected ${ip}`);
-        return;
-    }
+    // CRITICAL: Register authenticate handler IMMEDIATELY before any other setup
     if (REQUIRE_PASSWORD) {
-        // Set authentication timeout (increased from 5s to 30s for debugging)
-        const timeout = setTimeout(() => {
-            if (!authenticatedPlayers.has(socket.id)) {
-                console.log(`⏰ Auth timeout for ${ip} - Socket ID: ${socket.id}`);
-                console.log(`⏰ Authenticated players: ${Array.from(authenticatedPlayers)}`);
-                socket.emit('auth-timeout', 'Authentication timeout');
-                socket.disconnect();
-            }
-            else {
-                console.log(`✅ Auth timeout fired but player ${socket.id} is already authenticated`);
-            }
-        }, 30000); // Increased to 30 seconds
-        authTimeouts.set(socket.id, timeout);
-        console.log(`⏰ Set auth timeout for ${socket.id}`);
-        // Wait for password
         socket.on('authenticate', (data) => {
             console.log(`🔐 Authenticate event received for ${socket.id}`);
             const timeout = authTimeouts.get(socket.id);
@@ -213,6 +184,37 @@ io.on('connection', (socket) => {
                 console.log(`❌ Failed auth from ${ip}: wrong password`);
             }
         });
+    }
+    // DEBUG: Log all events received from this socket (AFTER auth handler is registered)
+    const originalOn = socket.on.bind(socket);
+    socket.on = function (event, handler) {
+        return originalOn(event, (...args) => {
+            console.log(`📡 [${socket.id.substring(0, 8)}] Received event: "${event}"`, args.length > 0 ? 'with data' : 'no data');
+            handler(...args);
+        });
+    };
+    // Check player limit
+    if (authenticatedPlayers.size >= MAX_PLAYERS) {
+        socket.emit('error', 'Server is full');
+        socket.disconnect();
+        console.log(`❌ Server full, rejected ${ip}`);
+        return;
+    }
+    if (REQUIRE_PASSWORD) {
+        // Set authentication timeout (increased from 5s to 30s for debugging)
+        const timeout = setTimeout(() => {
+            if (!authenticatedPlayers.has(socket.id)) {
+                console.log(`⏰ Auth timeout for ${ip} - Socket ID: ${socket.id}`);
+                console.log(`⏰ Authenticated players: ${Array.from(authenticatedPlayers)}`);
+                socket.emit('auth-timeout', 'Authentication timeout');
+                socket.disconnect();
+            }
+            else {
+                console.log(`✅ Auth timeout fired but player ${socket.id} is already authenticated`);
+            }
+        }, 30000); // Increased to 30 seconds
+        authTimeouts.set(socket.id, timeout);
+        console.log(`⏰ Set auth timeout for ${socket.id}`);
     }
     else {
         // No password required, join immediately
