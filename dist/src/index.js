@@ -69,21 +69,22 @@ io.use((socket, next) => {
 // Game room management
 const rooms = new Map();
 let defaultRoom = null;
-// Status endpoint for frontend to check server info
+// Health check endpoint for Railway
 app.get('/', (req, res) => {
     res.json({
-        game: 'Trespasser',
         status: 'online',
-        version: '1.0.0',
-        players: authenticatedPlayers.size,
-        maxPlayers: MAX_PLAYERS,
-        passwordRequired: REQUIRE_PASSWORD,
-        uptime: process.uptime()
+        service: 'Trespasser Multiplayer Backend',
+        timestamp: new Date().toISOString(),
+        gameRoom: defaultRoom ? 'initialized' : 'pending'
     });
 });
 // Health check endpoint
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({
+        status: 'healthy',
+        uptime: process.uptime(),
+        gameRoom: defaultRoom ? 'ready' : 'initializing'
+    });
 });
 // Debug endpoint to check game state
 app.get('/debug/gamestate', (req, res) => {
@@ -310,18 +311,31 @@ httpServer.on('error', (err) => {
 // Pre-create the default game room to avoid initialization delays
 async function initializeServer() {
     console.log('🔄 Initializing game room...');
-    defaultRoom = new GameRoom_1.GameRoom('default', io);
-    rooms.set('default', defaultRoom);
-    // Wait for room to be fully initialized
-    await new Promise(resolve => {
-        const checkInit = setInterval(() => {
-            if (defaultRoom && defaultRoom.isInitialized()) {
-                clearInterval(checkInit);
-                resolve(true);
-            }
-        }, 100);
-    });
-    console.log('✅ Game room ready!');
+    try {
+        defaultRoom = new GameRoom_1.GameRoom('default', io);
+        rooms.set('default', defaultRoom);
+        // Wait for room to be fully initialized with timeout
+        await Promise.race([
+            new Promise(resolve => {
+                const checkInit = setInterval(() => {
+                    if (defaultRoom && defaultRoom.isInitialized()) {
+                        clearInterval(checkInit);
+                        resolve(true);
+                    }
+                }, 100);
+            }),
+            // Add 30 second timeout for Railway
+            new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Game room initialization timeout')), 30000);
+            })
+        ]);
+        console.log('✅ Game room ready!');
+    }
+    catch (error) {
+        console.error('❌ Failed to initialize game room:', error);
+        console.log('🔄 Continuing with basic server...');
+        // Continue anyway for Railway deployment
+    }
 }
 // Initialize the server BEFORE starting to accept connections
 initializeServer().then(() => {
