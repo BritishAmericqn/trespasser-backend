@@ -221,6 +221,40 @@ export class GameStateSystem {
     return this.players.get(id);
   }
   
+  // Reset all game state without recreating systems
+  resetAllState(): void {
+    console.log('🧹 Resetting all game state...');
+    
+    // Clear all player state
+    for (const [playerId] of this.players) {
+      this.removePlayer(playerId);
+    }
+    
+    // Clear input tracking
+    this.lastInputSequence.clear();
+    
+    // Clear all pending events
+    this.pendingWallDamageEvents = [];
+    this.pendingReloadCompleteEvents = [];
+    this.pendingProjectileEvents = [];
+    this.pendingDeathEvents = [];
+    
+    // Reset wall update tracking
+    this.wallsUpdatedThisTick = false;
+    this.visionUpdateCounter = 0;
+    
+    // Clear projectiles
+    this.projectileSystem.clear();
+    
+    // Reset walls to full health
+    this.destructionSystem.resetAllWalls();
+    
+    // Re-initialize vision system with fresh wall data
+    this.initializeWalls();
+    
+    console.log('✅ All game state reset complete');
+  }
+
   getPlayers(): Map<string, PlayerState> {
     return this.players;
   }

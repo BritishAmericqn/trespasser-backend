@@ -443,5 +443,45 @@ class GameRoom {
             clearInterval(this.networkInterval);
         this.physics.destroy();
     }
+    // Simple game reset without system recreation
+    resetGame() {
+        console.log('🔄 Resetting game state...');
+        // Store connected players before reset
+        const connectedPlayers = Array.from(this.players.keys());
+        // Clear all game state (but keep systems intact)
+        this.gameState.resetAllState();
+        // Re-add all players to fresh game state
+        connectedPlayers.forEach(playerId => {
+            const socket = this.players.get(playerId);
+            if (socket && socket.connected) {
+                const playerState = this.gameState.createPlayer(playerId);
+                // Send fresh initial state to this player
+                const filteredState = this.gameState.getFilteredGameState(playerId);
+                socket.emit(constants_1.EVENTS.GAME_STATE, filteredState);
+                // Broadcast to other players that this player joined
+                const flattenedPlayerState = {
+                    id: playerState.id,
+                    position: playerState.transform.position,
+                    rotation: playerState.transform.rotation,
+                    scale: playerState.transform.scale,
+                    velocity: playerState.velocity,
+                    health: playerState.health,
+                    armor: playerState.armor,
+                    team: playerState.team,
+                    weaponId: playerState.weaponId,
+                    weapons: {}, // Will be populated when player sends weapon:equip
+                    isAlive: playerState.isAlive,
+                    movementState: playerState.movementState,
+                    isADS: playerState.isADS,
+                    lastDamageTime: playerState.lastDamageTime,
+                    kills: playerState.kills,
+                    deaths: playerState.deaths,
+                    transform: playerState.transform
+                };
+                socket.broadcast.emit(constants_1.EVENTS.PLAYER_JOINED, flattenedPlayerState);
+            }
+        });
+        console.log(`✅ Game reset complete! ${connectedPlayers.length} players restored`);
+    }
 }
 exports.GameRoom = GameRoom;

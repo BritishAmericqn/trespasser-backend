@@ -232,7 +232,89 @@ function setupGameEventHandlers(socket: any) {
     eventLimits.set(key, now);
     return false;
   }
-  
+
+  // Simple admin check - you can customize this logic
+  function isAdmin(socket: any): boolean {
+    // Option 1: Use environment variable for admin password
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (adminPassword) {
+      return socket.adminAuthenticated === true;
+    }
+    
+    // Option 2: First connected player is admin (simple approach)
+    const allSockets = Array.from(authenticatedPlayers);
+    return allSockets.length > 0 && allSockets[0] === socket.id;
+    
+    // Option 3: Always allow (remove this in production)
+    // return true;
+  }
+
+  // Admin authentication for restart commands
+  socket.on('admin:authenticate', (password: string) => {
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (adminPassword && password === adminPassword) {
+      socket.adminAuthenticated = true;
+      socket.emit('admin:authenticated');
+      console.log(`🔑 Admin authenticated: ${socket.id}`);
+    } else {
+      socket.emit('admin:auth-failed');
+      console.log(`❌ Admin auth failed: ${socket.id}`);
+    }
+  });
+
+    // Game restart functionality - SIMPLE APPROACH
+  socket.on('admin:restart_game', (data: { countdown?: number } = {}) => {
+    if (!authenticatedPlayers.has(socket.id)) {
+      return; // Not authenticated
+    }
+    
+    if (!isAdmin(socket)) {
+      socket.emit('error', 'Admin privileges required');
+      console.log(`❌ Restart denied - not admin: ${socket.id}`);
+      return;
+    }
+
+    const countdown = data.countdown || 3;
+    console.log(`🔄 GAME RESTART requested by admin ${socket.id} - ${countdown}s countdown`);
+    
+    // Notify all players of restart
+    io.emit('game:restarting', { 
+      countdown,
+      message: `Game restarting in ${countdown} seconds...`,
+      adminId: socket.id
+    });
+
+    setTimeout(() => {
+      try {
+        console.log('🔄 Executing simple game restart...');
+        
+        if (defaultRoom) {
+          // Simple state reset - no system recreation!
+          defaultRoom.resetGame();
+          
+          console.log('✅ Game restart complete!');
+          
+          // Notify all players restart is complete
+          io.emit('game:restarted', {
+            message: 'Game has been restarted!',
+            playersReconnected: authenticatedPlayers.size,
+            totalPlayers: authenticatedPlayers.size
+          });
+        } else {
+          throw new Error('No game room available');
+        }
+        
+      } catch (error) {
+        console.error('❌ Game restart failed:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        io.emit('game:restart_failed', {
+          error: errorMessage,
+          message: 'Game restart failed - please try again'
+        });
+      }
+    }, countdown * 1000);
+  });
+
   // Only handle game events from authenticated players
   const originalOn = socket.on.bind(socket);
   socket.on = function(event: string, handler: Function) {
