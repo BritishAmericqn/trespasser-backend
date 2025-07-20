@@ -549,6 +549,7 @@ export class DestructionSystem {
   
   // Reset all walls to full health
   resetAllWalls(): void {
+    console.log('⚠️  Using OLD resetAllWalls - repairs all walls to full health');
     for (const wall of this.walls.values()) {
       this.repairWall(wall.id);
     }

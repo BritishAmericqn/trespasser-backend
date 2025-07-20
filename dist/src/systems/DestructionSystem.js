@@ -442,9 +442,27 @@ class DestructionSystem {
     }
     // Reset all walls to full health
     resetAllWalls() {
+        console.log('⚠️  Using OLD resetAllWalls - repairs all walls to full health');
         for (const wall of this.walls.values()) {
             this.repairWall(wall.id);
         }
+    }
+    // Reset walls by re-reading the map file (preserves initial partial walls)
+    async resetFromMap() {
+        console.log('🔄 Resetting walls from map file...');
+        // Clean up existing physics bodies
+        for (const [wallId, body] of this.wallBodies) {
+            if (this.physics) {
+                this.physics.removeBody(body);
+            }
+        }
+        this.wallBodies.clear();
+        // Clear all walls
+        this.walls.clear();
+        this.wallIdCounter = 0;
+        // Re-initialize from map file
+        await this.initializeWalls();
+        console.log(`✅ Reset complete - loaded ${this.walls.size} walls from map`);
     }
     // Get spawn positions from loaded map
     getSpawnPositions() {

@@ -247,12 +247,30 @@ export class GameStateSystem {
     this.projectileSystem.clear();
     
     // Reset walls from map file (preserves partial walls)
+    console.log('🎯 GameStateSystem.resetAllState: Calling resetFromMap...');
     await this.destructionSystem.resetFromMap();
+    console.log('🎯 GameStateSystem.resetAllState: resetFromMap completed');
     
     // Re-initialize vision system with fresh wall data
     this.initializeWalls();
     
     console.log('✅ All game state reset complete');
+  }
+  
+  // Reset only walls from map (for debug purposes)
+  async resetWallsFromMap(): Promise<void> {
+    console.log('🔧 Resetting walls from map (debug)...');
+    
+    // Clear projectiles that might be in flight
+    this.projectileSystem.clear();
+    
+    // Reset walls from map file
+    await this.destructionSystem.resetFromMap();
+    
+    // Re-initialize vision system with fresh wall data
+    this.initializeWalls();
+    
+    console.log('✅ Walls reset from map complete');
   }
 
   getPlayers(): Map<string, PlayerState> {
@@ -352,7 +370,7 @@ export class GameStateSystem {
     // Respawn at team spawn
     this.respawnPlayerAtTeamSpawn(playerId);
     
-    console.log(`🔄 Player ${playerId.substring(0, 8)} respawned with ${GAME_CONFIG.DEATH.INVULNERABILITY_TIME}ms invulnerability`);
+    console.log(`�� Player ${playerId.substring(0, 8)} respawned with ${GAME_CONFIG.DEATH.INVULNERABILITY_TIME}ms invulnerability`);
     
     // Queue respawn event
     this.pendingDeathEvents.push({

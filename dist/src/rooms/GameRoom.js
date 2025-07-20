@@ -316,9 +316,8 @@ class GameRoom {
             }
         });
         // Debug events (for testing)
-        socket.on('debug:repair_walls', () => {
-            this.gameState.getDestructionSystem().resetAllWalls();
-            // console.log('🔧 All walls repaired');
+        socket.on('debug:repair_walls', async () => {
+            await this.gameState.resetWallsFromMap();
         });
         socket.on('debug:destruction_stats', () => {
             const stats = this.gameState.getDestructionSystem().getDestructionStats();
@@ -444,12 +443,12 @@ class GameRoom {
         this.physics.destroy();
     }
     // Simple game reset without system recreation
-    resetGame() {
+    async resetGame() {
         console.log('🔄 Resetting game state...');
         // Store connected players before reset
         const connectedPlayers = Array.from(this.players.keys());
         // Clear all game state (but keep systems intact)
-        this.gameState.resetAllState();
+        await this.gameState.resetAllState();
         // Re-add all players to fresh game state
         connectedPlayers.forEach(playerId => {
             const socket = this.players.get(playerId);

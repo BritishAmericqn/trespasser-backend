@@ -338,12 +338,12 @@ function setupGameEventHandlers(socket) {
             message: `Game restarting in ${countdown} seconds...`,
             adminId: socket.id
         });
-        setTimeout(() => {
+        setTimeout(async () => {
             try {
                 console.log('🔄 Executing simple game restart...');
                 if (defaultRoom) {
                     // Simple state reset - no system recreation!
-                    defaultRoom.resetGame();
+                    await defaultRoom.resetGame();
                     console.log('✅ Game restart complete!');
                     // Notify all players restart is complete
                     io.emit('game:restarted', {

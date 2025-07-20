@@ -362,9 +362,8 @@ export class GameRoom {
     });
     
     // Debug events (for testing)
-    socket.on('debug:repair_walls', () => {
-      this.gameState.getDestructionSystem().resetAllWalls();
-      // console.log('🔧 All walls repaired');
+    socket.on('debug:repair_walls', async () => {
+      await this.gameState.resetWallsFromMap();
     });
     
     socket.on('debug:destruction_stats', () => {
