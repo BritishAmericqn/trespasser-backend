@@ -439,15 +439,31 @@ initializeServer().then(() => {
 });
 // Graceful shutdown
 process.on('SIGINT', () => {
-    console.log('\n🛑 Server shutting down...');
+    console.log('\n🛑 Server shutting down (SIGINT)...');
+    gracefulShutdown();
+});
+// Handle Railway's SIGTERM signal
+process.on('SIGTERM', () => {
+    console.log('\n🛑 Server shutting down (SIGTERM - Railway container stop)...');
+    gracefulShutdown();
+});
+function gracefulShutdown() {
+    console.log('🔄 Starting graceful shutdown...');
     if (defaultRoom) {
+        console.log('🎮 Destroying game room...');
         defaultRoom.destroy();
     }
     httpServer.close(() => {
-        console.log('✅ Server stopped');
+        console.log('✅ HTTP server closed');
+        console.log('✅ Graceful shutdown complete');
         process.exit(0);
     });
-});
+    // Force exit after 5 seconds if graceful shutdown hangs
+    setTimeout(() => {
+        console.log('⚠️ Force exit after timeout');
+        process.exit(1);
+    }, 5000);
+}
 // Clean up rate limits every minute
 setInterval(() => {
     const now = Date.now();
