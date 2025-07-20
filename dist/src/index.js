@@ -76,7 +76,11 @@ const authTimeouts = new Map();
 // Socket.io server with open CORS for friend play
 const io = new socket_io_1.Server(httpServer, {
     cors: {
-        origin: "*", // Allow connections from anywhere
+        origin: (origin, callback) => {
+            console.log(`🌐 CORS check for origin: ${origin}`);
+            // Always allow for now to debug
+            callback(null, true);
+        },
         methods: ['GET', 'POST'],
         credentials: true
     },
@@ -147,6 +151,8 @@ app.get('/debug/gamestate', (req, res) => {
 io.on('connection', (socket) => {
     const ip = socket.handshake.address;
     console.log(`🔌 Connection attempt from ${ip} (${socket.id})`);
+    console.log(`🔌 Origin: ${socket.handshake.headers.origin || 'no origin header'}`);
+    console.log(`🔌 Transport: ${socket.conn.transport.name}`);
     // Check player limit
     if (authenticatedPlayers.size >= MAX_PLAYERS) {
         socket.emit('error', 'Server is full');
@@ -198,6 +204,12 @@ io.on('connection', (socket) => {
     setupGameEventHandlers(socket);
 });
 function joinGame(socket) {
+    // Debug logging
+    console.log(`🎮 [joinGame] Called for ${socket.id}`);
+    console.log(`🎮 [joinGame] defaultRoom status:`, {
+        exists: !!defaultRoom,
+        initialized: defaultRoom?.isInitialized ? defaultRoom.isInitialized() : 'method not available'
+    });
     // Room should already be created during server startup
     if (!defaultRoom) {
         console.error('❌ Game room not initialized! This should not happen.');
@@ -207,6 +219,7 @@ function joinGame(socket) {
     }
     // Add player to game
     defaultRoom.addPlayer(socket);
+    console.log(`✅ Player ${socket.id} added to game room`);
 }
 function handleDisconnect(socket, reason) {
     const wasAuthenticated = authenticatedPlayers.has(socket.id);
