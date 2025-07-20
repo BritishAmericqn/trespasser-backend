@@ -161,21 +161,31 @@ io.on('connection', (socket) => {
         return;
     }
     if (REQUIRE_PASSWORD) {
-        // Set authentication timeout
+        // Set authentication timeout (increased from 5s to 30s for debugging)
         const timeout = setTimeout(() => {
             if (!authenticatedPlayers.has(socket.id)) {
+                console.log(`⏰ Auth timeout for ${ip} - Socket ID: ${socket.id}`);
+                console.log(`⏰ Authenticated players: ${Array.from(authenticatedPlayers)}`);
                 socket.emit('auth-timeout', 'Authentication timeout');
                 socket.disconnect();
-                console.log(`⏰ Auth timeout for ${ip}`);
             }
-        }, 5000);
+            else {
+                console.log(`✅ Auth timeout fired but player ${socket.id} is already authenticated`);
+            }
+        }, 30000); // Increased to 30 seconds
         authTimeouts.set(socket.id, timeout);
+        console.log(`⏰ Set auth timeout for ${socket.id}`);
         // Wait for password
         socket.on('authenticate', (data) => {
+            console.log(`🔐 Authenticate event received for ${socket.id}`);
             const timeout = authTimeouts.get(socket.id);
             if (timeout) {
                 clearTimeout(timeout);
                 authTimeouts.delete(socket.id);
+                console.log(`✅ Cleared auth timeout for ${socket.id}`);
+            }
+            else {
+                console.log(`⚠️ No timeout found for ${socket.id} during auth`);
             }
             // Handle both string and object formats
             const password = typeof data === 'string' ? data : data?.password;
