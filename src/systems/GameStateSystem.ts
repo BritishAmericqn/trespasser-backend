@@ -7,7 +7,7 @@ import { DestructionSystem } from './DestructionSystem';
 import { VisibilityPolygonSystem } from './VisibilityPolygonSystem';
 import { WeaponDiagnostics } from './WeaponDiagnostics';
 import Matter from 'matter-js';
-import { calculateSliceIndex, isPointInSlice } from '../utils/wallSliceHelpers';
+import { calculateSliceIndex, isPointInSlice, isSlicePhysicallyIntact } from '../utils/wallSliceHelpers';
 
 export class GameStateSystem {
   private players: Map<string, PlayerState> = new Map();
@@ -1269,15 +1269,16 @@ export class GameStateSystem {
         // Find which slice the collision point is in
         const sliceIndex = calculateSliceIndex(wall, closestPoint);
         
-        // Check if the slice is intact
+        // 🔧 FIX: Check actual slice health for movement collision
+        // This ensures consistency with weapon system
         if (sliceIndex >= 0 && sliceIndex < GAME_CONFIG.DESTRUCTION.WALL_SLICES && 
-            wall.destructionMask[sliceIndex] === 0) {
+            isSlicePhysicallyIntact(wall.sliceHealth[sliceIndex])) {
           return false; // Collision detected with intact slice
         }
         
         // Also check adjacent slices for edge cases
         for (let i = Math.max(0, sliceIndex - 1); i <= Math.min(GAME_CONFIG.DESTRUCTION.WALL_SLICES - 1, sliceIndex + 1); i++) {
-          if (wall.destructionMask[i] === 0 && isPointInSlice(wall, closestPoint, i)) {
+          if (isSlicePhysicallyIntact(wall.sliceHealth[i]) && isPointInSlice(wall, closestPoint, i)) {
             return false; // Collision with adjacent intact slice
           }
         }

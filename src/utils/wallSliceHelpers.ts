@@ -196,6 +196,19 @@ export function shouldSliceAllowPenetration(material: string, sliceHealth: numbe
 }
 
 /**
+ * Check if a slice is physically intact (has health remaining)
+ * Used for collision detection across all systems to ensure consistency
+ * @param sliceHealth Current health of the slice
+ * @returns true if the slice has any health remaining and should block things
+ */
+export function isSlicePhysicallyIntact(sliceHealth: number): boolean {
+  // Use a small threshold to avoid floating point precision issues
+  // This prevents "quantum walls" where different systems disagree on slice state
+  const DESTRUCTION_THRESHOLD = 0.01;
+  return sliceHealth > DESTRUCTION_THRESHOLD;
+}
+
+/**
  * Check if a specific slice in a wall should block vision based on actual health values
  * @param wall The wall to check
  * @param sliceIndex The specific slice index (0-4)

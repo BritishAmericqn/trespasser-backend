@@ -7,7 +7,8 @@ import {
   getSlicePosition as getSlicePositionHelper,
   isPointInSlice,
   calculateSliceIndex,
-  shouldSliceAllowVision
+  shouldSliceAllowVision,
+  isSlicePhysicallyIntact
 } from '../utils/wallSliceHelpers';
 import { MapLoader } from '../utils/MapLoader';
 
@@ -226,8 +227,8 @@ export class DestructionSystem {
       return null;
     }
     
-    // Check if slice is already destroyed
-    if (wall.destructionMask[sliceIndex] === 1) {
+    // Check if slice already has no health
+    if (wall.sliceHealth[sliceIndex] <= 0) {
       return null;
     }
     
@@ -260,12 +261,14 @@ export class DestructionSystem {
     return getSlicePositionHelper(wall, sliceIndex);
   }
   
-  // Check if a wall slice is destroyed
+  // Check if a wall slice is destroyed (for vision purposes)
   isSliceDestroyed(wallId: string, sliceIndex: number): boolean {
     const wall = this.walls.get(wallId);
     if (!wall || sliceIndex < 0 || sliceIndex >= GAME_CONFIG.DESTRUCTION.WALL_SLICES) {
       return false;
     }
+    // Note: This checks vision mask, not physical destruction
+    // For physical collision, use isSlicePhysicallyIntact() instead
     return wall.destructionMask[sliceIndex] === 1;
   }
   
@@ -335,8 +338,8 @@ export class DestructionSystem {
       return false;
     }
     
-    // Check if slice is destroyed
-    if (wall.destructionMask[sliceIndex] === 1) {
+    // 🔧 FIX: Check actual slice health for consistency across all systems
+    if (!isSlicePhysicallyIntact(wall.sliceHealth[sliceIndex])) {
       return false;
     }
     

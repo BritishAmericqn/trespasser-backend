@@ -18,7 +18,8 @@ import {
   calculateSliceIndex,
   getSliceDimension,
   isHardWall,
-  shouldSliceAllowPenetration
+  shouldSliceAllowPenetration,
+  isSlicePhysicallyIntact
 } from '../utils/wallSliceHelpers';
 import { WeaponDiagnostics } from './WeaponDiagnostics';
 
@@ -511,8 +512,9 @@ export class WeaponSystem {
             // Calculate which slice we're in
             const currentSliceIndex = calculateSliceIndex(hit.wall, checkPoint);
             
-            // If we hit an intact slice, record it
-            if (hit.wall.destructionMask[currentSliceIndex] === 0) {
+            // 🔧 FIX: Check actual slice health instead of vision mask
+            // This prevents bullets passing through damaged but intact slices
+            if (isSlicePhysicallyIntact(hit.wall.sliceHealth[currentSliceIndex])) {
               closestHit = {
                 hit: true,
                 targetType: 'wall',

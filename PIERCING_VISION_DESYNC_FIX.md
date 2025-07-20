@@ -1,5 +1,7 @@
 # 🔧 Piercing Vision Desync Fix
 
+> **UPDATE**: This fix has been superseded by `PARTIAL_WALL_PASSTHROUGH_FIX.md` which addresses the root cause more comprehensively.
+
 ## Problem Summary
 
 **Issue**: After implementing the piercing system, walls sometimes appeared to be destroyed (you could see through them) but you couldn't shoot through them, creating a desync between vision and weapon systems.
