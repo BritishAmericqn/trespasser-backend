@@ -84,6 +84,7 @@ export interface WallState {
   material: 'concrete' | 'wood' | 'metal' | 'glass';
   maxHealth: number;
   sliceHealth: number[]; // health per slice
+  initialSliceHealth?: number[]; // Snapshot of health after map load (for restart preservation)
 }
 
 export interface ProjectileState {

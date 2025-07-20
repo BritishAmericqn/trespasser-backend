@@ -202,6 +202,9 @@ export class MapLoader {
           this.destructionSystem.applyDamage(createdWall.id, sliceIndex, 999999); // Excessive damage to ensure destruction
         });
         
+        // Capture the initial state after pre-destruction
+        this.destructionSystem.captureWallInitialState(createdWall.id);
+        
         console.log(`🧱 Created partial wall ${createdWall.id} (${wall.actualLength}/${5} slices), pre-destroyed slices: [${wall.preDestroyedSlices.join(', ')}]`);
       }
     });

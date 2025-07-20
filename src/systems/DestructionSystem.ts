@@ -479,8 +479,15 @@ export class DestructionSystem {
     }
     
     const currentHealth = wall.sliceHealth[sliceIndex];
-    const newHealth = Math.min(wall.maxHealth, currentHealth + healthToRestore);
     
+    // Determine max allowed health
+    let maxAllowedHealth = wall.maxHealth;
+    if (wall.initialSliceHealth && wall.initialSliceHealth[sliceIndex] !== undefined) {
+      // Don't repair beyond initial state
+      maxAllowedHealth = wall.initialSliceHealth[sliceIndex];
+    }
+    
+    const newHealth = Math.min(maxAllowedHealth, currentHealth + healthToRestore);
     wall.sliceHealth[sliceIndex] = newHealth;
     
     // Update bitmask based on health-based visibility logic
@@ -495,13 +502,31 @@ export class DestructionSystem {
     const wall = this.walls.get(wallId);
     if (!wall) return false;
     
-    // Restore all slices to full health
+    // Restore slices - respect initial state if it exists
     for (let i = 0; i < GAME_CONFIG.DESTRUCTION.WALL_SLICES; i++) {
-      wall.sliceHealth[i] = wall.maxHealth;
-      wall.destructionMask[i] = 0;
+      if (wall.initialSliceHealth) {
+        // Don't repair beyond initial state
+        wall.sliceHealth[i] = wall.initialSliceHealth[i];
+      } else {
+        // No initial state - repair to full health
+        wall.sliceHealth[i] = wall.maxHealth;
+      }
+      
+      // Update destruction mask
+      const shouldAllowVision = shouldSliceAllowVision(wall.material, wall.sliceHealth[i], wall.maxHealth);
+      wall.destructionMask[i] = shouldAllowVision ? 1 : 0;
     }
     
     return true;
+  }
+  
+  // Capture the initial state of a wall (used for partial walls from map loading)
+  captureWallInitialState(wallId: string): void {
+    const wall = this.walls.get(wallId);
+    if (!wall) return;
+    
+    // Store a snapshot of the current slice health as the initial state
+    wall.initialSliceHealth = [...wall.sliceHealth];
   }
   
   // Get destruction statistics
@@ -549,10 +574,22 @@ export class DestructionSystem {
     this.wallIdCounter = 0;
   }
   
-  // Reset all walls to full health
+  // Reset all walls to their initial state
   resetAllWalls(): void {
     for (const wall of this.walls.values()) {
-      this.repairWall(wall.id);
+      if (wall.initialSliceHealth) {
+        // Restore to initial state (preserves pre-destroyed slices from map)
+        for (let i = 0; i < GAME_CONFIG.DESTRUCTION.WALL_SLICES; i++) {
+          wall.sliceHealth[i] = wall.initialSliceHealth[i];
+          
+          // Update destruction mask based on the initial health
+          const shouldAllowVision = shouldSliceAllowVision(wall.material, wall.sliceHealth[i], wall.maxHealth);
+          wall.destructionMask[i] = shouldAllowVision ? 1 : 0;
+        }
+      } else {
+        // No initial state - repair to full health
+        this.repairWall(wall.id);
+      }
     }
   }
 
