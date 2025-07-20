@@ -343,13 +343,13 @@ function setupGameEventHandlers(socket: any) {
       adminId: socket.id
     });
 
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         console.log('🔄 Executing simple game restart...');
         
         if (defaultRoom) {
           // Simple state reset - no system recreation!
-          defaultRoom.resetGame();
+          await defaultRoom.resetGame();
           
           console.log('✅ Game restart complete!');
           

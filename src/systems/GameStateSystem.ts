@@ -222,7 +222,7 @@ export class GameStateSystem {
   }
   
   // Reset all game state without recreating systems
-  resetAllState(): void {
+  async resetAllState(): Promise<void> {
     console.log('🧹 Resetting all game state...');
     
     // Clear all player state
@@ -246,8 +246,8 @@ export class GameStateSystem {
     // Clear projectiles
     this.projectileSystem.clear();
     
-    // Reset walls to full health
-    this.destructionSystem.resetAllWalls();
+    // Reset walls from map file (preserves partial walls)
+    await this.destructionSystem.resetFromMap();
     
     // Re-initialize vision system with fresh wall data
     this.initializeWalls();

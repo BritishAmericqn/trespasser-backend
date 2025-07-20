@@ -507,14 +507,14 @@ export class GameRoom {
   }
 
   // Simple game reset without system recreation
-  resetGame(): void {
+  async resetGame(): Promise<void> {
     console.log('🔄 Resetting game state...');
     
     // Store connected players before reset
     const connectedPlayers = Array.from(this.players.keys());
     
     // Clear all game state (but keep systems intact)
-    this.gameState.resetAllState();
+    await this.gameState.resetAllState();
     
     // Re-add all players to fresh game state
     connectedPlayers.forEach(playerId => {
