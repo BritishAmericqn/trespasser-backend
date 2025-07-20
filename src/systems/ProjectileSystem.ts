@@ -400,7 +400,7 @@ export class ProjectileSystem {
         
         // Check if slice is destroyed
         const sliceIndex = calculateSliceIndex(wall, to);
-        if (wall.sliceHealth[sliceIndex] <= 0) {
+        if (wall.destructionMask && wall.destructionMask[sliceIndex] === 1) {
           continue; // Pass through destroyed slice
         }
         
@@ -506,11 +506,11 @@ export class ProjectileSystem {
           const distSq = distX * distX + distY * distY;
           
           if (distSq < this.GRENADE_RADIUS * this.GRENADE_RADIUS) {
-            // Check if slice is destroyed
+            // ✅ NEW: Check if the slice at collision point is destroyed
             const sliceIndex = calculateSliceIndex(wall, { x: closestX, y: closestY });
             
             // If this slice is destroyed, grenade should pass through
-            if (wall.sliceHealth[sliceIndex] <= 0) {
+            if (wall.destructionMask && wall.destructionMask[sliceIndex] === 1) {
               continue; // Skip this collision, grenade passes through destroyed slice
             }
             
@@ -692,7 +692,7 @@ export class ProjectileSystem {
         if (collision.hit) {
           // Debug: Log collision detection
           if (projectile.type === 'rocket') {
-            // Rocket hit debug removed for performance
+            console.log(`🚀 Rocket hit wall ${wallId} at step ${step}/${steps}, slice ${collision.sliceIndex}`);
           }
           return {
             hit: true,
@@ -782,8 +782,8 @@ export class ProjectileSystem {
       // Calculate which slice was hit (using original wall position, not expanded bounds)
       const sliceIndex = calculateSliceIndex(wall, { x: hitX, y: hitY });
       
-      // Check if slice is destroyed
-      if (wall.sliceHealth[sliceIndex] <= 0) {
+      // ✅ NEW: Check if the slice at collision point is destroyed
+      if (wall.destructionMask && wall.destructionMask[sliceIndex] === 1) {
         return { hit: false }; // Rocket passes through destroyed slice
       }
       
@@ -995,7 +995,9 @@ export class ProjectileSystem {
     const wallDamageEvents: WallDamageEvent[] = [];
     const explosions: ExplosionEvent[] = [...this.explosionQueue];
     
-    // Explosion queue debug removed for performance
+    if (this.explosionQueue.length > 0) {
+      console.log(`💥 Processing ${this.explosionQueue.length} explosions`);
+    }
     
     for (const explosion of this.explosionQueue) {
       // Add null check for explosion
@@ -1017,7 +1019,7 @@ export class ProjectileSystem {
           const damageMultiplier = 1 - (distance / explosion.radius);
           const damage = Math.floor(explosion.damage * damageMultiplier);
           
-          // Explosion damage debug removed for performance
+          console.log(`💥 Explosion damages player ${playerId}: ${damage} damage at distance ${distance.toFixed(1)}`);
           
           playerDamageEvents.push({
             playerId,

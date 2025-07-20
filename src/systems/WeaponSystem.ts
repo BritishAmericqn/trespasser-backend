@@ -17,8 +17,7 @@ import { GAME_CONFIG, EVENTS } from '../../shared/constants';
 import { 
   calculateSliceIndex,
   getSliceDimension,
-  isHardWall,
-  isSlicePhysicallyIntact
+  isHardWall
 } from '../utils/wallSliceHelpers';
 import { WeaponDiagnostics } from './WeaponDiagnostics';
 
@@ -483,7 +482,7 @@ export class WeaponSystem {
       if (hit.distance >= closestHit.distance) continue;
       
       // Check if the slice is destroyed
-      if (hit.wall.sliceHealth[hit.sliceIndex] <= 0) {
+      if (hit.wall.destructionMask && hit.wall.destructionMask[hit.sliceIndex] === 1) {
         // This slice is destroyed - check for intact slices within this wall
         const sliceDimension = getSliceDimension(hit.wall);
         let foundIntactSlice = false;
@@ -511,9 +510,8 @@ export class WeaponSystem {
             // Calculate which slice we're in
             const currentSliceIndex = calculateSliceIndex(hit.wall, checkPoint);
             
-            // 🔧 FIX: Check actual slice health instead of vision mask
-            // This prevents bullets passing through damaged but intact slices
-            if (isSlicePhysicallyIntact(hit.wall.sliceHealth[currentSliceIndex])) {
+            // If we hit an intact slice, record it
+            if (hit.wall.destructionMask[currentSliceIndex] === 0) {
               closestHit = {
                 hit: true,
                 targetType: 'wall',
@@ -662,8 +660,8 @@ export class WeaponSystem {
         const wall = closestHit.wall!;
         const sliceIndex = closestHit.sliceIndex!;
         
-        // Check if slice is already destroyed (health = 0)
-        if (wall.sliceHealth[sliceIndex] <= 0) {
+        // Check if slice is already destroyed
+        if (wall.destructionMask && wall.destructionMask[sliceIndex] === 1) {
           // Slice is destroyed - ray continues without damage reduction
           // Move start point slightly past the hit to avoid re-hitting the same wall
           const epsilon = 0.1;
@@ -1051,8 +1049,8 @@ export class WeaponSystem {
         const wall = closestHit.wall!;
         const sliceIndex = closestHit.sliceIndex!;
         
-        // Check if slice is already destroyed (health = 0)
-        if (wall.sliceHealth[sliceIndex] <= 0) {
+        // Check if slice is already destroyed
+        if (wall.destructionMask && wall.destructionMask[sliceIndex] === 1) {
           // Slice is destroyed - ray continues without damage reduction
           const epsilon = 0.1;
           currentStart = {
