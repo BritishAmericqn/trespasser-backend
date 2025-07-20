@@ -29,6 +29,12 @@ const REQUIRE_PASSWORD = GAME_PASSWORD.length > 0;
 const MAX_PLAYERS = parseInt(process.env.MAX_PLAYERS || '8');
 const PORT = parseInt(process.env.PORT || '3000');
 
+// Debug Railway port configuration
+console.log(`🔧 Railway Port Debug:`);
+console.log(`   process.env.PORT = "${process.env.PORT}"`);
+console.log(`   Final PORT = ${PORT}`);
+console.log(`   NODE_ENV = "${process.env.NODE_ENV}"`);
+
 // Rate limiting and connection tracking
 const connectionAttempts = new Map<string, { count: number; lastAttempt: number }>();
 const authenticatedPlayers = new Set<string>();
@@ -440,7 +446,15 @@ initializeServer().then(() => {
     
     // Railway-friendly troubleshooting
     console.log('💡 SERVER STATUS: READY TO ACCEPT CONNECTIONS');
+    console.log('🌐 Railway Health Check: Server is responding on all interfaces');
     console.log('');
+  });
+}).catch(error => {
+  console.error('❌ Failed to initialize server:', error);
+  // Start HTTP server anyway for Railway health checks
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 HTTP Server started on port ${PORT} (game room failed to initialize)`);
+    console.log('💡 SERVER STATUS: READY TO ACCEPT CONNECTIONS (LIMITED MODE)');
   });
 });
 
