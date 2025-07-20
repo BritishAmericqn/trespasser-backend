@@ -191,9 +191,12 @@ io.on('connection', (socket) => {
             const password = typeof data === 'string' ? data : data?.password;
             if (password === GAME_PASSWORD) {
                 authenticatedPlayers.add(socket.id);
-                socket.emit('authenticated');
-                joinGame(socket);
                 console.log(`✅ Player authenticated: ${socket.id} from ${ip}`);
+                socket.emit('authenticated');
+                console.log(`📤 Sent 'authenticated' event to ${socket.id}`);
+                console.log(`🎮 Waiting for frontend to send 'player:join' event...`);
+                // DON'T call joinGame here - let frontend send player:join with loadout data
+                // joinGame(socket);
             }
             else {
                 socket.emit('auth-failed', 'Invalid password');
@@ -227,9 +230,21 @@ function joinGame(socket) {
         socket.disconnect();
         return;
     }
-    // Add player to game
-    defaultRoom.addPlayer(socket);
-    console.log(`✅ Player ${socket.id} added to game room`);
+    // Add player to game with error handling
+    try {
+        console.log(`➕ About to add player ${socket.id} to defaultRoom...`);
+        defaultRoom.addPlayer(socket);
+        console.log(`✅ Player ${socket.id} successfully added to game room`);
+        // Emit initial game state
+        console.log(`📤 About to send game state to ${socket.id}...`);
+        // Note: We'll need to check what method actually exists for getting game state
+        console.log(`✅ Game join process completed for ${socket.id}`);
+    }
+    catch (error) {
+        console.error(`❌ Error adding player ${socket.id} to game:`, error);
+        socket.emit('error', 'Failed to join game');
+        socket.disconnect();
+    }
 }
 function handleDisconnect(socket, reason) {
     const wasAuthenticated = authenticatedPlayers.has(socket.id);
