@@ -27,12 +27,13 @@ app.use((req, res, next) => {
 const GAME_PASSWORD = process.env.GAME_PASSWORD || '';
 const REQUIRE_PASSWORD = GAME_PASSWORD.length > 0;
 const MAX_PLAYERS = parseInt(process.env.MAX_PLAYERS || '8');
-const PORT = parseInt(process.env.PORT || '3000');
+// Force port 3000 to match Railway's networking config
+const PORT = 3000; // parseInt(process.env.PORT || '3000');
 
 // Debug Railway port configuration
 console.log(`🔧 Railway Port Debug:`);
 console.log(`   process.env.PORT = "${process.env.PORT}"`);
-console.log(`   Final PORT = ${PORT}`);
+console.log(`   Final PORT = ${PORT} (FORCED to match Railway networking)`);
 console.log(`   NODE_ENV = "${process.env.NODE_ENV}"`);
 
 // Rate limiting and connection tracking
