@@ -194,9 +194,10 @@ io.on('connection', (socket) => {
                 console.log(`✅ Player authenticated: ${socket.id} from ${ip}`);
                 socket.emit('authenticated');
                 console.log(`📤 Sent 'authenticated' event to ${socket.id}`);
-                console.log(`🎮 Waiting for frontend to send 'player:join' event...`);
-                // DON'T call joinGame here - let frontend send player:join with loadout data
-                // joinGame(socket);
+                // RESTORE: Call joinGame to register event handlers (including player:join)
+                console.log(`🎮 About to call joinGame for ${socket.id}`);
+                joinGame(socket);
+                console.log(`🎮 Finished calling joinGame for ${socket.id}`);
             }
             else {
                 socket.emit('auth-failed', 'Invalid password');
