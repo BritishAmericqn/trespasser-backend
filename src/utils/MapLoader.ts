@@ -1,6 +1,8 @@
 import Jimp from 'jimp';
 import { DestructionSystem } from '../systems/DestructionSystem';
 import { Vector2 } from '../../shared/types';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface GridCell {
   x: number;
@@ -66,7 +68,35 @@ export class MapLoader {
   }
   
   async loadMapFromFile(filename: string): Promise<void> {
-    const mapPath = `./maps/${filename}.png`;
+    // Try multiple possible paths for map files
+    const possiblePaths = [
+      `./maps/${filename}.png`,          // Local development
+      `./dist/maps/${filename}.png`,     // Railway deployment (from root)
+      `../maps/${filename}.png`,        // Alternative deployment structure
+      path.join(__dirname, '../../maps', `${filename}.png`), // Relative to compiled file
+      path.join(process.cwd(), 'maps', `${filename}.png`),   // From working directory
+    ];
+    
+    let mapPath: string | null = null;
+    
+    // Find the first path that exists
+    for (const testPath of possiblePaths) {
+      try {
+        if (fs.existsSync(testPath)) {
+          mapPath = testPath;
+          console.log(`📍 Found map at: ${mapPath}`);
+          break;
+        }
+      } catch (error) {
+        // Continue to next path
+      }
+    }
+    
+    if (!mapPath) {
+      console.error(`❌ Map file ${filename}.png not found in any of these locations:`);
+      possiblePaths.forEach(p => console.error(`   - ${p}`));
+      throw new Error(`Map file ${filename}.png not found`);
+    }
     
     try {
       // Load the image
