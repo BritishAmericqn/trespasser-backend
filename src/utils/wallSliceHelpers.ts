@@ -182,6 +182,20 @@ export function shouldSliceAllowVision(material: string, sliceHealth: number, ma
 }
 
 /**
+ * Check if an individual slice should allow BULLETS through based on its health
+ * This is separate from vision to prevent desync between what you can see and shoot through
+ * @param material The wall material 
+ * @param sliceHealth Current health of the slice
+ * @param maxHealth Maximum health of the slice
+ * @returns true if bullets should pass through this slice
+ */
+export function shouldSliceAllowPenetration(material: string, sliceHealth: number, maxHealth: number): boolean {
+  // 🔧 PIERCING FIX: Bullets always require complete destruction regardless of material
+  // This prevents the desync where you can see through but not shoot through
+  return sliceHealth <= 0;
+}
+
+/**
  * Check if a specific slice in a wall should block vision based on actual health values
  * @param wall The wall to check
  * @param sliceIndex The specific slice index (0-4)

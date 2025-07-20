@@ -137,6 +137,7 @@ export class GameRoom {
           if (eventData.type === 'weapon:hit') {
             console.log(`   🎯 HIT EVENT DATA:`, JSON.stringify(eventData.data, null, 2));
           }
+          
           this.io.emit(eventData.type, eventData.data);
         }
       }

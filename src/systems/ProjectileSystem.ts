@@ -6,7 +6,8 @@ import { WeaponSystem } from './WeaponSystem';
 import { DestructionSystem } from './DestructionSystem';
 import { 
   calculateSliceIndex,
-  getSliceDimension
+  getSliceDimension,
+  shouldSliceAllowPenetration
 } from '../utils/wallSliceHelpers';
 
 export class ProjectileSystem {
@@ -398,10 +399,10 @@ export class ProjectileSystem {
       if (to.x >= wall.position.x && to.x <= wall.position.x + wall.width &&
           to.y >= wall.position.y && to.y <= wall.position.y + wall.height) {
         
-        // Check if slice is destroyed
+        // 🔧 PIERCING FIX: Check if slice allows penetration based on health
         const sliceIndex = calculateSliceIndex(wall, to);
-        if (wall.destructionMask && wall.destructionMask[sliceIndex] === 1) {
-          continue; // Pass through destroyed slice
+        if (shouldSliceAllowPenetration(wall.material, wall.sliceHealth[sliceIndex], wall.maxHealth)) {
+          continue; // Pass through slice that allows penetration
         }
         
         // Calculate collision normal based on which edge we hit
@@ -506,12 +507,12 @@ export class ProjectileSystem {
           const distSq = distX * distX + distY * distY;
           
           if (distSq < this.GRENADE_RADIUS * this.GRENADE_RADIUS) {
-            // ✅ NEW: Check if the slice at collision point is destroyed
+            // 🔧 PIERCING FIX: Check if slice allows penetration based on health
             const sliceIndex = calculateSliceIndex(wall, { x: closestX, y: closestY });
             
-            // If this slice is destroyed, grenade should pass through
-            if (wall.destructionMask && wall.destructionMask[sliceIndex] === 1) {
-              continue; // Skip this collision, grenade passes through destroyed slice
+            // If this slice allows penetration, grenade should pass through
+            if (shouldSliceAllowPenetration(wall.material, wall.sliceHealth[sliceIndex], wall.maxHealth)) {
+              continue; // Skip this collision, grenade passes through slice that allows penetration
             }
             
             // Slice is intact - proceed with normal collision
@@ -782,9 +783,9 @@ export class ProjectileSystem {
       // Calculate which slice was hit (using original wall position, not expanded bounds)
       const sliceIndex = calculateSliceIndex(wall, { x: hitX, y: hitY });
       
-      // ✅ NEW: Check if the slice at collision point is destroyed
-      if (wall.destructionMask && wall.destructionMask[sliceIndex] === 1) {
-        return { hit: false }; // Rocket passes through destroyed slice
+      // 🔧 PIERCING FIX: Check if slice allows penetration based on health
+      if (shouldSliceAllowPenetration(wall.material, wall.sliceHealth[sliceIndex], wall.maxHealth)) {
+        return { hit: false }; // Rocket passes through slice that allows penetration
       }
       
       // Slice is intact - proceed with normal collision
