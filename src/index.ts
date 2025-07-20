@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
+import * as os from 'os';
 import { GameRoom } from './rooms/GameRoom';
 import { EVENTS, GAME_CONFIG } from '../shared/constants';
 
@@ -403,42 +404,42 @@ initializeServer().then(() => {
     console.log(`   Local:    http://localhost:${PORT}`);
     console.log(`   Local:    http://127.0.0.1:${PORT}`);
     
-    // Show all network interfaces
-    const os = require('os');
-    const nets = os.networkInterfaces();
-    const lanIPs: string[] = [];
-    
-    Object.keys(nets).forEach(name => {
-      nets[name]?.forEach((net: any) => {
-        if (net.family === 'IPv4' && !net.internal) {
-          const lanUrl = `http://${net.address}:${PORT}`;
-          console.log(`   LAN (${name}): ${lanUrl}`);
-          lanIPs.push(net.address);
-        }
+    // Simplified network detection for Railway compatibility
+    try {
+      const nets = os.networkInterfaces();
+      const lanIPs: string[] = [];
+      
+      Object.keys(nets).forEach(name => {
+        nets[name]?.forEach((net: any) => {
+          if (net.family === 'IPv4' && !net.internal) {
+            const lanUrl = `http://${net.address}:${PORT}`;
+            console.log(`   LAN (${name}): ${lanUrl}`);
+            lanIPs.push(net.address);
+          }
+        });
       });
-    });
+      
+      if (lanIPs.length > 0) {
+        console.log('\n🏠 FOR LAN PLAY:');
+        console.log(`Share any of these URLs with friends on your network:`);
+        lanIPs.forEach(ip => console.log(`   http://${ip}:${PORT}`));
+      }
+    } catch (error) {
+      console.log('   (Network interface detection skipped in container)');
+    }
     
     console.log('\n🌐 FOR INTERNET PLAY:');
     console.log(`1. Port forward TCP port ${PORT} to this computer`);
     console.log(`2. Find your public IP: curl ifconfig.me`);
     console.log(`3. Share: http://[YOUR-PUBLIC-IP]:${PORT}`);
     
-    if (lanIPs.length > 0) {
-      console.log('\n🏠 FOR LAN PLAY:');
-      console.log(`Share any of these URLs with friends on your network:`);
-      lanIPs.forEach(ip => console.log(`   http://${ip}:${PORT}`));
-    }
-    
     console.log('\n🎯 GAME INFO:');
     console.log(`   Tick Rate: ${GAME_CONFIG.TICK_RATE} Hz`);
     console.log(`   Network Rate: ${GAME_CONFIG.NETWORK_RATE} Hz`);
     console.log('='.repeat(50) + '\n');
     
-    // Show quick troubleshooting tips
-    console.log('💡 TROUBLESHOOTING:');
-    console.log(`   • Test server: curl http://localhost:${PORT}`);
-    console.log(`   • Kill conflicting process: lsof -ti:${PORT} | xargs kill -9`);
-    console.log(`   • Use different port: PORT=3001 npm start`);
+    // Railway-friendly troubleshooting
+    console.log('💡 SERVER STATUS: READY TO ACCEPT CONNECTIONS');
     console.log('');
   });
 });

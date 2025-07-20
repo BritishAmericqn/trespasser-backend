@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -7,6 +40,7 @@ const express_1 = __importDefault(require("express"));
 const http_1 = require("http");
 const socket_io_1 = require("socket.io");
 const dotenv_1 = __importDefault(require("dotenv"));
+const os = __importStar(require("os"));
 const GameRoom_1 = require("./rooms/GameRoom");
 const constants_1 = require("../shared/constants");
 dotenv_1.default.config();
@@ -354,37 +388,38 @@ initializeServer().then(() => {
         console.log('\n📱 CONNECTION METHODS:');
         console.log(`   Local:    http://localhost:${PORT}`);
         console.log(`   Local:    http://127.0.0.1:${PORT}`);
-        // Show all network interfaces
-        const os = require('os');
-        const nets = os.networkInterfaces();
-        const lanIPs = [];
-        Object.keys(nets).forEach(name => {
-            nets[name]?.forEach((net) => {
-                if (net.family === 'IPv4' && !net.internal) {
-                    const lanUrl = `http://${net.address}:${PORT}`;
-                    console.log(`   LAN (${name}): ${lanUrl}`);
-                    lanIPs.push(net.address);
-                }
+        // Simplified network detection for Railway compatibility
+        try {
+            const nets = os.networkInterfaces();
+            const lanIPs = [];
+            Object.keys(nets).forEach(name => {
+                nets[name]?.forEach((net) => {
+                    if (net.family === 'IPv4' && !net.internal) {
+                        const lanUrl = `http://${net.address}:${PORT}`;
+                        console.log(`   LAN (${name}): ${lanUrl}`);
+                        lanIPs.push(net.address);
+                    }
+                });
             });
-        });
+            if (lanIPs.length > 0) {
+                console.log('\n🏠 FOR LAN PLAY:');
+                console.log(`Share any of these URLs with friends on your network:`);
+                lanIPs.forEach(ip => console.log(`   http://${ip}:${PORT}`));
+            }
+        }
+        catch (error) {
+            console.log('   (Network interface detection skipped in container)');
+        }
         console.log('\n🌐 FOR INTERNET PLAY:');
         console.log(`1. Port forward TCP port ${PORT} to this computer`);
         console.log(`2. Find your public IP: curl ifconfig.me`);
         console.log(`3. Share: http://[YOUR-PUBLIC-IP]:${PORT}`);
-        if (lanIPs.length > 0) {
-            console.log('\n🏠 FOR LAN PLAY:');
-            console.log(`Share any of these URLs with friends on your network:`);
-            lanIPs.forEach(ip => console.log(`   http://${ip}:${PORT}`));
-        }
         console.log('\n🎯 GAME INFO:');
         console.log(`   Tick Rate: ${constants_1.GAME_CONFIG.TICK_RATE} Hz`);
         console.log(`   Network Rate: ${constants_1.GAME_CONFIG.NETWORK_RATE} Hz`);
         console.log('='.repeat(50) + '\n');
-        // Show quick troubleshooting tips
-        console.log('💡 TROUBLESHOOTING:');
-        console.log(`   • Test server: curl http://localhost:${PORT}`);
-        console.log(`   • Kill conflicting process: lsof -ti:${PORT} | xargs kill -9`);
-        console.log(`   • Use different port: PORT=3001 npm start`);
+        // Railway-friendly troubleshooting
+        console.log('💡 SERVER STATUS: READY TO ACCEPT CONNECTIONS');
         console.log('');
     });
 });
