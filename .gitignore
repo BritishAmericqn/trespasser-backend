@@ -2,7 +2,7 @@ node_modules
 dist
 .env
 
-# Map files
-maps/*.png
+# Keep map files for deployment
+# maps/*.png  <- REMOVED THIS LINE
 # But keep the README
 !maps/README.md 
