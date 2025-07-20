@@ -134,6 +134,15 @@ io.on('connection', (socket) => {
   console.log(`🔌 Origin: ${socket.handshake.headers.origin || 'no origin header'}`);
   console.log(`🔌 Transport: ${socket.conn.transport.name}`);
   
+  // DEBUG: Log all events received from this socket
+  const originalOn = socket.on.bind(socket);
+  socket.on = function(event: string, handler: Function) {
+    return originalOn(event, (...args: any[]) => {
+      console.log(`📡 [${socket.id.substring(0, 8)}] Received event: "${event}"`, args.length > 0 ? 'with data' : 'no data');
+      handler(...args);
+    });
+  };
+  
   // Check player limit
   if (authenticatedPlayers.size >= MAX_PLAYERS) {
     socket.emit('error', 'Server is full');
