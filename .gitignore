@@ -5,4 +5,4 @@ dist
 # Keep map files for deployment
 # maps/*.png  <- REMOVED THIS LINE
 # But keep the README
-!maps/README.md 
+!maps/README.md

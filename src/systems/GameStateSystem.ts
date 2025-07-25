@@ -39,6 +39,12 @@ export class GameStateSystem {
     // Initialize polygon vision system
     this.visionSystem = new VisibilityPolygonSystem();
     
+    // Log vision system status
+    console.log(`🔍 Vision system: ${GAME_CONFIG.VISION.ENABLED ? 'ENABLED' : 'DISABLED'}`);
+    if (!GAME_CONFIG.VISION.ENABLED) {
+      console.log('   → All players can see the entire map');
+    }
+    
     // Don't initialize walls here - will be done in initialize()
     
     // Set up reload complete callback
@@ -1406,13 +1412,15 @@ export class GameStateSystem {
     }
     
     // Update vision with new tile-based system (only for alive players)
-    for (const [playerId, player] of this.players) {
-      if (!player.isAlive) continue;
-      
-      // Update vision using raycast for better gap detection
-      const visibleTilesSet = this.visionSystem.updatePlayerVisionRaycast(player);
-      
-      // Vision data is now handled by polygon system
+    if (GAME_CONFIG.VISION.ENABLED) {
+      for (const [playerId, player] of this.players) {
+        if (!player.isAlive) continue;
+        
+        // Update vision using raycast for better gap detection
+        const visibleTilesSet = this.visionSystem.updatePlayerVisionRaycast(player);
+        
+        // Vision data is now handled by polygon system
+      }
     }
   }
   
@@ -1624,7 +1632,7 @@ export class GameStateSystem {
   
   // Get filtered game state for a specific player based on vision
   getFilteredGameState(playerId: string): GameState {
-    // TEMP: Vision disabled - return all game state
+    // Vision can be disabled via config
     const player = this.players.get(playerId);
     
     if (!player) {
@@ -1638,7 +1646,7 @@ export class GameStateSystem {
       };
     }
     
-    // TEMP: Return all players since vision is disabled
+    // Return all players (vision filtering disabled or not implemented)
     const visiblePlayersObject: { [key: string]: PlayerState } = {};
     
     // 🎨 DEBUG: Track team data being sent
@@ -1689,7 +1697,7 @@ export class GameStateSystem {
       console.log(teamDataDebugLog);
     }
     
-    // TEMP: Return all projectiles since vision is disabled
+    // Return all projectiles (vision filtering disabled or not implemented)
     const allProjectiles = this.projectileSystem.getProjectiles();
     const visibleProjectiles = allProjectiles;
     
@@ -1708,8 +1716,8 @@ export class GameStateSystem {
       walls: wallsObject as any,
       timestamp: Date.now(),
       tickRate: GAME_CONFIG.TICK_RATE,
-      // Include polygon vision data
-      vision: player ? (() => {
+      // Include polygon vision data (only if vision system is enabled)
+      vision: (GAME_CONFIG.VISION.ENABLED && player) ? (() => {
         const visionData = this.visionSystem.getVisibilityData(player);
         return {
           type: 'polygon',

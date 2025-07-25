@@ -21,6 +21,7 @@ export const GAME_CONFIG = {
   
   // Vision system configuration
   VISION: {
+    ENABLED: false, // Set to false to disable polygon vision system
     FOG_OPACITY: 0.64, // Reduced by 20% from 0.8 - less darkness for unseen areas
     VIEW_DISTANCE: 60,
     VIEW_ANGLE_DEGREES: 90,
