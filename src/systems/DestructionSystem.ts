@@ -173,6 +173,7 @@ export class DestructionSystem {
     const materialMultiplier = GAME_CONFIG.DESTRUCTION.MATERIAL_MULTIPLIERS[params.material.toUpperCase() as keyof typeof GAME_CONFIG.DESTRUCTION.MATERIAL_MULTIPLIERS];
     const sliceHealth = GAME_CONFIG.DESTRUCTION.SLICE_HEALTH * materialMultiplier;
     
+    // All walls have 5 slices, but the slices are distributed across the actual wall dimensions
     const wall: WallState = {
       id: wallId,
       position: { ...params.position },

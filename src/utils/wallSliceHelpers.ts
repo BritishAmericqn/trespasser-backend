@@ -5,6 +5,7 @@ import { GAME_CONFIG } from '../../shared/constants';
  * Calculate which slice a point hits on a wall
  * For horizontal walls: divides by width (left to right, 0-4)
  * For vertical walls: divides by height (top to bottom, 0-4)
+ * All walls have 5 uniform slices regardless of size
  */
 export function calculateSliceIndex(wall: WallState, point: Vector2): number {
   if (wall.orientation === 'horizontal') {
@@ -23,6 +24,7 @@ export function calculateSliceIndex(wall: WallState, point: Vector2): number {
 
 /**
  * Get the dimension of a single slice
+ * Slices are uniform across the wall's actual dimensions
  */
 export function getSliceDimension(wall: WallState): number {
   return wall.orientation === 'horizontal' 

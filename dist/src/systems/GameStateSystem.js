@@ -9,6 +9,8 @@ const WeaponSystem_1 = require("./WeaponSystem");
 const ProjectileSystem_1 = require("./ProjectileSystem");
 const DestructionSystem_1 = require("./DestructionSystem");
 const VisibilityPolygonSystem_1 = require("./VisibilityPolygonSystem");
+const SmokeZoneSystem_1 = require("./SmokeZoneSystem");
+const FlashbangEffectSystem_1 = require("./FlashbangEffectSystem");
 const WeaponDiagnostics_1 = require("./WeaponDiagnostics");
 const matter_js_1 = __importDefault(require("matter-js"));
 const wallSliceHelpers_1 = require("../utils/wallSliceHelpers");
@@ -21,6 +23,8 @@ class GameStateSystem {
     projectileSystem;
     destructionSystem;
     visionSystem;
+    smokeZoneSystem;
+    flashbangEffectSystem;
     lastInputSequence = new Map();
     pendingWallDamageEvents = [];
     pendingReloadCompleteEvents = [];
@@ -35,8 +39,17 @@ class GameStateSystem {
         this.destructionSystem = new DestructionSystem_1.DestructionSystem(physics);
         this.weaponSystem = new WeaponSystem_1.WeaponSystem();
         this.projectileSystem = new ProjectileSystem_1.ProjectileSystem(physics, this.weaponSystem, this.destructionSystem);
-        // Initialize polygon vision system
-        this.visionSystem = new VisibilityPolygonSystem_1.VisibilityPolygonSystem();
+        // Initialize tactical systems
+        this.smokeZoneSystem = new SmokeZoneSystem_1.SmokeZoneSystem();
+        this.flashbangEffectSystem = new FlashbangEffectSystem_1.FlashbangEffectSystem();
+        // Initialize polygon vision system with smoke integration
+        this.visionSystem = new VisibilityPolygonSystem_1.VisibilityPolygonSystem(this.smokeZoneSystem);
+        // Log vision system status
+        console.log(`🔍 Vision system: ${constants_1.GAME_CONFIG.VISION.ENABLED ? 'ENABLED' : 'DISABLED'}`);
+        if (!constants_1.GAME_CONFIG.VISION.ENABLED) {
+            console.log('   → Sending full-map polygon to frontend');
+            console.log('   → All players can see the entire map');
+        }
         // Don't initialize walls here - will be done in initialize()
         // Set up reload complete callback
         this.weaponSystem.setReloadCompleteCallback((playerId, weapon) => {
@@ -333,8 +346,16 @@ class GameStateSystem {
     handlePlayerInput(playerId, input) {
         const player = this.players.get(playerId);
         const body = this.playerBodies.get(playerId);
-        if (!player || !body)
+        // DEBUG: Log why input might be rejected
+        if (!player) {
+            console.log(`❌ handlePlayerInput: No player found for ${playerId}`);
             return;
+        }
+        if (!body) {
+            console.log(`❌ handlePlayerInput: No physics body for ${playerId}`);
+            console.log(`   Available bodies: ${Array.from(this.playerBodies.keys()).join(', ')}`);
+            return;
+        }
         // Allow some input from dead players (for spectating, respawn requests)
         if (!player.isAlive) {
             // Dead players can still rotate camera/aim
@@ -1116,10 +1137,13 @@ class GameStateSystem {
         this.lastUpdateTime = now;
         // Reset wall update flag
         this.wallsUpdatedThisTick = false;
-        // Update machine gun cooling for all players
+        // Update tactical systems
+        this.smokeZoneSystem.update(deltaTime);
+        // Update machine gun cooling and player effects for all players
         for (const [playerId, player] of this.players) {
             if (player.isAlive) {
                 this.weaponSystem.cooldownMachineGuns(player.weapons, deltaTime);
+                this.flashbangEffectSystem.updatePlayerEffects(player, deltaTime);
             }
         }
         // Handle player respawning
@@ -1130,9 +1154,29 @@ class GameStateSystem {
         for (const updateEvent of projectileEvents.updateEvents) {
             this.pendingProjectileEvents.push({ type: constants_1.EVENTS.PROJECTILE_UPDATED, data: updateEvent });
         }
-        // Queue projectile explode events
+        // Queue projectile explode events and handle special explosion types
         for (const explodeEvent of projectileEvents.explodeEvents) {
             this.pendingProjectileEvents.push({ type: constants_1.EVENTS.PROJECTILE_EXPLODED, data: explodeEvent });
+            // Handle special explosion types
+            if (explodeEvent.type === 'smoke') {
+                // Create smoke zone
+                this.smokeZoneSystem.createSmokeZone(explodeEvent.id, explodeEvent.position);
+                console.log(`💨 Smoke grenade deployed at (${explodeEvent.position.x.toFixed(1)}, ${explodeEvent.position.y.toFixed(1)})`);
+            }
+            else if (explodeEvent.type === 'flash') {
+                // Calculate flashbang effects on all players
+                const flashEffect = this.flashbangEffectSystem.calculateFlashbangEffects(explodeEvent.position, this.players, this.destructionSystem.getWalls());
+                // Apply effects to affected players
+                for (const affectedPlayer of flashEffect.affectedPlayers) {
+                    const player = this.players.get(affectedPlayer.playerId);
+                    if (player) {
+                        this.flashbangEffectSystem.applyFlashbangEffect(player, affectedPlayer);
+                    }
+                }
+                // Queue flashbang effect event for frontend
+                this.pendingProjectileEvents.push({ type: 'FLASHBANG_EFFECT', data: flashEffect });
+                console.log(`⚡ Flashbang detonated, affected ${flashEffect.affectedPlayers.length} players`);
+            }
         }
         // Check projectile collisions
         this.checkProjectileCollisions();
@@ -1163,12 +1207,14 @@ class GameStateSystem {
             // console.log(`🔍 FINAL PLAYER POSITION for ${playerId}: (${player.transform.position.x.toFixed(2)}, ${player.transform.position.y.toFixed(2)}) | velocity=(${player.velocity.x.toFixed(2)}, ${player.velocity.y.toFixed(2)})`);
         }
         // Update vision with new tile-based system (only for alive players)
-        for (const [playerId, player] of this.players) {
-            if (!player.isAlive)
-                continue;
-            // Update vision using raycast for better gap detection
-            const visibleTilesSet = this.visionSystem.updatePlayerVisionRaycast(player);
-            // Vision data is now handled by polygon system
+        if (constants_1.GAME_CONFIG.VISION.ENABLED) {
+            for (const [playerId, player] of this.players) {
+                if (!player.isAlive)
+                    continue;
+                // Update vision using raycast for better gap detection
+                const visibleTilesSet = this.visionSystem.updatePlayerVisionRaycast(player);
+                // Vision data is now handled by polygon system
+            }
         }
     }
     // Check projectile collisions
@@ -1333,7 +1379,7 @@ class GameStateSystem {
     }
     // Get filtered game state for a specific player based on vision
     getFilteredGameState(playerId) {
-        // TEMP: Vision disabled - return all game state
+        // Vision can be disabled via config
         const player = this.players.get(playerId);
         if (!player) {
             // Return minimal state if no player
@@ -1345,7 +1391,7 @@ class GameStateSystem {
                 tickRate: constants_1.GAME_CONFIG.TICK_RATE
             };
         }
-        // TEMP: Return all players since vision is disabled
+        // Return all players (vision filtering disabled or not implemented)
         const visiblePlayersObject = {};
         // 🎨 DEBUG: Track team data being sent
         let teamDataDebugLog = `🎨 Game state for ${playerId.substring(0, 8)} - Team data:`;
@@ -1389,7 +1435,7 @@ class GameStateSystem {
         if (Math.random() < 0.01) { // 1% chance to log
             console.log(teamDataDebugLog);
         }
-        // TEMP: Return all projectiles since vision is disabled
+        // Return all projectiles (vision filtering disabled or not implemented)
         const allProjectiles = this.projectileSystem.getProjectiles();
         const visibleProjectiles = allProjectiles;
         // Get all walls (client will handle vision masking) - convert to plain object
@@ -1402,22 +1448,43 @@ class GameStateSystem {
         }
         return {
             players: visiblePlayersObject,
+            visiblePlayers: visiblePlayersObject, // Frontend compatibility: send both formats
             projectiles: visibleProjectiles,
             walls: wallsObject,
             timestamp: Date.now(),
             tickRate: constants_1.GAME_CONFIG.TICK_RATE,
             // Include polygon vision data
             vision: player ? (() => {
-                const visionData = this.visionSystem.getVisibilityData(player);
-                return {
-                    type: 'polygon',
-                    polygon: visionData.polygon,
-                    viewAngle: visionData.viewAngle,
-                    viewDirection: visionData.viewDirection,
-                    viewDistance: visionData.viewDistance,
-                    position: player.transform.position,
-                    fogOpacity: constants_1.GAME_CONFIG.VISION.FOG_OPACITY // Send fog opacity to frontend
-                };
+                if (constants_1.GAME_CONFIG.VISION.ENABLED) {
+                    // Normal vision system
+                    const visionData = this.visionSystem.getVisibilityData(player);
+                    return {
+                        type: 'polygon',
+                        polygon: visionData.polygon,
+                        viewAngle: visionData.viewAngle,
+                        viewDirection: visionData.viewDirection,
+                        viewDistance: visionData.viewDistance,
+                        position: player.transform.position,
+                        fogOpacity: constants_1.GAME_CONFIG.VISION.FOG_OPACITY
+                    };
+                }
+                else {
+                    // Vision disabled - send full map polygon
+                    return {
+                        type: 'polygon',
+                        polygon: [
+                            { x: 0, y: 0 },
+                            { x: constants_1.GAME_CONFIG.GAME_WIDTH, y: 0 },
+                            { x: constants_1.GAME_CONFIG.GAME_WIDTH, y: constants_1.GAME_CONFIG.GAME_HEIGHT },
+                            { x: 0, y: constants_1.GAME_CONFIG.GAME_HEIGHT }
+                        ],
+                        viewAngle: Math.PI * 2, // Full 360 degrees
+                        viewDirection: 0,
+                        viewDistance: Math.max(constants_1.GAME_CONFIG.GAME_WIDTH, constants_1.GAME_CONFIG.GAME_HEIGHT),
+                        position: player.transform.position,
+                        fogOpacity: 0 // No fog when vision is disabled
+                    };
+                }
             })() : undefined
         };
     }

@@ -14,6 +14,22 @@ export class GameRoom {
   private networkInterval?: NodeJS.Timeout;
   private initialized: boolean = false;
   
+  // Multi-lobby support properties
+  private gameMode: string = 'deathmatch';
+  private mapName: string = 'yourmap2';
+  private isPrivateRoom: boolean = false;
+  private password?: string;
+  private maxPlayers: number = 8;
+  private status: 'waiting' | 'playing' | 'finished' = 'waiting';
+  private createdAt: number = Date.now();
+  private lastActivity: number = Date.now();
+  
+  // Victory condition properties
+  private killTarget: number = 50;
+  private matchStartTime?: number;
+  private matchEndCallbacks: Array<(matchData: any) => void> = [];
+  private playerCountChangeCallbacks: Array<(count: number) => void> = [];
+  
   constructor(id: string, io: Server) {
     this.id = id;
     this.io = io;
@@ -191,9 +207,34 @@ export class GameRoom {
     socket.on('player:join', (data: { loadout: { primary: string; secondary: string; support: string[]; team: string }, timestamp: number }) => {
       console.log(`🎮 Player ${socket.id} joining with loadout:`, data.loadout);
       
-      const player = this.gameState.getPlayer(socket.id);
+      // Prevent duplicate processing
+      if ((socket as any)._processingJoin) {
+        console.log(`⚠️ Ignoring duplicate player:join from ${socket.id}`);
+        return;
+      }
+      (socket as any)._processingJoin = true;
+      
+      let player = this.gameState.getPlayer(socket.id);
       if (!player) {
-        console.error(`❌ Player ${socket.id} not found`);
+        console.error(`❌ Player ${socket.id} not found in game state`);
+        console.error(`🔍 Available players:`, Array.from(this.gameState.getPlayers().keys()));
+        console.error(`🔍 Players in room:`, Array.from(this.players.keys()));
+        console.error(`🔍 Room status:`, this.status);
+        
+        // Try to create the player if they're in the room but not in game state
+        if (this.players.has(socket.id)) {
+          console.log(`🔧 Player in room but not in game state, creating player...`);
+          player = this.gameState.createPlayer(socket.id);
+          console.log(`✅ Created player in game state: ${player.id}`);
+        } else {
+          console.error(`💥 Player not in room either - this shouldn't happen!`);
+          return;
+        }
+      }
+      
+      // Player should exist now
+      if (!player) {
+        console.error(`💥 Still can't find player after creation attempt`);
         return;
       }
       
@@ -275,6 +316,16 @@ export class GameRoom {
         weapons: Array.from(player.weapons.keys()),
         currentWeapon: player.weaponId
       });
+      
+      // CRITICAL: Send updated game state with vision data
+      console.log(`📤 Sending updated game state with vision to ${socket.id}`);
+      const updatedState = this.gameState.getFilteredGameState(socket.id);
+      console.log(`📤 Vision enabled: ${!!updatedState.vision}, Players: ${Object.keys(updatedState.players).length}, VisiblePlayers: ${Object.keys(updatedState.visiblePlayers || {}).length}`);
+      socket.emit(EVENTS.GAME_STATE, updatedState);
+      
+      // Clear the processing flag
+      (socket as any)._processingJoin = false;
+      console.log(`✅ Player ${socket.id} join processing complete`);
     });
     
     // Weapon equip handler - for when players select weapons before match
@@ -454,18 +505,31 @@ export class GameRoom {
         // Removed debug logging
       }
     });
+    
+    // Notify callbacks about player count change
+    this.notifyPlayerCountChange();
+    this.updateActivity();
   }
   
   removePlayer(playerId: string): void {
     this.players.delete(playerId);
     this.gameState.removePlayer(playerId);
     this.io.emit(EVENTS.PLAYER_LEFT, { playerId });
+    
+    // Notify callbacks about player count change
+    this.notifyPlayerCountChange();
+    this.updateActivity();
   }
   
   private startGameLoop(): void {
     this.gameLoopInterval = setInterval(() => {
       this.physics.update(1000 / GAME_CONFIG.TICK_RATE);
       this.gameState.update(1000 / GAME_CONFIG.TICK_RATE);
+      
+      // Check victory condition if match is active
+      if (this.status === 'playing') {
+        this.checkVictoryCondition();
+      }
       
       // CRITICAL FIX: Broadcast pending wall damage events from projectiles/explosions
       const pendingEvents = this.gameState.getPendingEvents();
@@ -551,5 +615,213 @@ export class GameRoom {
     });
     
     console.log(`✅ Game reset complete! ${connectedPlayers.length} players restored`);
+  }
+  
+  // ===== MULTI-LOBBY SUPPORT METHODS =====
+  
+  getId(): string {
+    return this.id;
+  }
+  
+  getPlayerCount(): number {
+    return this.players.size;
+  }
+  
+  getMaxPlayers(): number {
+    return this.maxPlayers;
+  }
+  
+  setMaxPlayers(max: number): void {
+    this.maxPlayers = Math.min(max, parseInt(process.env.MAX_PLAYERS_PER_LOBBY || '8'));
+  }
+  
+  getGameMode(): string {
+    return this.gameMode;
+  }
+  
+  setGameMode(mode: string): void {
+    this.gameMode = mode;
+  }
+  
+  getMapName(): string {
+    return this.mapName;
+  }
+  
+  setMapName(name: string): void {
+    this.mapName = name;
+  }
+  
+  isPrivate(): boolean {
+    return this.isPrivateRoom;
+  }
+  
+  setPrivate(isPrivate: boolean): void {
+    this.isPrivateRoom = isPrivate;
+  }
+  
+  hasPassword(): boolean {
+    return !!this.password;
+  }
+  
+  setPassword(password: string): void {
+    this.password = password;
+    this.isPrivateRoom = true;
+  }
+  
+  verifyPassword(password: string): boolean {
+    return this.password === password;
+  }
+  
+  getStatus(): 'waiting' | 'playing' | 'finished' {
+    return this.status;
+  }
+  
+  setStatus(status: 'waiting' | 'playing' | 'finished'): void {
+    this.status = status;
+    this.lastActivity = Date.now();
+  }
+  
+  getCreatedAt(): number {
+    return this.createdAt;
+  }
+  
+  getLastActivity(): number {
+    return this.lastActivity;
+  }
+  
+  updateActivity(): void {
+    this.lastActivity = Date.now();
+  }
+  
+  // ===== MATCH MANAGEMENT METHODS =====
+  
+  startMatch(): void {
+    this.status = 'playing';
+    this.matchStartTime = Date.now();
+    this.updateActivity();
+    
+    console.log(`🎮 Match started in lobby ${this.id}`);
+    
+    // Notify all players in this lobby
+    this.broadcastToLobby('match_started', {
+      lobbyId: this.id,
+      startTime: this.matchStartTime,
+      killTarget: this.killTarget
+    });
+  }
+  
+  resetForNewMatch(): void {
+    this.status = 'waiting';
+    this.matchStartTime = undefined;
+    this.updateActivity();
+    
+    // Reset game state
+    this.gameState.resetAllState();
+    
+    console.log(`🔄 Lobby ${this.id} reset for new match`);
+  }
+  
+  checkVictoryCondition(): boolean {
+    if (this.status !== 'playing') return false;
+    
+    const players = this.gameState.getPlayers();
+    let redKills = 0;
+    let blueKills = 0;
+    
+    // Calculate team kill counts
+    for (const [playerId, playerState] of players) {
+      if (playerState.team === 'red') {
+        redKills += playerState.kills;
+      } else if (playerState.team === 'blue') {
+        blueKills += playerState.kills;
+      }
+    }
+    
+    // Check if any team reached the kill target
+    if (redKills >= this.killTarget || blueKills >= this.killTarget) {
+      this.endMatch(redKills, blueKills);
+      return true;
+    }
+    
+    return false;
+  }
+  
+  private endMatch(redKills: number, blueKills: number): void {
+    const winnerTeam = redKills >= this.killTarget ? 'red' : 'blue';
+    const matchDuration = this.matchStartTime ? Date.now() - this.matchStartTime : 0;
+    
+    this.status = 'finished';
+    this.updateActivity();
+    
+    // Gather player statistics
+    const playerStats: Array<{
+      playerId: string;
+      playerName: string;
+      team: 'red' | 'blue';
+      kills: number;
+      deaths: number;
+      damageDealt: number;
+    }> = [];
+    
+    for (const [playerId, playerState] of this.gameState.getPlayers()) {
+      playerStats.push({
+        playerId: playerId,
+        playerName: `Player ${playerId.substring(0, 8)}`, // TODO: Add player names to PlayerState
+        team: playerState.team,
+        kills: playerState.kills,
+        deaths: playerState.deaths,
+        damageDealt: 0 // TODO: Add damage tracking to PlayerState
+      });
+    }
+    
+    const matchData = {
+      lobbyId: this.id,
+      winnerTeam,
+      redKills,
+      blueKills,
+      duration: matchDuration,
+      playerStats
+    };
+    
+    console.log(`🏁 Match ended in lobby ${this.id} - Winner: ${winnerTeam} (${redKills} vs ${blueKills} kills)`);
+    
+    // Broadcast match end to all players in lobby
+    this.broadcastToLobby('match_ended', matchData);
+    
+    // Trigger match end callbacks
+    this.matchEndCallbacks.forEach(callback => {
+      try {
+        callback(matchData);
+      } catch (error) {
+        console.error('Error in match end callback:', error);
+      }
+    });
+  }
+  
+  // ===== EVENT BROADCASTING METHODS =====
+  
+  broadcastToLobby(event: string, data: any): void {
+    this.io.to(this.id).emit(event, data);
+  }
+  
+  // ===== CALLBACK REGISTRATION METHODS =====
+  
+  onMatchEnd(callback: (matchData: any) => void): void {
+    this.matchEndCallbacks.push(callback);
+  }
+  
+  onPlayerCountChange(callback: (count: number) => void): void {
+    this.playerCountChangeCallbacks.push(callback);
+  }
+  
+  private notifyPlayerCountChange(): void {
+    const count = this.players.size;
+    this.playerCountChangeCallbacks.forEach(callback => {
+      try {
+        callback(count);
+      } catch (error) {
+        console.error('Error in player count change callback:', error);
+      }
+    });
   }
 }

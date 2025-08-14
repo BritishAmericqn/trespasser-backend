@@ -1,0 +1,232 @@
+# Trespasser Development CLI Aliases & Shortcuts
+# Source this file in your ~/.zshrc: echo 'source ~/.trespasser-aliases' >> ~/.zshrc
+
+# ===== MODERN CLI REPLACEMENTS =====
+alias ls="eza -la --group-directories-first"
+alias ll="eza -la --group-directories-first"
+alias tree="eza --tree"
+alias cat="bat"
+alias find="fd"
+alias grep="rg"
+
+# ===== TRESPASSER PROJECT SHORTCUTS =====
+alias tcd="cd /Users/benjaminroyston/trespasser-backend"
+alias tdev="cd /Users/benjaminroyston/trespasser-backend && npm run dev"
+alias tbuild="cd /Users/benjaminroyston/trespasser-backend && npm run build"
+alias ttest="cd /Users/benjaminroyston/trespasser-backend && npm test"
+alias tlint="cd /Users/benjaminroyston/trespasser-backend && npm run lint"
+alias tinstall="cd /Users/benjaminroyston/trespasser-backend && npm install"
+
+# ===== DATABASE SHORTCUTS =====
+alias tdb="pgcli postgresql://localhost:5432/trespasser"
+alias tdb-dev="pgcli postgresql://localhost:5432/trespasser_dev"
+alias tredis="redis-cli"
+alias tredis-monitor="redis-cli monitor"
+
+# ===== DOCKER & CONTAINERS =====
+alias tup="docker-compose up -d"
+alias tdown="docker-compose down"
+alias tlogs="docker-compose logs -f"
+alias tstats="docker stats"
+alias tprune="docker system prune -af"
+
+# ===== MONITORING & PERFORMANCE =====
+alias tmon="glances"
+alias tnet="if command -v bandwhich &> /dev/null; then bandwhich; else echo 'bandwhich not installed'; fi"
+alias tproc="if command -v procs &> /dev/null; then procs; else ps aux; fi"
+alias tcpu="top -o cpu"
+alias tmem="top -o mem"
+
+# ===== LOAD TESTING =====
+alias tload="artillery run"
+alias tbench="autocannon"
+alias tperf="npm run perf:test"
+
+# ===== GIT SHORTCUTS =====
+alias tgit="git status"
+alias tpush="git add . && git commit -m 'Quick update' && git push"
+alias tpull="git pull"
+alias tlog="git log --oneline -10"
+
+# ===== DEVELOPMENT UTILITIES =====
+alias tstart="npm start"
+alias tstop="killall node"
+alias trestart="tstop && sleep 2 && tstart"
+alias tclean="rm -rf node_modules package-lock.json && npm install"
+
+# ===== FRONTEND DEVELOPMENT =====
+alias tvite="vite"
+alias treact="create-react-app"
+alias tangular="ng"
+alias tvue="vue"
+
+# ===== NETWORKING =====
+alias tping="ping 8.8.8.8"
+alias tports="netstat -tulpn"
+alias ttunnel="ngrok http 3000"
+
+# ===== PRODUCTION SHORTCUTS =====
+alias tdeploy="echo 'Deploying to production...' && npm run build && npm run deploy"
+alias tstaging="echo 'Deploying to staging...' && npm run build:staging && npm run deploy:staging"
+
+# ===== DEBUGGING =====
+alias tdebug="NODE_ENV=development DEBUG=* npm run dev"
+alias tverbose="npm run dev -- --verbose"
+
+# ===== QUICK FILE OPERATIONS =====
+alias tedit="code ."
+alias tconfig="code package.json"
+alias tenv="code .env"
+
+# ===== KUBERNETES (for production) =====
+alias tk="kubectl"
+alias tk9s="k9s"
+alias thelm="helm"
+
+# ===== FUNCTIONS FOR COMPLEX OPERATIONS =====
+
+# Start complete development environment
+tdev-full() {
+    echo "🚀 Starting Trespasser Development Environment..."
+    
+    # Check and start PostgreSQL
+    if ! pgrep -x "postgres" > /dev/null; then
+        echo "🗄️ Starting PostgreSQL..."
+        brew services start postgresql@14
+    fi
+    
+    # Check and start Redis
+    if ! pgrep -x "redis-server" > /dev/null; then
+        echo "📦 Starting Redis..."
+        brew services start redis
+    fi
+    
+    # Navigate to project
+    cd /Users/benjaminroyston/trespasser-backend
+    
+    # Install dependencies if needed
+    if [ ! -d "node_modules" ]; then
+        echo "📦 Installing dependencies..."
+        npm install
+    fi
+    
+    echo "🎮 Starting Trespasser backend..."
+    npm run dev
+}
+
+# Monitor all systems
+tmonitor() {
+    echo "📊 Trespasser System Monitor"
+    echo "==========================="
+    
+    # System performance
+    echo "🖥️ System Performance:"
+    glances --time 1 --quiet &
+    GLANCES_PID=$!
+    
+    # Network monitoring if available
+    if command -v bandwhich &> /dev/null; then
+        echo "🌐 Network Usage:"
+        bandwhich &
+        BANDWHICH_PID=$!
+    fi
+    
+    # Container monitoring if Docker is running
+    if command -v docker &> /dev/null && docker info > /dev/null 2>&1; then
+        echo "🐳 Container Performance:"
+        watch docker stats &
+        DOCKER_PID=$!
+    fi
+    
+    # Cleanup on exit
+    cleanup() {
+        echo "🧹 Cleaning up monitoring processes..."
+        [ ! -z "$GLANCES_PID" ] && kill $GLANCES_PID 2>/dev/null
+        [ ! -z "$BANDWHICH_PID" ] && kill $BANDWHICH_PID 2>/dev/null
+        [ ! -z "$DOCKER_PID" ] && kill $DOCKER_PID 2>/dev/null
+    }
+    
+    trap cleanup EXIT
+    
+    echo "Press Ctrl+C to stop monitoring..."
+    wait
+}
+
+# Load test with custom scenarios
+tload-test() {
+    local scenario=${1:-"basic"}
+    echo "🔥 Running load test: $scenario"
+    
+    case $scenario in
+        "basic")
+            artillery run tests/artillery-basic.yml
+            ;;
+        "stress")
+            artillery run tests/artillery-stress.yml
+            ;;
+        "spike")
+            artillery run tests/artillery-spike.yml
+            ;;
+        *)
+            echo "Available scenarios: basic, stress, spike"
+            ;;
+    esac
+}
+
+# Database operations
+tdb-reset() {
+    echo "⚠️ Resetting Trespasser database..."
+    read "?Are you sure? (y/N): " confirm
+    if [[ $confirm == [yY] ]]; then
+        dropdb trespasser_dev 2>/dev/null || true
+        createdb trespasser_dev
+        echo "✅ Database reset complete"
+    else
+        echo "❌ Database reset cancelled"
+    fi
+}
+
+# Security scan
+tsecurity() {
+    echo "🔒 Trespasser Security Scan"
+    echo "========================="
+    
+    echo "📋 NPM Security Audit:"
+    npm audit
+    
+    echo "🔍 Dependency vulnerabilities:"
+    if command -v npm-check &> /dev/null; then
+        npm-check
+    else
+        npm outdated
+    fi
+}
+
+# Project info
+tinfo() {
+    echo "📊 Trespasser Project Information"
+    echo "================================"
+    echo "📁 Project Path: $(pwd)"
+    echo "📦 Node Version: $(node --version)"
+    echo "📋 NPM Version: $(npm --version)"
+    echo "🗄️ PostgreSQL Status: $(brew services list | grep postgresql@14 | awk '{print $2}')"
+    echo "📦 Redis Status: $(brew services list | grep redis | awk '{print $2}')"
+    echo "🐳 Docker Status: $(docker info > /dev/null 2>&1 && echo 'Running' || echo 'Not running')"
+    echo "🔧 Git Branch: $(git branch --show-current 2>/dev/null || echo 'Not a git repo')"
+    echo "📈 Git Status: $(git status --porcelain | wc -l | xargs echo) files changed"
+}
+
+# Quick commit and push
+tquick() {
+    local message=${1:-"Quick update"}
+    echo "⚡ Quick commit: $message"
+    git add .
+    git commit -m "$message"
+    git push
+}
+
+echo "✅ Trespasser CLI aliases loaded!"
+echo "Run 'tinfo' to see project status"
+echo "Run 'tdev-full' to start complete development environment"
+echo "Run 'tmonitor' for comprehensive system monitoring"
+

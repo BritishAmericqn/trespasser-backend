@@ -145,6 +145,7 @@ class DestructionSystem {
         // Calculate slice health based on material
         const materialMultiplier = constants_1.GAME_CONFIG.DESTRUCTION.MATERIAL_MULTIPLIERS[params.material.toUpperCase()];
         const sliceHealth = constants_1.GAME_CONFIG.DESTRUCTION.SLICE_HEALTH * materialMultiplier;
+        // All walls have 5 slices, but the slices are distributed across the actual wall dimensions
         const wall = {
             id: wallId,
             position: { ...params.position },

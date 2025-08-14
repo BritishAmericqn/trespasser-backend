@@ -341,7 +341,7 @@ export class MapLoader {
       visited.add(`${x + dx},${y}`);
     }
     
-    // Always create a 5-slice wall, but mark unused slices as destroyed
+    // Always create a 5-slice wall (50 pixels wide), but mark unused slices as destroyed
     const SLICES_PER_WALL = 5;
     const preDestroyedSlices: number[] = [];
     
@@ -352,7 +352,7 @@ export class MapLoader {
       }
     }
     
-    // Always create wall as if it were 5 tiles long (50 pixels) for consistent slicing
+    // Always create wall as 50 pixels wide (5 tiles) for consistent slicing
     const wallWidth = SLICES_PER_WALL * MapLoader.GRID_SIZE;
     
     return {
@@ -360,8 +360,8 @@ export class MapLoader {
         x: x * MapLoader.GRID_SIZE, 
         y: y * MapLoader.GRID_SIZE 
       },
-      width: wallWidth,
-      height: MapLoader.GRID_SIZE,
+      width: wallWidth,  // Always 50px for horizontal walls
+      height: MapLoader.GRID_SIZE,  // Always 10px height
       material: material as any,
       actualLength: length,
       preDestroyedSlices: preDestroyedSlices.length > 0 ? preDestroyedSlices : undefined
@@ -374,7 +374,7 @@ export class MapLoader {
       visited.add(`${x},${y + dy}`);
     }
     
-    // Always create a 5-slice wall, but mark unused slices as destroyed
+    // Always create a 5-slice wall (50 pixels tall), but mark unused slices as destroyed
     const SLICES_PER_WALL = 5;
     const preDestroyedSlices: number[] = [];
     
@@ -385,7 +385,7 @@ export class MapLoader {
       }
     }
     
-    // Always create wall as if it were 5 tiles long (50 pixels) for consistent slicing
+    // Always create wall as 50 pixels tall (5 tiles) for consistent slicing
     const wallHeight = SLICES_PER_WALL * MapLoader.GRID_SIZE;
     
     return {
@@ -393,8 +393,8 @@ export class MapLoader {
         x: x * MapLoader.GRID_SIZE, 
         y: y * MapLoader.GRID_SIZE 
       },
-      width: MapLoader.GRID_SIZE,
-      height: wallHeight,
+      width: MapLoader.GRID_SIZE,  // Always 10px width
+      height: wallHeight,  // Always 50px for vertical walls
       material: material as any,
       actualLength: length,
       preDestroyedSlices: preDestroyedSlices.length > 0 ? preDestroyedSlices : undefined

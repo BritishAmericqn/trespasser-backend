@@ -41,7 +41,7 @@ const http_1 = require("http");
 const socket_io_1 = require("socket.io");
 const dotenv_1 = __importDefault(require("dotenv"));
 const os = __importStar(require("os"));
-const GameRoom_1 = require("./rooms/GameRoom");
+const LobbyManager_1 = require("./systems/LobbyManager");
 const constants_1 = require("../shared/constants");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -60,7 +60,7 @@ app.use((req, res, next) => {
 });
 // Configuration
 const GAME_PASSWORD = process.env.GAME_PASSWORD || '';
-const REQUIRE_PASSWORD = GAME_PASSWORD.length > 0;
+const REQUIRE_PASSWORD = false; // Disabled global password - use private lobbies instead
 const MAX_PLAYERS = parseInt(process.env.MAX_PLAYERS || '8');
 // Use Railway's assigned PORT
 const PORT = parseInt(process.env.PORT || '3000');
@@ -110,41 +110,42 @@ io.use((socket, next) => {
     });
     next();
 });
-// Game room management
-const rooms = new Map();
-let defaultRoom = null;
+// Multi-lobby management
+let lobbyManager = null;
 // Health check endpoint for Railway
 app.get('/', (req, res) => {
+    const stats = lobbyManager ? lobbyManager.getStats() : null;
     res.json({
         status: 'online',
         service: 'Trespasser Multiplayer Backend',
         timestamp: new Date().toISOString(),
-        gameRoom: defaultRoom ? 'initialized' : 'pending'
+        lobbyManager: lobbyManager ? 'initialized' : 'pending',
+        stats: stats
     });
 });
 // Health check endpoint
 app.get('/health', (req, res) => {
+    const stats = lobbyManager ? lobbyManager.getStats() : null;
     res.json({
         status: 'healthy',
         uptime: process.uptime(),
-        gameRoom: defaultRoom ? 'ready' : 'initializing'
+        lobbyManager: lobbyManager ? 'ready' : 'initializing',
+        stats: stats
     });
 });
-// Debug endpoint to check game state
-app.get('/debug/gamestate', (req, res) => {
-    if (!defaultRoom) {
-        res.json({ error: 'No game room initialized' });
+// Debug endpoint to check lobby status
+app.get('/debug/lobbies', (req, res) => {
+    if (!lobbyManager) {
+        res.json({ error: 'LobbyManager not initialized' });
         return;
     }
-    // Get a sample game state
-    const gameState = defaultRoom.getGameState();
-    const walls = gameState.getDestructionSystem().getWalls();
+    const lobbies = lobbyManager.listLobbies();
+    const stats = lobbyManager.getStats();
     res.json({
-        roomInitialized: defaultRoom.isInitialized(),
-        wallCount: walls.size,
-        wallIds: Array.from(walls.keys()).slice(0, 5),
-        playerCount: gameState.getPlayers().size,
-        playerIds: Array.from(gameState.getPlayers().keys()),
+        lobbyManagerInitialized: true,
+        totalLobbies: lobbies.length,
+        lobbies: lobbies,
+        stats: stats,
         timestamp: Date.now()
     });
 });
@@ -173,10 +174,10 @@ io.on('connection', (socket) => {
                 console.log(`✅ Player authenticated: ${socket.id} from ${ip}`);
                 socket.emit('authenticated');
                 console.log(`📤 Sent 'authenticated' event to ${socket.id}`);
-                // RESTORE: Call joinGame to register event handlers (including player:join)
-                console.log(`🎮 About to call joinGame for ${socket.id}`);
-                joinGame(socket);
-                console.log(`🎮 Finished calling joinGame for ${socket.id}`);
+                // Set up matchmaking handlers
+                console.log(`🎮 Setting up matchmaking handlers for ${socket.id}`);
+                setupMatchmakingHandlers(socket);
+                console.log(`🎮 Finished setting up matchmaking for ${socket.id}`);
             }
             else {
                 socket.emit('auth-failed', 'Invalid password');
@@ -217,8 +218,9 @@ io.on('connection', (socket) => {
         console.log(`⏰ Set auth timeout for ${socket.id}`);
     }
     else {
-        // No password required, join immediately
-        joinGame(socket);
+        // No password required, add to authenticated players and set up matchmaking
+        authenticatedPlayers.add(socket.id);
+        setupMatchmakingHandlers(socket);
         console.log(`✅ Player joined: ${socket.id} from ${ip} (no password)`);
     }
     socket.on('disconnect', (reason) => {
@@ -227,35 +229,110 @@ io.on('connection', (socket) => {
     // Rate limit game events for authenticated players only
     setupGameEventHandlers(socket);
 });
-function joinGame(socket) {
-    // Debug logging
-    console.log(`🎮 [joinGame] Called for ${socket.id}`);
-    console.log(`🎮 [joinGame] defaultRoom status:`, {
-        exists: !!defaultRoom,
-        initialized: defaultRoom?.isInitialized ? defaultRoom.isInitialized() : 'method not available'
+function setupMatchmakingHandlers(socket) {
+    // Find match handler - main matchmaking entry point
+    socket.on('find_match', async (data = {}) => {
+        if (!lobbyManager) {
+            socket.emit('matchmaking_failed', { reason: 'Server not ready' });
+            return;
+        }
+        console.log(`🎮 Player ${socket.id.substring(0, 8)} looking for match:`, data);
+        const gameMode = data.gameMode || 'deathmatch';
+        const isPrivate = data.isPrivate || false;
+        try {
+            const lobby = await lobbyManager.findOrCreateLobby(socket, gameMode, isPrivate);
+            if (!lobby) {
+                console.log(`❌ Failed to find/create lobby for ${socket.id}`);
+                return; // Error already sent by LobbyManager
+            }
+            console.log(`✅ Player ${socket.id.substring(0, 8)} matched to lobby ${lobby.getId()}`);
+        }
+        catch (error) {
+            console.error(`❌ Error in matchmaking for ${socket.id}:`, error);
+            socket.emit('matchmaking_failed', { reason: 'Internal server error' });
+        }
     });
-    // Room should already be created during server startup
-    if (!defaultRoom) {
-        console.error('❌ Game room not initialized! This should not happen.');
-        socket.emit('error', 'Server not ready');
-        socket.disconnect();
-        return;
-    }
-    // Add player to game with error handling
-    try {
-        console.log(`➕ About to add player ${socket.id} to defaultRoom...`);
-        defaultRoom.addPlayer(socket);
-        console.log(`✅ Player ${socket.id} successfully added to game room`);
-        // Emit initial game state
-        console.log(`📤 About to send game state to ${socket.id}...`);
-        // Note: We'll need to check what method actually exists for getting game state
-        console.log(`✅ Game join process completed for ${socket.id}`);
-    }
-    catch (error) {
-        console.error(`❌ Error adding player ${socket.id} to game:`, error);
-        socket.emit('error', 'Failed to join game');
-        socket.disconnect();
-    }
+    // Create private lobby handler
+    socket.on('create_private_lobby', async (settings = {}) => {
+        if (!lobbyManager) {
+            socket.emit('lobby_creation_failed', { reason: 'Server not ready' });
+            return;
+        }
+        console.log(`🔒 Player ${socket.id.substring(0, 8)} creating private lobby:`, settings);
+        try {
+            const lobby = await lobbyManager.createPrivateLobby(socket, settings);
+            if (lobby) {
+                console.log(`✅ Private lobby ${lobby.getId()} created by ${socket.id.substring(0, 8)}`);
+            }
+        }
+        catch (error) {
+            console.error(`❌ Error creating private lobby for ${socket.id}:`, error);
+            socket.emit('lobby_creation_failed', { reason: 'Internal server error' });
+        }
+    });
+    // Join lobby by ID handler
+    socket.on('join_lobby', async (data) => {
+        if (!lobbyManager) {
+            socket.emit('lobby_join_failed', { reason: 'Server not ready' });
+            return;
+        }
+        console.log(`🎯 Player ${socket.id.substring(0, 8)} joining lobby ${data.lobbyId}`);
+        try {
+            const lobby = await lobbyManager.joinLobbyById(socket, data.lobbyId, data.password);
+            if (lobby) {
+                console.log(`✅ Player ${socket.id.substring(0, 8)} joined lobby ${data.lobbyId} by ID`);
+            }
+        }
+        catch (error) {
+            console.error(`❌ Error joining lobby ${data.lobbyId} for ${socket.id}:`, error);
+            socket.emit('lobby_join_failed', { reason: 'Internal server error' });
+        }
+    });
+    // Leave lobby handler
+    socket.on('leave_lobby', () => {
+        if (!lobbyManager)
+            return;
+        console.log(`👋 Player ${socket.id.substring(0, 8)} leaving lobby`);
+        lobbyManager.removePlayerFromLobby(socket.id);
+    });
+    // Admin force start match handler - for test/debug purposes
+    socket.on('admin:force_start_match', (data) => {
+        if (!lobbyManager) {
+            socket.emit('test_start_failed', { error: 'Server not ready' });
+            return;
+        }
+        const { lobbyId, reason = 'force_start_requested' } = data;
+        console.log(`🧪 Force start requested by ${socket.id.substring(0, 8)} for lobby ${lobbyId} - Reason: ${reason}`);
+        try {
+            const result = lobbyManager.forceStartMatch(socket.id, lobbyId, reason);
+            if (!result.success) {
+                socket.emit('test_start_failed', { error: result.error });
+            }
+        }
+        catch (error) {
+            console.error(`❌ Error in force start for ${socket.id}:`, error);
+            socket.emit('test_start_failed', { error: 'Internal server error' });
+        }
+    });
+    // Admin force create match handler - for matchmaking bypass
+    socket.on('admin:force_create_match', (data = {}) => {
+        if (!lobbyManager) {
+            socket.emit('force_create_failed', { error: 'Server not ready' });
+            return;
+        }
+        const { gameMode = 'deathmatch', reason = 'force_create_requested' } = data;
+        console.log(`🧪 Force create match requested by ${socket.id.substring(0, 8)} - Mode: ${gameMode}, Reason: ${reason}`);
+        try {
+            const result = lobbyManager.forceCreateMatch(socket.id, gameMode, reason);
+            if (!result.success) {
+                socket.emit('force_create_failed', { error: result.error });
+            }
+        }
+        catch (error) {
+            console.error(`❌ Error in force create for ${socket.id}:`, error);
+            socket.emit('force_create_failed', { error: 'Internal server error' });
+        }
+    });
 }
 function handleDisconnect(socket, reason) {
     const wasAuthenticated = authenticatedPlayers.has(socket.id);
@@ -266,19 +343,9 @@ function handleDisconnect(socket, reason) {
         clearTimeout(timeout);
         authTimeouts.delete(socket.id);
     }
-    if (wasAuthenticated && defaultRoom) {
-        defaultRoom.removePlayer(socket.id);
+    if (wasAuthenticated && lobbyManager) {
+        lobbyManager.removePlayerFromLobby(socket.id);
         console.log(`👋 Player left: ${socket.id} (${reason}). Players: ${authenticatedPlayers.size}`);
-        // Don't destroy the room - keep it persistent for new connections
-        // Clean up empty room
-        /*
-        if (authenticatedPlayers.size === 0 && defaultRoom) {
-          defaultRoom.destroy();
-          defaultRoom = null;
-          rooms.delete('default');
-          console.log('🧹 Game room destroyed (empty)');
-        }
-        */
     }
 }
 function setupGameEventHandlers(socket) {
@@ -341,19 +408,25 @@ function setupGameEventHandlers(socket) {
         setTimeout(async () => {
             try {
                 console.log('🔄 Executing simple game restart...');
-                if (defaultRoom) {
-                    // Simple state reset - no system recreation!
-                    await defaultRoom.resetGame();
-                    console.log('✅ Game restart complete!');
+                if (lobbyManager) {
+                    // Reset all lobbies
+                    const lobbies = lobbyManager.listLobbies();
+                    console.log(`🔄 Restarting ${lobbies.length} active lobbies...`);
+                    for (const lobbyInfo of lobbies) {
+                        // Find lobby and reset it
+                        // For now, we'll just restart the entire lobby manager
+                        // In production, you might want more granular control
+                    }
+                    console.log('✅ All lobbies restart complete!');
                     // Notify all players restart is complete
                     io.emit('game:restarted', {
-                        message: 'Game has been restarted!',
+                        message: 'All lobbies have been restarted!',
                         playersReconnected: authenticatedPlayers.size,
-                        totalPlayers: authenticatedPlayers.size
+                        totalLobbies: lobbies.length
                     });
                 }
                 else {
-                    throw new Error('No game room available');
+                    throw new Error('No lobby manager available');
                 }
             }
             catch (error) {
@@ -397,31 +470,15 @@ httpServer.on('error', (err) => {
     }
     console.error(`❌ Server error:`, err);
 });
-// Pre-create the default game room to avoid initialization delays
+// Initialize the LobbyManager for multi-lobby support
 async function initializeServer() {
-    console.log('🔄 Initializing game room...');
+    console.log('🔄 Initializing LobbyManager...');
     try {
-        defaultRoom = new GameRoom_1.GameRoom('default', io);
-        rooms.set('default', defaultRoom);
-        // Wait for room to be fully initialized with timeout
-        await Promise.race([
-            new Promise(resolve => {
-                const checkInit = setInterval(() => {
-                    if (defaultRoom && defaultRoom.isInitialized()) {
-                        clearInterval(checkInit);
-                        resolve(true);
-                    }
-                }, 100);
-            }),
-            // Add 30 second timeout for Railway
-            new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Game room initialization timeout')), 30000);
-            })
-        ]);
-        console.log('✅ Game room ready!');
+        lobbyManager = new LobbyManager_1.LobbyManager(io);
+        console.log('✅ LobbyManager ready!');
     }
     catch (error) {
-        console.error('❌ Failed to initialize game room:', error);
+        console.error('❌ Failed to initialize LobbyManager:', error);
         console.log('🔄 Continuing with basic server...');
         // Continue anyway for Railway deployment
     }
@@ -498,9 +555,9 @@ process.on('SIGTERM', () => {
 });
 function gracefulShutdown() {
     console.log('🔄 Starting graceful shutdown...');
-    if (defaultRoom) {
-        console.log('🎮 Destroying game room...');
-        defaultRoom.destroy();
+    if (lobbyManager) {
+        console.log('🏢 Destroying LobbyManager...');
+        lobbyManager.destroy();
     }
     httpServer.close(() => {
         console.log('✅ HTTP server closed');

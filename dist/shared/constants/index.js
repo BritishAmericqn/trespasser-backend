@@ -18,13 +18,14 @@ exports.GAME_CONFIG = {
     WALL_SLICES_PER_TILE: 5,
     WALL_HEALTH_PER_SLICE: 100,
     VISION_RANGE: 60, // Reduced from 100 for performance
-    VISION_ANGLE: 90,
+    VISION_ANGLE: 180,
     VISION_RAYS: 45,
     HOLE_VISION_ANGLE: 15,
     // Vision system configuration
     VISION: {
+        ENABLED: true, // Set to true for frontend compatibility testing
         FOG_OPACITY: 0.64, // Reduced by 20% from 0.8 - less darkness for unseen areas
-        VIEW_DISTANCE: 60,
+        VIEW_DISTANCE: 90,
         VIEW_ANGLE_DEGREES: 90,
         TILE_SIZE: 8, // For tile-based vision fallback
     },
@@ -221,7 +222,11 @@ exports.GAME_CONFIG = {
             HITSCAN: false,
             PROJECTILE_SPEED: 180,
             SMOKE_RADIUS: 60,
-            SMOKE_DURATION: 10000, // 10 seconds
+            SMOKE_DURATION: 15000, // 15 seconds
+            SMOKE_EXPANSION_TIME: 3000, // 3 seconds to reach full size
+            SMOKE_MAX_DENSITY: 0.9, // Maximum opacity at center
+            SMOKE_WIND_SPEED: 8, // pixels per second drift
+            SMOKE_EDGE_FADE: 0.3, // Density multiplier at edges
             FUSE_TIME: 2000 // milliseconds
         },
         FLASHBANG: {
@@ -235,8 +240,14 @@ exports.GAME_CONFIG = {
             RANGE: 150,
             HITSCAN: false,
             PROJECTILE_SPEED: 200,
-            EFFECT_RADIUS: 100,
-            MAX_EFFECT_DURATION: 2000, // 2 seconds at full intensity
+            EFFECT_RADIUS: 120,
+            MAX_EFFECT_DURATION: 4000, // 4 seconds maximum
+            BLIND_DURATION_BASE: 1500, // Base blind time at point-blank
+            DISORIENTED_DURATION_BASE: 2000, // Base disorientation time
+            RECOVERING_DURATION_BASE: 1000, // Base recovery time
+            DISTANCE_FALLOFF: 0.8, // How quickly effect drops with distance
+            ANGLE_EFFECT_MULTIPLIER: 0.6, // Effect reduction when not looking directly
+            WALL_PENETRATION_FACTOR: 0.3, // Effect through walls
             FUSE_TIME: 1500 // milliseconds
         },
         ROCKET: {

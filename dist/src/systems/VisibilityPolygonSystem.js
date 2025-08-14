@@ -7,8 +7,16 @@ class VisibilityPolygonSystem {
     walls = new Map();
     viewAngle = (120 * Math.PI) / 180; // 120 degrees in radians
     viewDistance = 160; // Maximum view distance
-    constructor() {
-        console.log('VisibilityPolygonSystem initialized');
+    smokeZoneSystem;
+    constructor(smokeZoneSystem) {
+        this.smokeZoneSystem = smokeZoneSystem;
+        console.log('VisibilityPolygonSystem initialized with smoke zone integration');
+    }
+    /**
+     * Set the smoke zone system for vision integration
+     */
+    setSmokeZoneSystem(smokeZoneSystem) {
+        this.smokeZoneSystem = smokeZoneSystem;
     }
     /**
      * Initialize walls from destruction system format
@@ -543,13 +551,21 @@ class VisibilityPolygonSystem {
         return edges;
     }
     /**
-     * Cast a ray from viewer position at given angle
+     * Cast a ray from viewer position at given angle with smoke zone integration
      */
     castRay(viewerPos, angle) {
         const dx = Math.cos(angle);
         const dy = Math.sin(angle);
         let closestIntersection = null;
         let closestDistance = this.viewDistance;
+        // Check for smoke zone occlusion first
+        if (this.smokeZoneSystem) {
+            const smokeIntersection = this.checkSmokeIntersection(viewerPos, angle);
+            if (smokeIntersection) {
+                closestDistance = Math.min(closestDistance, smokeIntersection.distance);
+                closestIntersection = smokeIntersection.point;
+            }
+        }
         // Check intersection with all walls
         this.walls.forEach((wall) => {
             // Skip fully destroyed walls
@@ -860,6 +876,61 @@ class VisibilityPolygonSystem {
                 right: rightBound * 180 / Math.PI
             }
         };
+    }
+    /**
+     * Check if a ray intersects with smoke zones and calculate visibility cutoff
+     */
+    checkSmokeIntersection(viewerPos, angle) {
+        if (!this.smokeZoneSystem)
+            return null;
+        const dx = Math.cos(angle);
+        const dy = Math.sin(angle);
+        const sampleStep = 5; // Check every 5 pixels along the ray
+        let cumulativeOpacity = 0;
+        const opacityThreshold = 0.7; // At what opacity do we consider vision "blocked"
+        for (let distance = sampleStep; distance <= this.viewDistance; distance += sampleStep) {
+            const samplePoint = {
+                x: viewerPos.x + dx * distance,
+                y: viewerPos.y + dy * distance
+            };
+            const opacity = this.smokeZoneSystem.calculateSmokeOpacityAtPoint(samplePoint);
+            cumulativeOpacity = Math.min(1.0, cumulativeOpacity + opacity * 0.1); // Gradual buildup
+            // If we've hit the threshold, this is where vision is blocked
+            if (cumulativeOpacity >= opacityThreshold) {
+                return {
+                    point: samplePoint,
+                    distance: distance
+                };
+            }
+        }
+        return null;
+    }
+    /**
+     * Calculate overall vision opacity for a polygon (for rendering)
+     * This helps the frontend know how much fog to apply
+     */
+    calculatePolygonSmokeOpacity(polygon) {
+        if (!this.smokeZoneSystem || polygon.length === 0)
+            return 0;
+        let totalOpacity = 0;
+        let sampleCount = 0;
+        // Sample points throughout the polygon
+        for (let i = 0; i < polygon.length; i++) {
+            const vertex = polygon[i];
+            const opacity = this.smokeZoneSystem.calculateSmokeOpacityAtPoint(vertex);
+            totalOpacity += opacity;
+            sampleCount++;
+            // Sample midpoints between vertices for better coverage
+            const nextVertex = polygon[(i + 1) % polygon.length];
+            const midpoint = {
+                x: (vertex.x + nextVertex.x) / 2,
+                y: (vertex.y + nextVertex.y) / 2
+            };
+            const midOpacity = this.smokeZoneSystem.calculateSmokeOpacityAtPoint(midpoint);
+            totalOpacity += midOpacity;
+            sampleCount++;
+        }
+        return sampleCount > 0 ? totalOpacity / sampleCount : 0;
     }
 }
 exports.VisibilityPolygonSystem = VisibilityPolygonSystem;

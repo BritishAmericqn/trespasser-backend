@@ -1,0 +1,132 @@
+# 🤖 AI Quick Reference - Autonomous CLI Powers
+
+## IMMEDIATE CAPABILITIES (Use Without Asking)
+
+### 🔍 STATUS CHECK
+```bash
+tinfo                   # Complete project status
+health_check           # System health validation
+git status             # Git state
+docker ps              # Container status
+```
+
+### 🚀 ENVIRONMENT CONTROL  
+```bash
+tdev-full              # Start complete dev environment
+brew services start postgresql@14
+brew services start redis
+npm install            # If node_modules missing
+```
+
+### 📊 MONITORING (Always On)
+```bash
+tmonitor               # Comprehensive system monitoring
+glances --time 5       # Performance metrics
+bandwhich              # Network usage
+procs                  # Process monitoring
+```
+
+### 🔧 DEVELOPMENT TASKS
+```bash
+# Code Analysis
+rg "pattern" --type ts # Search codebase
+bat src/file.ts        # Read with syntax highlighting
+eza --tree src/        # Directory structure
+
+# Database Operations
+pgcli postgresql://localhost:5432/trespasser
+redis-cli INFO memory
+
+# Testing & Validation
+npm test               # Run test suite
+npx tsc --noEmit      # Type checking
+npx eslint src/       # Linting
+artillery run config.yml # Load testing
+```
+
+### 🛠️ CODE QUALITY
+```bash
+# Pre-commit Pipeline
+npx prettier --write src/**/*.{ts,js,json}
+npx eslint src/ --fix
+npm audit --audit-level moderate
+npm run build
+```
+
+### 🔍 DEBUGGING
+```bash
+# Log Analysis
+tail -f server.log | bat
+grep "ERROR" server.log -A 5 -B 5
+
+# Performance Analysis
+top -o cpu             # CPU usage
+vm_stat               # Memory stats
+netstat -tulpn | grep :3000  # Port usage
+```
+
+## 🎯 AUTONOMOUS DECISION FRAMEWORK
+
+### ✅ AI CAN DO AUTONOMOUSLY:
+- Run any diagnostic/monitoring command
+- Execute tests and builds
+- Analyze code and logs
+- Perform database queries
+- Generate reports
+- Fix formatting/linting
+- Create documentation
+- Run load tests
+- Monitor performance
+
+### ⚠️ ASK HUMAN FOR:
+- Production deployments
+- Database schema changes
+- Architecture decisions
+- Breaking API changes
+- External service integrations
+- Security policy changes
+
+## 🚨 ERROR RECOVERY
+```bash
+# Service Recovery
+brew services restart postgresql@14
+brew services restart redis
+pkill -f "node.*3000" && npm run dev
+
+# Clean Slate
+rm -rf node_modules package-lock.json
+npm install
+npm run build
+```
+
+## 📋 TASK LOGGING (For Self-Assessment)
+```bash
+echo "$(date): AI Task: [description]" >> /tmp/ai-activity.log
+echo "$(date): Automated: [success/failure]" >> /tmp/ai-activity.log
+echo "$(date): Human Input: [reason]" >> /tmp/ai-activity.log
+```
+
+## 🎮 TRESPASSER-SPECIFIC
+```bash
+# Multi-lobby testing
+node -e "/* WebSocket client simulation */"
+
+# Performance validation
+artillery run tests/artillery/lobby-test.yml
+
+# Database operations
+pgcli postgresql://localhost:5432/trespasser -c "SELECT COUNT(*) FROM players;"
+
+# Code generation validation
+npx tsc --noEmit src/rooms/LobbyManager.ts
+```
+
+## 🔥 POWER USER SHORTCUTS
+```bash
+alias quickfix="npx prettier --write . && npx eslint --fix . && npm test"
+alias fullcheck="tinfo && health_check && npm run build && npm test"
+alias perfmon="glances --time 2 --export csv --export-csv-file /tmp/perf.csv"
+alias loadtest="artillery run tests/artillery/stress.yml --output /tmp/results.json"
+```
+
+**🎯 Remember: These tools are YOUR tools. Use them proactively to solve problems, gather information, and validate solutions. The human wants maximum AI autonomy!**

@@ -72,6 +72,8 @@ export interface PlayerState {
   respawnTime?: number; // When player will respawn
   invulnerableUntil?: number; // Invulnerability after respawn
   killerId?: string; // Who killed this player
+  // Effect states for tactical equipment
+  effectState?: PlayerEffectState;
 }
 
 export interface WallState {
@@ -104,6 +106,7 @@ export interface ProjectileState {
 
 export interface GameState {
   players: Map<string, PlayerState>;
+  visiblePlayers?: Map<string, PlayerState>; // Frontend compatibility: filtered visible players
   walls: Map<string, WallState>;
   projectiles: ProjectileState[];
   timestamp: number;
@@ -281,12 +284,50 @@ export interface WallPenetratedEvent {
   remainingDamage: number;
 }
 
-// Smoke zone for vision blocking
+// Enhanced smoke zone for advanced vision blocking
 export interface SmokeZone {
   id: string;
   position: Vector2;
   radius: number;
+  maxRadius: number;
   createdAt: number;
   duration: number;
+  expansionTime: number; // Time to reach full radius
+  density: number; // Current density (0-1)
+  maxDensity: number; // Maximum density at center
+  windDirection: number; // Radians
+  windSpeed: number; // pixels per second
+  driftPosition: Vector2; // Current center position after wind drift
   type: 'smoke';
+}
+
+// Player effect states for flashbangs and other effects
+export interface PlayerEffectState {
+  flashbangIntensity: number; // 0-1, current flash effect strength
+  flashbangRecoveryPhase: 'blind' | 'disoriented' | 'recovering' | 'normal';
+  flashbangEndTime: number; // When effect fully ends
+  visualImpairment: number; // 0-1, visual clarity reduction
+  audioImpairment: number; // 0-1, audio clarity reduction
+  movementImpairment: number; // 0-1, movement precision reduction
+  lastFlashTime: number; // Timestamp of last flash effect
+}
+
+// Enhanced flashbang event with detailed effect calculation
+export interface FlashbangEffectEvent {
+  id: string;
+  position: Vector2;
+  affectedPlayers: Array<{
+    playerId: string;
+    distance: number;
+    lineOfSight: boolean;
+    viewingAngle: number; // How directly they were looking at flash (0-1)
+    intensity: number; // Final calculated effect intensity (0-1)
+    duration: number; // Effect duration in milliseconds
+    phases: {
+      blindDuration: number;
+      disorientedDuration: number;
+      recoveringDuration: number;
+    };
+  }>;
+  timestamp: number;
 }

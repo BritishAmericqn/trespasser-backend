@@ -16,6 +16,7 @@ const constants_1 = require("../../shared/constants");
  * Calculate which slice a point hits on a wall
  * For horizontal walls: divides by width (left to right, 0-4)
  * For vertical walls: divides by height (top to bottom, 0-4)
+ * All walls have 5 uniform slices regardless of size
  */
 function calculateSliceIndex(wall, point) {
     if (wall.orientation === 'horizontal') {
@@ -34,6 +35,7 @@ function calculateSliceIndex(wall, point) {
 }
 /**
  * Get the dimension of a single slice
+ * Slices are uniform across the wall's actual dimensions
  */
 function getSliceDimension(wall) {
     return wall.orientation === 'horizontal'

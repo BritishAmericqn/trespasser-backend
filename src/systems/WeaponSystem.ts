@@ -783,69 +783,107 @@ export class WeaponSystem {
   
   // Check if ray hits a wall
   private checkWallHit(start: Vector2, direction: Vector2, maxDistance: number, wall: any): { hitPoint: Vector2; distance: number; sliceIndex: number } | null {
-    // Simple AABB collision for now
-    const wallBounds = {
-      left: wall.position.x,
-      right: wall.position.x + wall.width,
-      top: wall.position.y,
-      bottom: wall.position.y + wall.height
-    };
+    // For walls with pre-destroyed slices, we need to check each intact slice individually
+    // to avoid hitting the "invisible" parts of the wall
     
-    // Handle division by zero for ray-AABB intersection
-    let tMinX = -Infinity;
-    let tMaxX = Infinity;
-    let tMinY = -Infinity;
-    let tMaxY = Infinity;
-    
-    // X-axis intersection
-    if (Math.abs(direction.x) > 0.0001) {
-      const t1 = (wallBounds.left - start.x) / direction.x;
-      const t2 = (wallBounds.right - start.x) / direction.x;
-      tMinX = Math.min(t1, t2);
-      tMaxX = Math.max(t1, t2);
-    } else {
-      // Ray is parallel to X-axis
-      if (start.x < wallBounds.left || start.x > wallBounds.right) {
-        return null; // Ray misses the wall
+    // First, determine which slices are intact
+    const intactSlices: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      if (!wall.destructionMask || wall.destructionMask[i] === 0) {
+        intactSlices.push(i);
       }
     }
     
-    // Y-axis intersection
-    if (Math.abs(direction.y) > 0.0001) {
-      const t1 = (wallBounds.top - start.y) / direction.y;
-      const t2 = (wallBounds.bottom - start.y) / direction.y;
-      tMinY = Math.min(t1, t2);
-      tMaxY = Math.max(t1, t2);
-    } else {
-      // Ray is parallel to Y-axis
-      if (start.y < wallBounds.top || start.y > wallBounds.bottom) {
-        return null; // Ray misses the wall
+    // If no intact slices, wall is fully destroyed
+    if (intactSlices.length === 0) {
+      return null;
+    }
+    
+    // Check collision with each intact slice's bounding box
+    let closestHit: { hitPoint: Vector2; distance: number; sliceIndex: number } | null = null;
+    
+    for (const sliceIndex of intactSlices) {
+      // Calculate the bounds of this specific slice
+      const sliceBounds = this.getSliceBounds(wall, sliceIndex);
+      
+      // Ray-AABB intersection for this slice
+      let tMinX = -Infinity;
+      let tMaxX = Infinity;
+      let tMinY = -Infinity;
+      let tMaxY = Infinity;
+      
+      // X-axis intersection
+      if (Math.abs(direction.x) > 0.0001) {
+        const t1 = (sliceBounds.left - start.x) / direction.x;
+        const t2 = (sliceBounds.right - start.x) / direction.x;
+        tMinX = Math.min(t1, t2);
+        tMaxX = Math.max(t1, t2);
+      } else {
+        // Ray is parallel to X-axis
+        if (start.x < sliceBounds.left || start.x > sliceBounds.right) {
+          continue; // Ray misses this slice
+        }
+      }
+      
+      // Y-axis intersection
+      if (Math.abs(direction.y) > 0.0001) {
+        const t1 = (sliceBounds.top - start.y) / direction.y;
+        const t2 = (sliceBounds.bottom - start.y) / direction.y;
+        tMinY = Math.min(t1, t2);
+        tMaxY = Math.max(t1, t2);
+      } else {
+        // Ray is parallel to Y-axis
+        if (start.y < sliceBounds.top || start.y > sliceBounds.bottom) {
+          continue; // Ray misses this slice
+        }
+      }
+      
+      // Find intersection
+      const tMin = Math.max(tMinX, tMinY);
+      const tMax = Math.min(tMaxX, tMaxY);
+      
+      if (tMin <= tMax && tMin >= 0 && tMin <= maxDistance) {
+        const hitPoint = {
+          x: start.x + direction.x * tMin,
+          y: start.y + direction.y * tMin
+        };
+        
+        // Check if this is the closest hit so far
+        if (!closestHit || tMin < closestHit.distance) {
+          closestHit = {
+            hitPoint,
+            distance: tMin,
+            sliceIndex: sliceIndex
+          };
+        }
       }
     }
     
-    // Find intersection
-    const tMin = Math.max(tMinX, tMinY);
-    const tMax = Math.min(tMaxX, tMaxY);
+    return closestHit;
+  }
+  
+  // Helper method to get the bounds of a specific wall slice
+  private getSliceBounds(wall: any, sliceIndex: number): { left: number; right: number; top: number; bottom: number } {
+    const sliceWidth = wall.width / 5;
+    const sliceHeight = wall.height / 5;
     
-    if (tMin <= tMax && tMin >= 0 && tMin <= maxDistance) {
-      const hitPoint = {
-        x: start.x + direction.x * tMin,
-        y: start.y + direction.y * tMin
-      };
-      
-      // Calculate which slice was hit
-      const sliceIndex = calculateSliceIndex(wall, hitPoint);
-      
-      // Always return the hit info, even for destroyed slices
-      // The performHitscan method will handle checking for intact slices
+    if (wall.orientation === 'horizontal') {
+      // Horizontal wall - slices are arranged left to right
       return {
-        hitPoint,
-        distance: tMin,
-        sliceIndex: sliceIndex
+        left: wall.position.x + (sliceIndex * sliceWidth),
+        right: wall.position.x + ((sliceIndex + 1) * sliceWidth),
+        top: wall.position.y,
+        bottom: wall.position.y + wall.height
+      };
+    } else {
+      // Vertical wall - slices are arranged top to bottom
+      return {
+        left: wall.position.x,
+        right: wall.position.x + wall.width,
+        top: wall.position.y + (sliceIndex * sliceHeight),
+        bottom: wall.position.y + ((sliceIndex + 1) * sliceHeight)
       };
     }
-    
-    return null;
   }
   
   // Generate unique projectile ID
