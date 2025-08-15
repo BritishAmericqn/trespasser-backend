@@ -36,6 +36,7 @@ export class LobbyManager {
   private playerLobbyMap: Map<string, string> = new Map(); // socketId -> lobbyId
   private lobbyCleanupInterval: NodeJS.Timeout;
   private io: Server;
+  private pendingStarts: Set<string> = new Set(); // Track lobbies with pending match starts
   
   // Configuration
   private readonly maxLobbiesPerNode = parseInt(process.env.MAX_LOBBIES_PER_NODE || '100');
@@ -112,13 +113,28 @@ export class LobbyManager {
       targetLobby.addPlayer(socket);
       this.playerLobbyMap.set(socket.id, targetLobby.getId());
       
-      // Emit lobby joined event
-      socket.emit('lobby_joined', {
-        lobbyId: targetLobby.getId(),
-        playerCount: targetLobby.getPlayerCount(),
-        maxPlayers: this.maxPlayersPerLobby,
-        gameMode: gameMode
-      });
+      // Wait a moment for the player to be actually added (in case room is initializing)
+      // Then emit lobby joined event with correct count
+      setTimeout(() => {
+        const currentPlayerCount = targetLobby.getPlayerCount();
+        
+        // Send lobby_joined to the joining player with accurate count
+        socket.emit('lobby_joined', {
+          lobbyId: targetLobby.getId(),
+          playerCount: currentPlayerCount,
+          maxPlayers: this.maxPlayersPerLobby,
+          gameMode: gameMode,
+          status: 'waiting'
+        });
+        
+        // If a match is already starting, notify the new player
+        if (this.pendingStarts.has(targetLobby.getId())) {
+          socket.emit('match_starting', {
+            lobbyId: targetLobby.getId(),
+            countdown: 3 // Approximate remaining time
+          });
+        }
+      }, 200); // Slightly longer delay to ensure player is fully added
       
       // Update lobby activity
       const lobbyInfo = this.getLobbyInfo(targetLobby.getId());
@@ -127,10 +143,8 @@ export class LobbyManager {
         
         // Check if lobby is ready to start
         if (lobbyInfo.playerCount >= 2 && lobbyInfo.status === 'waiting') {
-          // Start match after brief delay to allow for more players
-          setTimeout(() => {
-            this.startMatch(targetLobby.getId());
-          }, 5000);
+          // Use synchronized match start
+          this.scheduleMatchStart(targetLobby.getId());
         }
       }
       
@@ -235,11 +249,26 @@ export class LobbyManager {
       lobby.addPlayer(socket);
       this.playerLobbyMap.set(socket.id, lobbyId);
       
-      socket.emit('lobby_joined', {
-        lobbyId: lobbyId,
-        playerCount: lobby.getPlayerCount(),
-        maxPlayers: lobby.getMaxPlayers()
-      });
+      // Wait a moment for the player to be actually added (in case room is initializing)
+      setTimeout(() => {
+        const currentPlayerCount = lobby.getPlayerCount();
+        
+        // Send lobby_joined to the joining player with accurate count
+        socket.emit('lobby_joined', {
+          lobbyId: lobbyId,
+          playerCount: currentPlayerCount,
+          maxPlayers: lobby.getMaxPlayers(),
+          status: 'waiting'
+        });
+        
+        // If a match is already starting, notify the new player
+        if (this.pendingStarts.has(lobbyId)) {
+          socket.emit('match_starting', {
+            lobbyId: lobbyId,
+            countdown: 3 // Approximate remaining time
+          });
+        }
+      }, 200); // Slightly longer delay to ensure player is fully added
       
       console.log(`✅ Player ${socket.id.substring(0, 8)} joined lobby ${lobbyId} by ID`);
       return lobby;
@@ -354,15 +383,74 @@ export class LobbyManager {
     // Update lobby status
     lobby.setStatus('playing');
     
-    // Notify players that match is starting
-    lobby.broadcastToLobby('match_starting', {
+    // NOTE: Don't broadcast match_starting here - that's done by scheduleMatchStart
+    // Just start the game logic
+    lobby.startMatch();
+    
+    // Broadcast that match has actually started (frontend expects minimal data)
+    lobby.broadcastToLobby('match_started', {
       lobbyId: lobbyId,
-      playerCount: info.playerCount,
-      gameMode: info.gameMode
+      killTarget: 50  // Or get from config
+    });
+  }
+  
+  /**
+   * Schedule a synchronized match start with countdown
+   */
+  private scheduleMatchStart(lobbyId: string): void {
+    if (this.pendingStarts.has(lobbyId)) return;
+    
+    const lobby = this.lobbies.get(lobbyId);
+    if (!lobby) return;
+    
+    const info = this.getLobbyInfo(lobbyId);
+    if (!info || info.status !== 'waiting') return;
+    
+    this.pendingStarts.add(lobbyId);
+    const countdown = 5;
+    
+    console.log(`⏱️ Scheduling match start for lobby ${lobbyId} in ${countdown} seconds`);
+    
+    // Broadcast countdown start to all players (frontend expects minimal data)
+    lobby.broadcastToLobby('match_starting', {
+      lobbyId,
+      countdown
     });
     
-    // Start the game logic
-    lobby.startMatch();
+    // Schedule the actual start
+    setTimeout(() => {
+      this.pendingStarts.delete(lobbyId);
+      
+      // Verify conditions still met
+      const currentInfo = this.getLobbyInfo(lobbyId);
+      if (currentInfo && currentInfo.playerCount >= 2 && currentInfo.status === 'waiting') {
+        this.startMatch(lobbyId);
+      } else {
+        console.log(`❌ Match start cancelled for lobby ${lobbyId} - conditions no longer met`);
+        lobby.broadcastToLobby('match_start_cancelled', {
+          lobbyId,
+          reason: 'Not enough players'
+        });
+      }
+    }, countdown * 1000);
+  }
+  
+  /**
+   * Cancel a pending match start
+   */
+  private cancelPendingStart(lobbyId: string): void {
+    if (!this.pendingStarts.has(lobbyId)) return;
+    
+    this.pendingStarts.delete(lobbyId);
+    
+    const lobby = this.lobbies.get(lobbyId);
+    if (lobby) {
+      console.log(`❌ Cancelling pending match start for lobby ${lobbyId}`);
+      lobby.broadcastToLobby('match_start_cancelled', {
+        lobbyId,
+        reason: 'Not enough players'
+      });
+    }
   }
   
   /**
@@ -406,20 +494,26 @@ export class LobbyManager {
     
     console.log(`🧪 Force starting match in lobby ${lobbyId} with ${info.playerCount} players - Reason: ${reason}`);
     
-    // Update lobby status
-    lobby.setStatus('playing');
+    // Cancel any pending start first
+    this.cancelPendingStart(lobbyId);
     
-    // Notify players that match is force starting
+    // Schedule immediate start with short countdown
+    this.pendingStarts.add(lobbyId);
+    const countdown = 3; // Shorter countdown for force start
+    
+    // Notify players that match is force starting (frontend expects minimal data)
     lobby.broadcastToLobby('match_starting', {
       lobbyId: lobbyId,
-      playerCount: info.playerCount,
-      gameMode: info.gameMode,
-      forceStart: true,
-      reason: reason
+      countdown
     });
     
-    // Start the game logic (same as normal start)
-    lobby.startMatch();
+    // Schedule the actual start
+    setTimeout(() => {
+      this.pendingStarts.delete(lobbyId);
+      
+      // Use the centralized startMatch method which handles status and broadcasts
+      this.startMatch(lobbyId);
+    }, countdown * 1000);
     
     return { success: true };
   }
@@ -468,41 +562,45 @@ export class LobbyManager {
         reason: reason
       });
       
-      // Wait a moment for GameRoom to initialize, then start the match
+      // Wait a moment for GameRoom to initialize, then start the match with countdown
       setTimeout(() => {
         if (lobby.isInitialized()) {
           console.log(`🧪 Starting force created match in lobby ${lobbyId}`);
           
-          // Set status to playing
-          lobby.setStatus('playing');
+          // Schedule immediate start with short countdown
+          this.pendingStarts.add(lobbyId);
+          const countdown = 3; // Short countdown for force created match
           
-          // Notify that match is force starting
+          // Notify that match is force starting (frontend expects minimal data)
           lobby.broadcastToLobby('match_starting', {
             lobbyId: lobbyId,
-            playerCount: lobby.getPlayerCount(),
-            gameMode: gameMode,
-            forceStart: true,
-            forceCreated: true,
-            reason: reason
+            countdown
           });
           
-          // Start the game logic
-          lobby.startMatch();
+          // Schedule the actual start
+          setTimeout(() => {
+            this.pendingStarts.delete(lobbyId);
+            
+            // Use the centralized startMatch method
+            this.startMatch(lobbyId);
+          }, countdown * 1000);
         } else {
           console.warn(`⚠️ GameRoom ${lobbyId} not yet initialized, retrying...`);
           // Retry after another delay
           setTimeout(() => {
             if (lobby.isInitialized()) {
-              lobby.setStatus('playing');
+              this.pendingStarts.add(lobbyId);
+              const countdown = 3;
+              
               lobby.broadcastToLobby('match_starting', {
                 lobbyId: lobbyId,
-                playerCount: lobby.getPlayerCount(),
-                gameMode: gameMode,
-                forceStart: true,
-                forceCreated: true,
-                reason: reason
+                countdown
               });
-              lobby.startMatch();
+              
+              setTimeout(() => {
+                this.pendingStarts.delete(lobbyId);
+                this.startMatch(lobbyId);
+              }, countdown * 1000);
             } else {
               console.error(`❌ GameRoom ${lobbyId} failed to initialize for force create`);
             }
@@ -580,6 +678,17 @@ export class LobbyManager {
       const info = this.getLobbyInfo(lobby.getId());
       if (info) {
         info.lastActivity = Date.now();
+        
+        // CRITICAL FIX: Broadcast lobby state to all players on count change
+        lobby.broadcastLobbyState();
+        
+        // Auto-start if conditions met
+        if (count >= 2 && info.status === 'waiting' && !this.pendingStarts.has(lobby.getId())) {
+          this.scheduleMatchStart(lobby.getId());
+        } else if (count < 2 && this.pendingStarts.has(lobby.getId())) {
+          // Cancel pending start if player count drops below minimum
+          this.cancelPendingStart(lobby.getId());
+        }
       }
     });
   }

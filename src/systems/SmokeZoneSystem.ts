@@ -196,3 +196,4 @@ export class SmokeZoneSystem {
     return t * t * t;
   }
 }
+

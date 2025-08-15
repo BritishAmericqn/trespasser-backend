@@ -311,3 +311,4 @@ export class FlashbangEffectSystem {
     return player.effectState?.flashbangIntensity || 0;
   }
 }
+

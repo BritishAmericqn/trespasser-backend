@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Game State Test</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #0f0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #333;
+            color: #0f0;
+            border: 1px solid #0f0;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #444;
+        }
+        #log {
+            margin-top: 20px;
+            padding: 10px;
+            background: #000;
+            border: 1px solid #0f0;
+            height: 400px;
+            overflow-y: auto;
+        }
+        .error { color: #f00; }
+        .success { color: #0f0; }
+        .info { color: #0ff; }
+        .data { color: #ff0; }
+    </style>
+</head>
+<body>
+    <h1>🎮 Game State Test Client</h1>
+    
+    <div>
+        <button onclick="connect()">1. Connect</button>
+        <button onclick="findMatch()">2. Find Match</button>
+        <button onclick="joinGame()">3. Join Game (player:join)</button>
+        <button onclick="requestState()">4. Request State</button>
+        <button onclick="disconnect()">Disconnect</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div id="status">Status: Disconnected</div>
+    
+    <div id="log"></div>
+    
+    <script>
+        let socket = null;
+        let connected = false;
+        
+        function log(message, type = 'info') {
+            const log = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.innerHTML = `[${time}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function updateStatus(text) {
+            document.getElementById('status').innerHTML = `Status: ${text}`;
+        }
+        
+        function connect() {
+            if (socket) {
+                socket.disconnect();
+            }
+            
+            log('🔌 Connecting to server...', 'info');
+            socket = io('http://localhost:3000', {
+                reconnection: false
+            });
+            
+            // Listen for ALL events
+            socket.onAny((event, ...args) => {
+                log(`📡 Event: "${event}"`, 'data');
+                if (args && args[0]) {
+                    const data = args[0];
+                    
+                    // Special handling for game:state
+                    if (event === 'game:state') {
+                        log(`✅ GAME STATE RECEIVED!`, 'success');
+                        log(`  Players: ${Object.keys(data.players || {}).length}`, 'success');
+                        log(`  Walls: ${Object.keys(data.walls || {}).length}`, 'success');
+                        log(`  Projectiles: ${(data.projectiles || []).length}`, 'success');
+                        
+                        if (data.walls && Object.keys(data.walls).length > 0) {
+                            const firstWall = Object.values(data.walls)[0];
+                            log(`  First wall: ${JSON.stringify(firstWall).substring(0, 100)}...`, 'data');
+                        }
+                    } else {
+                        log(`  Data: ${JSON.stringify(data).substring(0, 200)}`, 'data');
+                    }
+                }
+            });
+            
+            socket.on('connect', () => {
+                connected = true;
+                updateStatus(`Connected (ID: ${socket.id})`);
+                log(`✅ Connected! Socket ID: ${socket.id}`, 'success');
+            });
+            
+            socket.on('disconnect', () => {
+                connected = false;
+                updateStatus('Disconnected');
+                log('❌ Disconnected', 'error');
+            });
+            
+            socket.on('connect_error', (error) => {
+                log(`❌ Connection error: ${error.message}`, 'error');
+            });
+        }
+        
+        function findMatch() {
+            if (!connected) {
+                log('❌ Not connected!', 'error');
+                return;
+            }
+            
+            log('🎮 Sending find_match...', 'info');
+            socket.emit('find_match', { gameMode: 'deathmatch' });
+        }
+        
+        function joinGame() {
+            if (!connected) {
+                log('❌ Not connected!', 'error');
+                return;
+            }
+            
+            const loadout = {
+                primary: 'rifle',
+                secondary: 'pistol',
+                support: ['grenade'],
+                team: 'red'
+            };
+            
+            log('🎮 Sending player:join with loadout...', 'info');
+            log(`  Loadout: ${JSON.stringify(loadout)}`, 'data');
+            
+            socket.emit('player:join', {
+                loadout: loadout,
+                timestamp: Date.now()
+            });
+        }
+        
+        function requestState() {
+            if (!connected) {
+                log('❌ Not connected!', 'error');
+                return;
+            }
+            
+            log('📥 Requesting game state...', 'info');
+            socket.emit('request_game_state', {});
+        }
+        
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                connected = false;
+            }
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        // Auto-connect on load
+        window.onload = () => {
+            log('🎮 Game State Test Client Ready', 'success');
+            log('Click buttons in order: Connect → Find Match → Join Game', 'info');
+        };
+    </script>
+</body>
+</html>

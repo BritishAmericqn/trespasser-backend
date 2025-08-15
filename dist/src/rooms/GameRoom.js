@@ -56,7 +56,7 @@ class GameRoom {
             setTimeout(() => this.addPlayer(socket), 100);
             return;
         }
-        // console.log(`🎮 Player ${socket.id} joined the game`);
+        console.log(`🕹️ Adding player ${socket.id} to GameRoom ${this.id}`);
         this.players.set(socket.id, socket);
         // CRITICAL: Join the socket to this room so they receive broadcasts
         socket.join(this.id);
@@ -68,6 +68,12 @@ class GameRoom {
             walls: Object.keys(filteredState.walls).length,
             projectiles: filteredState.projectiles.length
         });
+        // CRITICAL: Log wall data to debug
+        if (Object.keys(filteredState.walls).length === 0) {
+            console.error(`❌ NO WALLS IN GAME STATE! This is the problem!`);
+            console.error(`🧺 GameRoom initialized:`, this.initialized);
+            console.error(`🧺 GameRoom status:`, this.status);
+        }
         // Debug: Log the event name being used
         console.log(`📡 Using event name: "${constants_1.EVENTS.GAME_STATE}"`);
         // Log the first wall to verify structure
@@ -100,7 +106,8 @@ class GameRoom {
         };
         // 🎨 DEBUG: Verify team data in PLAYER_JOINED broadcast
         console.log(`🎨 [PLAYER_JOINED] Broadcasting player ${playerState.id.substring(0, 8)} with team: ${flattenedPlayerState.team}`);
-        socket.broadcast.emit(constants_1.EVENTS.PLAYER_JOINED, flattenedPlayerState);
+        // CRITICAL FIX: Only broadcast to players in THIS lobby, not all players
+        this.broadcastToLobby(constants_1.EVENTS.PLAYER_JOINED, flattenedPlayerState);
         // Player input handling
         socket.on(constants_1.EVENTS.PLAYER_INPUT, (input) => {
             this.gameState.handlePlayerInput(socket.id, input);
@@ -127,13 +134,14 @@ class GameRoom {
             const result = this.gameState.handleWeaponFire(weaponFireEvent);
             if (result.success) {
                 console.log(`📤 BROADCASTING ${result.events.length} weapon events to ALL players:`);
-                // Broadcast all events to all players
+                // Broadcast all events to players IN THIS LOBBY ONLY
                 for (const eventData of result.events) {
                     console.log(`   Event: ${eventData.type} from player ${weaponFireEvent.playerId.substring(0, 8)}`);
                     if (eventData.type === 'weapon:hit') {
                         console.log(`   🎯 HIT EVENT DATA:`, JSON.stringify(eventData.data, null, 2));
                     }
-                    this.io.emit(eventData.type, eventData.data);
+                    // CRITICAL FIX: Only broadcast to this lobby, not all players
+                    this.broadcastToLobby(eventData.type, eventData.data);
                 }
             }
         });
@@ -146,7 +154,8 @@ class GameRoom {
             const result = this.gameState.handleWeaponReload(weaponReloadEvent.playerId);
             if (result.success) {
                 for (const eventData of result.events) {
-                    this.io.emit(eventData.type, eventData.data);
+                    // CRITICAL FIX: Only broadcast to this lobby, not all players
+                    this.broadcastToLobby(eventData.type, eventData.data);
                 }
             }
         });
@@ -159,7 +168,8 @@ class GameRoom {
             const result = this.gameState.handleWeaponSwitch(weaponSwitchEvent.playerId, weaponSwitchEvent.toWeapon);
             if (result.success) {
                 for (const eventData of result.events) {
-                    this.io.emit(eventData.type, eventData.data);
+                    // CRITICAL FIX: Only broadcast to this lobby, not all players
+                    this.broadcastToLobby(eventData.type, eventData.data);
                 }
             }
         });
@@ -172,13 +182,15 @@ class GameRoom {
             const result = this.gameState.handleGrenadeThrow(grenadeThrowEvent);
             if (result.success) {
                 for (const eventData of result.events) {
-                    this.io.emit(eventData.type, eventData.data);
+                    // CRITICAL FIX: Only broadcast to this lobby, not all players
+                    this.broadcastToLobby(eventData.type, eventData.data);
                 }
             }
         });
         // Player join handler - NEW! Receives loadout from frontend after auth
         socket.on('player:join', (data) => {
             console.log(`🎮 Player ${socket.id} joining with loadout:`, data.loadout);
+            console.log(`📊 Current game state has ${Object.keys(this.gameState.getPlayers()).length} players`);
             // Prevent duplicate processing
             if (socket._processingJoin) {
                 console.log(`⚠️ Ignoring duplicate player:join from ${socket.id}`);
@@ -280,11 +292,29 @@ class GameRoom {
             // CRITICAL: Send updated game state with vision data
             console.log(`📤 Sending updated game state with vision to ${socket.id}`);
             const updatedState = this.gameState.getFilteredGameState(socket.id);
-            console.log(`📤 Vision enabled: ${!!updatedState.vision}, Players: ${Object.keys(updatedState.players).length}, VisiblePlayers: ${Object.keys(updatedState.visiblePlayers || {}).length}`);
+            console.log(`📤 Vision enabled: ${!!updatedState.vision}, Players: ${Object.keys(updatedState.players).length}, Walls: ${Object.keys(updatedState.walls).length}, VisiblePlayers: ${Object.keys(updatedState.visiblePlayers || {}).length}`);
+            console.log(`📤 Event name being sent: '${constants_1.EVENTS.GAME_STATE}'`);
+            // CRITICAL DEBUG: Check if walls exist
+            if (Object.keys(updatedState.walls).length === 0) {
+                console.error(`❌ CRITICAL: No walls in game state during player:join!`);
+                console.error(`🧺 GameRoom initialized: ${this.initialized}`);
+                console.error(`🧺 GameRoom status: ${this.status}`);
+                // Force send a state request to check
+                const testState = this.gameState.getState();
+                console.error(`🧺 Full game state walls: ${Object.keys(testState.walls).length}`);
+            }
             socket.emit(constants_1.EVENTS.GAME_STATE, updatedState);
+            console.log(`✅ game:state event sent with ${Object.keys(updatedState.walls).length} walls`);
             // Clear the processing flag
             socket._processingJoin = false;
             console.log(`✅ Player ${socket.id} join processing complete`);
+        });
+        // Handle explicit game state requests from frontend
+        socket.on('request_game_state', () => {
+            console.log(`📥 Player ${socket.id} requested game state`);
+            const filteredState = this.gameState.getFilteredGameState(socket.id);
+            console.log(`📤 Sending requested game state: ${Object.keys(filteredState.players).length} players, ${Object.keys(filteredState.walls).length} walls`);
+            socket.emit(constants_1.EVENTS.GAME_STATE, filteredState);
         });
         // Weapon equip handler - for when players select weapons before match
         socket.on('weapon:equip', (weaponData) => {
@@ -406,7 +436,8 @@ class GameRoom {
                 const throwResult = this.gameState.handleGrenadeThrow(grenadeThrowEvent);
                 if (throwResult.success) {
                     for (const eventData of throwResult.events) {
-                        this.io.emit(eventData.type, eventData.data);
+                        // CRITICAL FIX: Only broadcast to this lobby, not all players
+                        this.broadcastToLobby(eventData.type, eventData.data);
                     }
                 }
             }
@@ -447,11 +478,40 @@ class GameRoom {
         // Notify callbacks about player count change
         this.notifyPlayerCountChange();
         this.updateActivity();
+        // CRITICAL FIX: Recreate player info for broadcast (flattenedPlayerState is out of scope here)
+        const playerInfo = {
+            id: socket.id,
+            position: playerState.transform.position,
+            rotation: playerState.transform.rotation,
+            health: playerState.health,
+            team: playerState.team,
+            kills: playerState.kills,
+            deaths: playerState.deaths,
+            isAlive: playerState.isAlive
+        };
+        // Broadcast player join to ALL players in lobby
+        // MUST match frontend's expected structure exactly
+        this.broadcastToLobby('player_joined_lobby', {
+            lobbyId: this.id,
+            playerCount: this.players.size, // Top-level field as frontend expects
+            playerId: socket.id,
+            timestamp: Date.now()
+        });
     }
     removePlayer(playerId) {
         this.players.delete(playerId);
         this.gameState.removePlayer(playerId);
-        this.io.emit(constants_1.EVENTS.PLAYER_LEFT, { playerId });
+        // CRITICAL FIX: Broadcast to lobby room only, not globally
+        this.broadcastToLobby(constants_1.EVENTS.PLAYER_LEFT, {
+            playerId
+        });
+        // Broadcast player left event with frontend's expected structure
+        this.broadcastToLobby('player_left_lobby', {
+            lobbyId: this.id,
+            playerCount: this.players.size, // Top-level field as frontend expects
+            playerId: playerId,
+            timestamp: Date.now()
+        });
         // Notify callbacks about player count change
         this.notifyPlayerCountChange();
         this.updateActivity();
@@ -471,7 +531,8 @@ class GameRoom {
             }
             for (const event of pendingEvents) {
                 // console.log(`📤 Emitting ${event.type}:`, event.data);
-                this.io.emit(event.type, event.data);
+                // CRITICAL FIX: Only broadcast to this lobby, not all players
+                this.broadcastToLobby(event.type, event.data);
             }
         }, 1000 / constants_1.GAME_CONFIG.TICK_RATE);
         this.networkInterval = setInterval(() => {
@@ -532,7 +593,8 @@ class GameRoom {
                     deaths: playerState.deaths,
                     transform: playerState.transform
                 };
-                socket.broadcast.emit(constants_1.EVENTS.PLAYER_JOINED, flattenedPlayerState);
+                // CRITICAL FIX: Only broadcast to players in THIS lobby, not all players
+                this.broadcastToLobby(constants_1.EVENTS.PLAYER_JOINED, flattenedPlayerState);
             }
         });
         console.log(`✅ Game reset complete! ${connectedPlayers.length} players restored`);
@@ -600,12 +662,8 @@ class GameRoom {
         this.matchStartTime = Date.now();
         this.updateActivity();
         console.log(`🎮 Match started in lobby ${this.id}`);
-        // Notify all players in this lobby
-        this.broadcastToLobby('match_started', {
-            lobbyId: this.id,
-            startTime: this.matchStartTime,
-            killTarget: this.killTarget
-        });
+        // NOTE: match_started event is broadcast by LobbyManager.startMatch()
+        // to avoid duplicate events
     }
     resetForNewMatch() {
         this.status = 'waiting';
@@ -678,6 +736,37 @@ class GameRoom {
     // ===== EVENT BROADCASTING METHODS =====
     broadcastToLobby(event, data) {
         this.io.to(this.id).emit(event, data);
+    }
+    // Get comprehensive lobby state for broadcasting
+    getLobbyState() {
+        const players = Array.from(this.players.keys()).map(id => {
+            const player = this.gameState.getPlayer(id);
+            if (!player)
+                return null;
+            return {
+                id,
+                health: player.health,
+                team: player.team,
+                kills: player.kills,
+                deaths: player.deaths,
+                isAlive: player.isAlive
+            };
+        }).filter(p => p !== null);
+        return {
+            lobbyId: this.id,
+            playerCount: this.players.size,
+            maxPlayers: this.maxPlayers,
+            players,
+            status: this.status,
+            minimumPlayers: 2,
+            gameMode: this.gameMode,
+            mapName: this.mapName,
+            matchStartTime: this.matchStartTime
+        };
+    }
+    // Broadcast the current lobby state to all players
+    broadcastLobbyState() {
+        this.broadcastToLobby('lobby_state_update', this.getLobbyState());
     }
     // ===== CALLBACK REGISTRATION METHODS =====
     onMatchEnd(callback) {
