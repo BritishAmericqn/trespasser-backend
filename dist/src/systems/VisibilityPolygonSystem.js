@@ -887,14 +887,15 @@ class VisibilityPolygonSystem {
         const dy = Math.sin(angle);
         const sampleStep = 5; // Check every 5 pixels along the ray
         let cumulativeOpacity = 0;
-        const opacityThreshold = 0.7; // At what opacity do we consider vision "blocked"
+        const opacityThreshold = 0.5; // Lower threshold - smoke blocks vision more easily
         for (let distance = sampleStep; distance <= this.viewDistance; distance += sampleStep) {
             const samplePoint = {
                 x: viewerPos.x + dx * distance,
                 y: viewerPos.y + dy * distance
             };
             const opacity = this.smokeZoneSystem.calculateSmokeOpacityAtPoint(samplePoint);
-            cumulativeOpacity = Math.min(1.0, cumulativeOpacity + opacity * 0.1); // Gradual buildup
+            // More aggressive opacity accumulation - smoke should block vision quickly
+            cumulativeOpacity = Math.min(1.0, cumulativeOpacity + opacity * 0.3);
             // If we've hit the threshold, this is where vision is blocked
             if (cumulativeOpacity >= opacityThreshold) {
                 return {

@@ -1396,10 +1396,12 @@ export class GameStateSystem {
       this.pendingProjectileEvents.push({ type: EVENTS.PROJECTILE_EXPLODED, data: explodeEvent });
       
       // Handle special explosion types
+      console.log(`💥 Processing explosion event: type=${explodeEvent.type}, id=${explodeEvent.id}`);
       if (explodeEvent.type === 'smoke') {
         // Create smoke zone
         this.smokeZoneSystem.createSmokeZone(explodeEvent.id, explodeEvent.position);
         console.log(`💨 Smoke grenade deployed at (${explodeEvent.position.x.toFixed(1)}, ${explodeEvent.position.y.toFixed(1)})`);
+        console.log(`💨 Active smoke zones: ${this.smokeZoneSystem.getZoneCount()}`);
       } else if (explodeEvent.type === 'flash') {
         // Calculate flashbang effects on all players
         const flashEffect = this.flashbangEffectSystem.calculateFlashbangEffects(
@@ -1654,6 +1656,7 @@ export class GameStateSystem {
       players: playersObject as any, // Cast to maintain interface compatibility
       walls: wallsObject as any,
       projectiles: this.projectileSystem.getProjectiles(),
+      smokeZones: this.smokeZoneSystem.getSmokeZones(),
       timestamp: Date.now(),
       tickRate: GAME_CONFIG.TICK_RATE
     };
@@ -1689,6 +1692,7 @@ export class GameStateSystem {
         players: {} as any,
         projectiles: [],
         walls: {} as any,
+        smokeZones: [],
         timestamp: Date.now(),
         tickRate: GAME_CONFIG.TICK_RATE
       };
@@ -1758,11 +1762,18 @@ export class GameStateSystem {
       };
     }
     
+    // Debug smoke zones
+    const smokeZones = this.smokeZoneSystem.getSmokeZones();
+    if (smokeZones.length > 0) {
+      console.log(`💨 Including ${smokeZones.length} smoke zone(s) in game state for ${playerId.substring(0, 8)}`);
+    }
+    
     return {
       players: visiblePlayersObject as any,
       visiblePlayers: visiblePlayersObject as any, // Frontend compatibility: send both formats
       projectiles: visibleProjectiles,
       walls: wallsObject as any,
+      smokeZones: smokeZones, // Include smoke zones for rendering
       timestamp: Date.now(),
       tickRate: GAME_CONFIG.TICK_RATE,
       // Include polygon vision data

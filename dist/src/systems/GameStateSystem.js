@@ -1158,10 +1158,12 @@ class GameStateSystem {
         for (const explodeEvent of projectileEvents.explodeEvents) {
             this.pendingProjectileEvents.push({ type: constants_1.EVENTS.PROJECTILE_EXPLODED, data: explodeEvent });
             // Handle special explosion types
+            console.log(`💥 Processing explosion event: type=${explodeEvent.type}, id=${explodeEvent.id}`);
             if (explodeEvent.type === 'smoke') {
                 // Create smoke zone
                 this.smokeZoneSystem.createSmokeZone(explodeEvent.id, explodeEvent.position);
                 console.log(`💨 Smoke grenade deployed at (${explodeEvent.position.x.toFixed(1)}, ${explodeEvent.position.y.toFixed(1)})`);
+                console.log(`💨 Active smoke zones: ${this.smokeZoneSystem.getZoneCount()}`);
             }
             else if (explodeEvent.type === 'flash') {
                 // Calculate flashbang effects on all players
@@ -1358,6 +1360,7 @@ class GameStateSystem {
             players: playersObject, // Cast to maintain interface compatibility
             walls: wallsObject,
             projectiles: this.projectileSystem.getProjectiles(),
+            smokeZones: this.smokeZoneSystem.getSmokeZones(),
             timestamp: Date.now(),
             tickRate: constants_1.GAME_CONFIG.TICK_RATE
         };
@@ -1387,6 +1390,7 @@ class GameStateSystem {
                 players: {},
                 projectiles: [],
                 walls: {},
+                smokeZones: [],
                 timestamp: Date.now(),
                 tickRate: constants_1.GAME_CONFIG.TICK_RATE
             };
@@ -1446,11 +1450,17 @@ class GameStateSystem {
                 destructionMask: Array.from(wall.destructionMask)
             };
         }
+        // Debug smoke zones
+        const smokeZones = this.smokeZoneSystem.getSmokeZones();
+        if (smokeZones.length > 0) {
+            console.log(`💨 Including ${smokeZones.length} smoke zone(s) in game state for ${playerId.substring(0, 8)}`);
+        }
         return {
             players: visiblePlayersObject,
             visiblePlayers: visiblePlayersObject, // Frontend compatibility: send both formats
             projectiles: visibleProjectiles,
             walls: wallsObject,
+            smokeZones: smokeZones, // Include smoke zones for rendering
             timestamp: Date.now(),
             tickRate: constants_1.GAME_CONFIG.TICK_RATE,
             // Include polygon vision data

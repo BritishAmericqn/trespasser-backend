@@ -109,6 +109,7 @@ export interface GameState {
   visiblePlayers?: Map<string, PlayerState>; // Frontend compatibility: filtered visible players
   walls: Map<string, WallState>;
   projectiles: ProjectileState[];
+  smokeZones?: SmokeZone[]; // Active smoke zones for rendering
   timestamp: number;
   tickRate: number;
   vision?: {

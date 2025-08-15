@@ -365,7 +365,10 @@ export class GameRoom {
     // Weapon equip handler - for when players select weapons before match
     socket.on('weapon:equip', (weaponData: { primary?: string, secondary?: string, support?: string[] }) => {
       const player = this.gameState.getPlayer(socket.id);
-      if (!player) return;
+      if (!player) {
+        console.log(`❌ Player not found for weapon:equip from ${socket.id}`);
+        return;
+      }
       
       console.log(`🎯 Equipping weapons for ${socket.id.substring(0, 8)}: primary=${weaponData.primary}, secondary=${weaponData.secondary}, support=[${weaponData.support?.join(',')}]`);
       

@@ -136,13 +136,13 @@ async function runTest() {
     await sleep(5000); // Monitor recovery
     
     console.log('\n💨 Test Phase 5: Smoke Zone Persistence');
-    console.log('   Testing smoke zone duration and wind drift...');
-    await sleep(10000); // Let smoke persist and test vision blocking
+    console.log('   Testing smoke zone duration (no drift)...');
+    await sleep(5000); // Test smoke persistence (total 8 seconds)
     
     console.log('\n✅ Test Complete!');
     console.log('\nExpected Results:');
-    console.log('- Smoke grenade should deploy and expand over 3 seconds');
-    console.log('- Smoke should drift with wind and fade after 15 seconds');
+    console.log('- Smoke grenade should deploy and expand over 1.5 seconds');
+    console.log('- Smoke should remain stationary (no drift) and fade after 8 seconds');
     console.log('- Vision should be blocked through smoke zones');
     console.log('- Flashbang should affect nearby players based on line-of-sight');
     console.log('- Flash effects should have blind → disoriented → recovering phases');

@@ -220,13 +220,13 @@ exports.GAME_CONFIG = {
             ACCURACY: 1.0,
             RANGE: 150,
             HITSCAN: false,
-            PROJECTILE_SPEED: 180,
+            PROJECTILE_SPEED: 20, // Similar to frag grenade throw speed
             SMOKE_RADIUS: 60,
             SMOKE_DURATION: 15000, // 15 seconds
-            SMOKE_EXPANSION_TIME: 3000, // 3 seconds to reach full size
-            SMOKE_MAX_DENSITY: 0.9, // Maximum opacity at center
-            SMOKE_WIND_SPEED: 8, // pixels per second drift
-            SMOKE_EDGE_FADE: 0.3, // Density multiplier at edges
+            SMOKE_EXPANSION_TIME: 1500, // 1.5 seconds to reach full size
+            SMOKE_MAX_DENSITY: 0.95, // Maximum opacity at center
+            SMOKE_WIND_SPEED: 0, // No drift - smoke stays in place
+            SMOKE_EDGE_FADE: 0.5, // Density multiplier at edges - more opaque throughout
             FUSE_TIME: 2000 // milliseconds
         },
         FLASHBANG: {
@@ -239,15 +239,15 @@ exports.GAME_CONFIG = {
             ACCURACY: 1.0,
             RANGE: 150,
             HITSCAN: false,
-            PROJECTILE_SPEED: 200,
+            PROJECTILE_SPEED: 20, // Similar to frag grenade throw speed
             EFFECT_RADIUS: 120,
             MAX_EFFECT_DURATION: 4000, // 4 seconds maximum
             BLIND_DURATION_BASE: 1500, // Base blind time at point-blank
             DISORIENTED_DURATION_BASE: 2000, // Base disorientation time
             RECOVERING_DURATION_BASE: 1000, // Base recovery time
             DISTANCE_FALLOFF: 0.8, // How quickly effect drops with distance
-            ANGLE_EFFECT_MULTIPLIER: 0.6, // Effect reduction when not looking directly
-            WALL_PENETRATION_FACTOR: 0.3, // Effect through walls
+            ANGLE_EFFECT_MULTIPLIER: 0.9, // Much stronger reduction when not looking directly
+            WALL_PENETRATION_FACTOR: 0.1, // Minimal effect through walls (10%)
             FUSE_TIME: 1500 // milliseconds
         },
         ROCKET: {

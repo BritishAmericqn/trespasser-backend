@@ -224,6 +224,7 @@ export class ProjectileSystem {
           // Different explosion events based on type
           if (projectile.type === 'smokegrenade') {
             // Smoke grenades create smoke zones instead of damage explosions
+            console.log(`💨 Smoke grenade ${projectile.id} exploded at (${projectile.position.x.toFixed(1)}, ${projectile.position.y.toFixed(1)})`);
             explodeEvents.push({
               id: projectile.id,
               type: 'smoke',
@@ -255,11 +256,30 @@ export class ProjectileSystem {
         const speed = Math.sqrt(projectile.velocity.x ** 2 + projectile.velocity.y ** 2);
         if (speed < this.GRENADE_MIN_BOUNCE_SPEED) {
           this.explodeProjectile(projectile);
-          explodeEvents.push({
-            id: projectile.id,
-            position: { x: projectile.position.x, y: projectile.position.y },
-            radius: projectile.explosionRadius || 40
-          });
+          
+          // Handle different grenade types
+          if (projectile.type === 'smokegrenade') {
+            explodeEvents.push({
+              id: projectile.id,
+              type: 'smoke',
+              position: { x: projectile.position.x, y: projectile.position.y },
+              radius: GAME_CONFIG.WEAPONS.SMOKEGRENADE.SMOKE_RADIUS
+            });
+          } else if (projectile.type === 'flashbang') {
+            explodeEvents.push({
+              id: projectile.id,
+              type: 'flash',
+              position: { x: projectile.position.x, y: projectile.position.y },
+              radius: GAME_CONFIG.WEAPONS.FLASHBANG.EFFECT_RADIUS
+            });
+          } else {
+            explodeEvents.push({
+              id: projectile.id,
+              type: 'explosion',
+              position: { x: projectile.position.x, y: projectile.position.y },
+              radius: projectile.explosionRadius || 40
+            });
+          }
           projectilesToRemove.push(projectileId);
           continue;
         }
@@ -290,13 +310,32 @@ export class ProjectileSystem {
       
       // Check if projectile has exceeded its range
       if (projectile.traveledDistance >= projectile.range) {
-        if (projectile.type === 'grenade') {
+        if (projectile.type === 'grenade' || projectile.type === 'smokegrenade' || projectile.type === 'flashbang') {
           this.explodeProjectile(projectile);
-          explodeEvents.push({
-            id: projectile.id,
-            position: { x: projectile.position.x, y: projectile.position.y },
-            radius: projectile.explosionRadius || 40
-          });
+          
+          // Handle different grenade types
+          if (projectile.type === 'smokegrenade') {
+            explodeEvents.push({
+              id: projectile.id,
+              type: 'smoke',
+              position: { x: projectile.position.x, y: projectile.position.y },
+              radius: GAME_CONFIG.WEAPONS.SMOKEGRENADE.SMOKE_RADIUS
+            });
+          } else if (projectile.type === 'flashbang') {
+            explodeEvents.push({
+              id: projectile.id,
+              type: 'flash',
+              position: { x: projectile.position.x, y: projectile.position.y },
+              radius: GAME_CONFIG.WEAPONS.FLASHBANG.EFFECT_RADIUS
+            });
+          } else {
+            explodeEvents.push({
+              id: projectile.id,
+              type: 'explosion',
+              position: { x: projectile.position.x, y: projectile.position.y },
+              radius: projectile.explosionRadius || 40
+            });
+          }
         }
         projectilesToRemove.push(projectileId);
         continue;

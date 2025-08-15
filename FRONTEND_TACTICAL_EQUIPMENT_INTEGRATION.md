@@ -31,12 +31,12 @@ interface SmokeZone {
   maxRadius: number;            // Target radius (60px)
   createdAt: number;            // Creation timestamp
   duration: number;             // Total lifetime (15 seconds)
-  expansionTime: number;        // Time to reach full size (3 seconds)
+  expansionTime: number;        // Time to reach full size (1.5 seconds)
   density: number;              // Current opacity (0-1)
   maxDensity: number;           // Peak opacity (0.9)
-  windDirection: number;        // Wind direction in radians
-  windSpeed: number;            // Drift speed (pixels/second)
-  driftPosition: Vector2;       // Current center after drift
+  windDirection: number;        // Unused (always 0)
+  windSpeed: number;            // Unused (always 0)
+  driftPosition: Vector2;       // Same as position (no drift)
   type: 'smoke';
 }
 ```
@@ -95,21 +95,19 @@ class SmokeRenderer {
     for (const [id, smokeZone] of this.smokeZones) {
       const age = Date.now() - smokeZone.createdAt;
       
-      // Update expansion
+      // Update expansion (1.5 seconds)
       if (age < smokeZone.expansionTime) {
         const progress = age / smokeZone.expansionTime;
         smokeZone.radius = smokeZone.maxRadius * this.easeOutCubic(progress);
       }
       
-      // Update position with wind drift
-      const drift = smokeZone.windSpeed * (deltaTime / 1000);
-      smokeZone.driftPosition.x += Math.cos(smokeZone.windDirection) * drift;
-      smokeZone.driftPosition.y += Math.sin(smokeZone.windDirection) * drift;
+      // No drift - smoke stays at original position
+      // smokeZone.driftPosition remains same as smokeZone.position
       
       // Update particle system
       this.updateParticleSystem(id, smokeZone);
       
-      // Remove expired smoke
+      // Remove expired smoke (after 15 seconds)
       if (age >= smokeZone.duration) {
         this.removeSmokeZone(id);
       }
@@ -361,8 +359,9 @@ function playTacticalSound(soundType, position, volume = 1.0) {
 ## Testing Checklist
 
 ### Visual Effects
-- [ ] Smoke zones expand smoothly over 3 seconds
-- [ ] Smoke drifts with wind and fades properly
+- [ ] Smoke zones expand smoothly over 1.5 seconds
+- [ ] Smoke remains stationary at deployment location
+- [ ] Smoke fades out in the last 2 seconds before dispersing
 - [ ] Vision is properly blocked through smoke
 - [ ] Flashbang creates appropriate white-out effect
 - [ ] Recovery phases show progressive improvement

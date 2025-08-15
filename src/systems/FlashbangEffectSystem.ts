@@ -47,17 +47,22 @@ export class FlashbangEffectSystem {
       const distanceRatio = distance / config.EFFECT_RADIUS;
       let baseIntensity = 1 - Math.pow(distanceRatio, config.DISTANCE_FALLOFF);
       
-      // Apply line of sight modifiers
+      // Apply line of sight modifiers - NO EFFECT if wall is blocking
       if (!lineOfSight) {
         baseIntensity *= config.WALL_PENETRATION_FACTOR;
       }
       
-      // Apply viewing angle modifier
+      // Apply viewing angle modifier - GREATLY REDUCED if looking away
       const angleMultiplier = 1 - (viewingAngle * config.ANGLE_EFFECT_MULTIPLIER);
       baseIntensity *= angleMultiplier;
       
-      // Skip if intensity is too low to matter
-      if (baseIntensity < 0.05) continue;
+      // If looking completely away (> 90 degrees), no effect at all
+      if (viewingAngle > 0.5) {
+        baseIntensity *= (1 - viewingAngle) * 0.5; // Extra reduction for looking away
+      }
+      
+      // Skip if intensity is too low to matter (raised threshold)
+      if (baseIntensity < 0.15) continue;
       
       // Calculate effect durations based on intensity
       const phases = this.calculateEffectPhases(baseIntensity);
@@ -149,6 +154,14 @@ export class FlashbangEffectSystem {
    * Check if a line segment intersects with a wall
    */
   private lineIntersectsWall(start: Vector2, end: Vector2, wall: any): boolean {
+    // Skip fully destroyed walls
+    if (wall.destructionMask) {
+      const maskArray = Array.from(wall.destructionMask) as number[];
+      if (maskArray.every(v => v === 255)) {
+        return false; // Wall is completely destroyed
+      }
+    }
+    
     // Simple AABB line intersection
     const dx = end.x - start.x;
     const dy = end.y - start.y;
@@ -173,7 +186,7 @@ export class FlashbangEffectSystem {
       }
     }
     
-    // Check Y boundaries
+    // Check Y boundaries  
     if (Math.abs(dy) > 0.0001) {
       const t1 = (wall.position.y - start.y) / dy;
       const t2 = (wall.position.y + wall.height - start.y) / dy;
@@ -189,10 +202,9 @@ export class FlashbangEffectSystem {
       }
     }
     
-    // Check if there's a valid intersection and the wall slice is intact
+    // Check if there's a valid intersection
     if (tMin <= tMax && tMax >= 0 && tMin <= 1) {
-      // For flashbangs, we could check slice destruction here
-      // For now, assume all walls block line of sight
+      // Wall blocks line of sight
       return true;
     }
     

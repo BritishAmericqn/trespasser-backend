@@ -17,15 +17,15 @@ This system implements advanced smoke grenades and flashbangs with realistic tac
 
 ### Deployment Mechanics
 - **Fuse Time**: 2 seconds before deployment
-- **Expansion**: Gradually expands to full radius over 3 seconds
-- **Duration**: 15 seconds total lifetime
-- **Wind Drift**: Smoke drifts with randomized wind patterns
-- **Density**: Variable opacity from center (90%) to edges (30%)
+- **Expansion**: Gradually expands to full radius over 1.5 seconds
+- **Duration**: 8 seconds total lifetime
+- **Stationary**: Smoke remains at deployment location (no drift)
+- **Density**: Variable opacity from center (95%) to edges (50%)
 
 ### Vision Occlusion
 - **Ray-based Integration**: Vision rays accumulate opacity when passing through smoke
 - **Cumulative Effect**: Multiple smoke zones stack for increased density
-- **Threshold System**: Vision is blocked when cumulative opacity reaches 70%
+- **Threshold System**: Vision is blocked when cumulative opacity reaches 50%
 - **Dynamic Clipping**: Visibility polygons are dynamically modified by smoke zones
 
 ### Technical Implementation
@@ -59,8 +59,10 @@ if (opacity >= 0.7) {
 
 ### Effect Modifiers
 - **Distance**: `intensity = 1 - (distance/radius)^0.8`
-- **Viewing Angle**: `intensity *= (1 - angle * 0.6)`
-- **Wall Penetration**: `intensity *= 0.3` through walls
+- **Viewing Angle**: `intensity *= (1 - angle * 0.9)` - Strong reduction when not looking directly
+- **Looking Away**: Additional 50% reduction if looking > 90° away
+- **Wall Penetration**: `intensity *= 0.1` through walls (minimal 10% effect)
+- **Minimum Threshold**: No effect if final intensity < 15%
 
 ## Configuration
 
@@ -69,11 +71,12 @@ if (opacity >= 0.7) {
 SMOKEGRENADE: {
   SMOKE_RADIUS: 60,           // Maximum radius
   SMOKE_DURATION: 15000,      // 15 seconds
-  SMOKE_EXPANSION_TIME: 3000, // 3 second expansion
-  SMOKE_MAX_DENSITY: 0.9,     // 90% opacity at center
-  SMOKE_WIND_SPEED: 8,        // Drift speed
-  SMOKE_EDGE_FADE: 0.3,       // Edge opacity multiplier
-  FUSE_TIME: 2000             // 2 second fuse
+  SMOKE_EXPANSION_TIME: 1500, // 1.5 second expansion
+  SMOKE_MAX_DENSITY: 0.95,    // 95% opacity at center
+  SMOKE_WIND_SPEED: 0,        // No drift - stationary smoke
+  SMOKE_EDGE_FADE: 0.5,       // Edge opacity multiplier (50% at edges)
+  FUSE_TIME: 2000,            // 2 second fuse
+  PROJECTILE_SPEED: 20        // Same as frag grenade throw speed
 }
 ```
 
@@ -86,9 +89,10 @@ FLASHBANG: {
   DISORIENTED_DURATION_BASE: 2000,  // Base disorientation
   RECOVERING_DURATION_BASE: 1000,   // Base recovery
   DISTANCE_FALLOFF: 0.8,            // Distance curve
-  ANGLE_EFFECT_MULTIPLIER: 0.6,     // Viewing angle penalty
-  WALL_PENETRATION_FACTOR: 0.3,     // Through-wall effect
-  FUSE_TIME: 1500                   // 1.5 second fuse
+  ANGLE_EFFECT_MULTIPLIER: 0.9,     // Strong viewing angle penalty
+  WALL_PENETRATION_FACTOR: 0.1,     // Minimal through-wall effect (10%)
+  FUSE_TIME: 1500,                  // 1.5 second fuse
+  PROJECTILE_SPEED: 20              // Same as frag grenade throw speed
 }
 ```
 
@@ -137,8 +141,8 @@ node test-smoke-flashbang.js
 ```
 
 ### Test Coverage
-- ✅ Smoke grenade deployment and expansion
-- ✅ Wind drift and density gradients  
+- ✅ Smoke grenade deployment and expansion (1.5s)
+- ✅ Stationary smoke zones (no drift)
 - ✅ Vision occlusion integration
 - ✅ Flashbang line-of-sight calculation
 - ✅ Multi-phase effect recovery

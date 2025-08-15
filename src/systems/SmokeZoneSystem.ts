@@ -15,10 +15,6 @@ export class SmokeZoneSystem {
     const config = GAME_CONFIG.WEAPONS.SMOKEGRENADE;
     const now = Date.now();
     
-    // Random wind direction and speed variation
-    const windDirection = Math.random() * 2 * Math.PI;
-    const windSpeedVariation = 0.5 + Math.random() * 0.5; // 0.5x to 1x base speed
-    
     const smokeZone: SmokeZone = {
       id,
       position: { ...position },
@@ -29,9 +25,9 @@ export class SmokeZoneSystem {
       expansionTime: config.SMOKE_EXPANSION_TIME,
       density: 0.1, // Start with low density
       maxDensity: config.SMOKE_MAX_DENSITY,
-      windDirection,
-      windSpeed: config.SMOKE_WIND_SPEED * windSpeedVariation,
-      driftPosition: { ...position },
+      windDirection: 0, // No wind
+      windSpeed: 0, // No drift
+      driftPosition: { ...position }, // Will stay at original position
       type: 'smoke'
     };
     
@@ -42,7 +38,7 @@ export class SmokeZoneSystem {
   }
   
   /**
-   * Update all smoke zones - handle expansion, drift, and decay
+   * Update all smoke zones - handle expansion and decay
    */
   update(deltaTime: number): void {
     const now = Date.now();
@@ -57,16 +53,16 @@ export class SmokeZoneSystem {
         continue;
       }
       
-      // Update expansion (first few seconds)
+      // Update expansion (first 1.5 seconds)
       if (age < zone.expansionTime) {
         const expansionProgress = age / zone.expansionTime;
         zone.radius = zone.maxRadius * this.easeOutCubic(expansionProgress);
         zone.density = zone.maxDensity * this.easeInQuad(expansionProgress);
       } else {
-        // Full size reached, start decay in final quarter of duration
+        // Full size reached, start decay in final 2 seconds
         zone.radius = zone.maxRadius;
         const remainingTime = zone.duration - age;
-        const decayTime = zone.duration * 0.25; // Last 25% of duration
+        const decayTime = 2000; // Last 2 seconds fade out
         
         if (remainingTime < decayTime) {
           const decayProgress = 1 - (remainingTime / decayTime);
@@ -76,17 +72,8 @@ export class SmokeZoneSystem {
         }
       }
       
-      // Apply wind drift
-      const deltaSeconds = deltaTime / 1000;
-      const driftX = Math.cos(zone.windDirection) * zone.windSpeed * deltaSeconds;
-      const driftY = Math.sin(zone.windDirection) * zone.windSpeed * deltaSeconds;
-      
-      zone.driftPosition.x += driftX;
-      zone.driftPosition.y += driftY;
-      
-      // Keep drift within game bounds with some margin
-      zone.driftPosition.x = Math.max(zone.maxRadius, Math.min(GAME_CONFIG.GAME_WIDTH - zone.maxRadius, zone.driftPosition.x));
-      zone.driftPosition.y = Math.max(zone.maxRadius, Math.min(GAME_CONFIG.GAME_HEIGHT - zone.maxRadius, zone.driftPosition.y));
+      // No drift - smoke stays at original position
+      // driftPosition remains unchanged from initial position
     }
     
     // Remove expired zones
