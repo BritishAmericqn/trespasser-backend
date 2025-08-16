@@ -61,6 +61,27 @@ class GameRoom {
         // CRITICAL: Join the socket to this room so they receive broadcasts
         socket.join(this.id);
         const playerState = this.gameState.createPlayer(socket.id);
+        // Handle late joiners to games in progress
+        if (this.status === 'playing') {
+            console.log(`⚡ Player ${socket.id} joining game in progress`);
+            // Send match_started event so they know game is active
+            socket.emit('match_started', {
+                lobbyId: this.id,
+                startTime: this.matchStartTime,
+                killTarget: this.killTarget,
+                isLateJoin: true
+            });
+            // Find safe spawn point away from enemies
+            const safeSpawn = this.gameState.findSafeSpawnPoint(playerState.team);
+            if (safeSpawn) {
+                playerState.transform.position = safeSpawn;
+                console.log(`🛡️ Late joiner ${socket.id} spawned at safe location:`, safeSpawn);
+            }
+            // Give brief spawn protection (3 seconds)
+            playerState.spawnProtection = 3000;
+            playerState.spawnProtectionStart = Date.now();
+            console.log(`🛡️ Late joiner ${socket.id} given 3 seconds spawn protection`);
+        }
         // Send initial filtered state to the joining player
         const filteredState = this.gameState.getFilteredGameState(socket.id);
         console.log(`📤 Sending initial game state to ${socket.id}:`, {

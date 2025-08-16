@@ -258,7 +258,9 @@ export class LobbyManager {
           lobbyId: lobbyId,
           playerCount: currentPlayerCount,
           maxPlayers: lobby.getMaxPlayers(),
-          status: 'waiting'
+          status: lobby.getStatus(),  // FIX: Use actual status instead of hardcoded 'waiting'
+          gameMode: lobby.getGameMode(),
+          isInProgress: lobby.getStatus() === 'playing'
         });
         
         // If a match is already starting, notify the new player
@@ -337,6 +339,55 @@ export class LobbyManager {
       }
     }
     return lobbies;
+  }
+  
+  /**
+   * Get joinable lobbies based on filters for server browser
+   */
+  getJoinableLobbies(filters?: {
+    showPrivate?: boolean;
+    showFull?: boolean;
+    showInProgress?: boolean;
+    gameMode?: string;
+  }): LobbyInfo[] {
+    const joinableLobbies: LobbyInfo[] = [];
+    
+    for (const [lobbyId, lobby] of this.lobbies) {
+      const info = this.getLobbyInfo(lobbyId);
+      if (!info) continue;
+      
+      // Apply filters if provided
+      if (filters) {
+        // Skip private lobbies unless explicitly requested
+        if (!filters.showPrivate && info.isPrivate) continue;
+        
+        // Skip full lobbies unless explicitly requested
+        if (!filters.showFull && info.playerCount >= info.maxPlayers) continue;
+        
+        // Skip in-progress games unless explicitly requested
+        if (!filters.showInProgress && info.status === 'playing') continue;
+        
+        // Filter by game mode if specified
+        if (filters.gameMode && info.gameMode !== filters.gameMode) continue;
+      } else {
+        // Default filters: show only public, not-full, not-finished lobbies
+        if (info.isPrivate) continue;
+        if (info.playerCount >= info.maxPlayers) continue;
+        if (info.status === 'finished') continue;
+      }
+      
+      joinableLobbies.push(info);
+    }
+    
+    // Sort by: waiting games first, then by player count (fuller lobbies first for better matchmaking)
+    return joinableLobbies.sort((a, b) => {
+      // Prioritize waiting lobbies
+      if (a.status === 'waiting' && b.status !== 'waiting') return -1;
+      if (b.status === 'waiting' && a.status !== 'waiting') return 1;
+      
+      // Then sort by player count (higher is better for quick matches)
+      return b.playerCount - a.playerCount;
+    });
   }
   
   /**

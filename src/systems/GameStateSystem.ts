@@ -1681,6 +1681,59 @@ export class GameStateSystem {
     return this.destructionSystem;
   }
   
+  /**
+   * Find a safe spawn point for late-joining players
+   */
+  findSafeSpawnPoint(team: string): { x: number; y: number } | null {
+    // Define spawn points based on team
+    const spawnPoints = team === 'red' 
+      ? [
+          { x: 50, y: 50 },    // Top-left area
+          { x: 100, y: 50 },
+          { x: 50, y: 100 }
+        ]
+      : [
+          { x: 430, y: 220 },  // Bottom-right area
+          { x: 380, y: 220 },
+          { x: 430, y: 170 }
+        ];
+    
+    // Get all alive enemies
+    const enemies = Object.values(this.players).filter(p => 
+      p.team !== team && p.isAlive
+    );
+    
+    // If no enemies, return default spawn
+    if (enemies.length === 0) {
+      return spawnPoints[0];
+    }
+    
+    // Find spawn point furthest from all enemies
+    let bestSpawn = spawnPoints[0];
+    let maxMinDistance = 0;
+    
+    for (const spawn of spawnPoints) {
+      // Calculate minimum distance to any enemy
+      let minDistance = Infinity;
+      for (const enemy of enemies) {
+        const distance = Math.hypot(
+          spawn.x - enemy.transform.position.x,
+          spawn.y - enemy.transform.position.y
+        );
+        minDistance = Math.min(minDistance, distance);
+      }
+      
+      // Track the spawn with the maximum "minimum distance" (furthest from nearest enemy)
+      if (minDistance > maxMinDistance) {
+        maxMinDistance = minDistance;
+        bestSpawn = spawn;
+      }
+    }
+    
+    console.log(`🎯 Found safe spawn for ${team} team: ${bestSpawn.x}, ${bestSpawn.y} (min distance from enemies: ${maxMinDistance.toFixed(0)})`);
+    return bestSpawn;
+  }
+  
   // Get filtered game state for a specific player based on vision
   getFilteredGameState(playerId: string): GameState {
     // Vision can be disabled via config

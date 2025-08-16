@@ -297,6 +297,35 @@ function setupMatchmakingHandlers(socket: any) {
     lobbyManager.removePlayerFromLobby(socket.id);
   });
   
+  // Get lobby list handler - NEW for server browser
+  socket.on('get_lobby_list', async (filters?: {
+    showPrivate?: boolean;
+    showFull?: boolean;
+    showInProgress?: boolean;
+    gameMode?: string;
+  }) => {
+    if (!lobbyManager) {
+      socket.emit('lobby_list', { error: 'Server not ready', lobbies: [] });
+      return;
+    }
+    
+    console.log(`🔍 Player ${socket.id.substring(0, 8)} requesting lobby list with filters:`, filters);
+    
+    try {
+      const lobbies = lobbyManager.getJoinableLobbies(filters);
+      socket.emit('lobby_list', { 
+        lobbies: lobbies,
+        totalCount: lobbies.length,
+        timestamp: Date.now() 
+      });
+      
+      console.log(`📋 Sent ${lobbies.length} lobbies to ${socket.id.substring(0, 8)}`);
+    } catch (error) {
+      console.error(`❌ Error getting lobby list for ${socket.id}:`, error);
+      socket.emit('lobby_list', { error: 'Failed to get lobby list', lobbies: [] });
+    }
+  });
+  
   // Admin force start match handler - for test/debug purposes
   socket.on('admin:force_start_match', (data: { lobbyId: string; reason?: string }) => {
     if (!lobbyManager) {
