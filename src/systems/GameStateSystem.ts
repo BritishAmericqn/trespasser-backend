@@ -327,42 +327,64 @@ export class GameStateSystem {
     console.log(`🧹 [CLEANUP] Player ${id.substring(0, 8)} completely removed with all associated state`);
   }
   
-  // Respawn player at correct team spawn position
+  // Respawn player at correct team spawn position - CRITICAL FIX: Never use (0,0)
   respawnPlayerAtTeamSpawn(playerId: string): void {
     const player = this.players.get(playerId);
     if (!player) return;
     
-    // 🎨 DEBUG: Verify team persistence
-    console.log(`🎨 [TEAM SPAWN] Player ${playerId.substring(0, 8)} respawning:`);
+    console.log(`🎯 [TEAM SPAWN] Player ${playerId.substring(0, 8)} respawning:`);
     console.log(`   Stored team: ${player.team}`);
     console.log(`   Available spawns: Red=${this.spawnPositions.red.length}, Blue=${this.spawnPositions.blue.length}`);
     
+    // Use hardcoded safe spawn positions if map spawns unavailable
+    let spawnPosition: Vector2;
+    
     const teamSpawns = this.spawnPositions[player.team];
     if (teamSpawns && teamSpawns.length > 0) {
-      // Pick a random spawn from team spawns
+      // Use map-based spawn positions
       const spawn = teamSpawns[Math.floor(Math.random() * teamSpawns.length)];
-      player.transform.position = { x: spawn.x, y: spawn.y };
-      
-      // Update physics body position
-      const body = this.playerBodies.get(playerId);
-      if (body) {
-        Matter.Body.setPosition(body, { x: spawn.x, y: spawn.y });
-      }
-      
-      console.log(`🎯 Respawned ${playerId.substring(0, 8)} at team ${player.team} spawn: (${spawn.x}, ${spawn.y})`);
+      spawnPosition = { x: spawn.x, y: spawn.y };
+      console.log(`   ✅ Using map spawn: (${spawnPosition.x}, ${spawnPosition.y})`);
     } else {
-      console.warn(`⚠️ No ${player.team} team spawns available for player ${playerId.substring(0, 8)}`);
+      // Use fallback spawn positions - NEVER (0,0)
+      if (player.team === 'red') {
+        spawnPosition = { x: 50, y: 135 }; // Left side
+      } else {
+        spawnPosition = { x: 430, y: 135 }; // Right side
+      }
+      console.log(`   ⚠️ Using fallback ${player.team} spawn: (${spawnPosition.x}, ${spawnPosition.y})`);
     }
+    
+    // CRITICAL: Validate spawn position is never (0,0)
+    if (spawnPosition.x === 0 && spawnPosition.y === 0) {
+      console.error(`❌ INVALID SPAWN POSITION (0,0) for player ${playerId}`);
+      spawnPosition = player.team === 'red' ? { x: 50, y: 135 } : { x: 430, y: 135 };
+      console.log(`   🔧 Corrected to safe position: (${spawnPosition.x}, ${spawnPosition.y})`);
+    }
+    
+    player.transform.position = spawnPosition;
+    
+    // Update physics body position
+    const body = this.playerBodies.get(playerId);
+    if (body) {
+      Matter.Body.setPosition(body, spawnPosition);
+    }
+    
+    console.log(`🎯 Respawned ${playerId.substring(0, 8)} at team ${player.team} spawn: (${spawnPosition.x}, ${spawnPosition.y})`);
   }
   
-  // Handle player respawning
+  // Handle player respawning - AUTO-RESPAWN DISABLED
   private handleRespawning(): void {
-    const now = Date.now();
+    // CRITICAL FIX: Remove auto-respawn logic
+    // Players must manually request respawn via 'player:respawn' event
+    // This prevents players from auto-respawning without frontend consent
     
+    // Optional: Clean up expired death timers for tracking purposes only
+    const now = Date.now();
     for (const [playerId, player] of this.players) {
-      if (!player.isAlive && player.respawnTime && now >= player.respawnTime) {
-        // Time to respawn
-        this.respawnPlayer(playerId);
+      if (!player.isAlive && player.deathTime) {
+        // Track death time but don't auto-respawn
+        // Client must explicitly send 'player:respawn' request
       }
     }
   }
@@ -387,12 +409,13 @@ export class GameStateSystem {
     
     console.log(`�� Player ${playerId.substring(0, 8)} respawned with ${GAME_CONFIG.DEATH.INVULNERABILITY_TIME}ms invulnerability`);
     
-    // Queue respawn event
+    // Queue respawn event with correct backend prefix
     this.pendingDeathEvents.push({
-      type: EVENTS.PLAYER_RESPAWNED,
+      type: 'backend:player:respawned', // CRITICAL FIX: Use backend prefix for frontend compatibility
       data: {
         playerId: player.id,
         position: { ...player.transform.position },
+        health: player.health, // CRITICAL FIX: Include health in respawn event
         team: player.team,
         invulnerableUntil: player.invulnerableUntil,
         timestamp: now
@@ -1143,24 +1166,32 @@ export class GameStateSystem {
       
       console.log(`💀 Player ${player.id.substring(0, 8)} killed by ${sourcePlayerId.substring(0, 8)} - respawn in ${GAME_CONFIG.DEATH.RESPAWN_DELAY}ms`);
       
-      // Queue death event
+      // Queue enhanced death event with kill attribution details
+      const killer = this.players.get(sourcePlayerId);
       this.pendingDeathEvents.push({
-        type: EVENTS.PLAYER_DIED,
+        type: 'backend:player:died', // CRITICAL FIX: Use backend prefix for frontend compatibility
         data: {
-          playerId: player.id,
+          playerId: player.id, // CONSISTENT: Always use playerId for victim
           killerId: sourcePlayerId,
+          killerTeam: killer?.team || 'unknown',
+          victimTeam: player.team,
+          weaponType: killer?.weaponId || 'unknown',
+          isTeamKill: killer?.team === player.team,
           position: { ...position },
           damageType,
-          team: player.team, // 🎨 Include team for frontend team damage rules
           timestamp: now
         }
       });
       
-      // Award kill to source player
-      const killer = this.players.get(sourcePlayerId);
+      // Award kill to source player (only for enemy team eliminations)
       if (killer && killer.id !== player.id) {
-        killer.kills++;
-        console.log(`🎯 Kill credit: ${sourcePlayerId.substring(0, 8)} now has ${killer.kills} kills`);
+        // ✅ CRITICAL FIX: Only count kills against opposing team
+        if (killer.team !== player.team) {
+          killer.kills++;
+          console.log(`🎯 Kill credit: ${killer.team} player ${sourcePlayerId.substring(0, 8)} eliminated ${player.team} player ${player.id.substring(0, 8)} - Kills: ${killer.kills}`);
+        } else {
+          console.log(`⚠️ Team kill ignored: ${killer.team} player ${sourcePlayerId.substring(0, 8)} killed teammate ${player.id.substring(0, 8)}`);
+        }
       }
     }
     
@@ -1621,7 +1652,7 @@ export class GameStateSystem {
         rotation: player.transform.rotation,
         scale: player.transform.scale,
         velocity: player.velocity,
-        health: player.health,
+        health: player.isAlive ? player.health : 0, // CRITICAL FIX: Force 0 health when dead
         armor: player.armor,
         team: player.team,
         weaponId: player.weaponId,
@@ -1772,7 +1803,7 @@ export class GameStateSystem {
         rotation: p.transform.rotation,
         scale: p.transform.scale,
         velocity: p.velocity,
-        health: p.health,
+        health: p.isAlive ? p.health : 0, // CRITICAL FIX: Force 0 health when dead
         armor: p.armor,
         team: p.team,
         weaponId: p.weaponId,

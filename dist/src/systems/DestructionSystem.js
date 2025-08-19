@@ -29,20 +29,34 @@ class DestructionSystem {
         const mapFile = process.env.MAP_FILE || process.env.LOAD_MAP;
         if (mapFile) {
             try {
+                console.log(`🗺️ Attempting to load map file: ${mapFile}`);
                 const mapLoader = new MapLoader_1.MapLoader(this);
-                await mapLoader.loadMapFromFile(mapFile);
+                // Add timeout to prevent hanging in Railway
+                const mapLoadPromise = mapLoader.loadMapFromFile(mapFile);
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Map loading timeout')), 15000); // 15 second timeout
+                });
+                await Promise.race([mapLoadPromise, timeoutPromise]);
                 // Store spawn positions from the map
                 this.spawnPositions = mapLoader.getSpawnPositions();
                 this.teamSpawnPositions = mapLoader.getTeamSpawnPositions();
-                console.log(`📍 Loaded spawn positions - Red: ${this.teamSpawnPositions.red.length}, Blue: ${this.teamSpawnPositions.blue.length}`);
+                console.log(`✅ Map loaded successfully - Red spawns: ${this.teamSpawnPositions.red.length}, Blue spawns: ${this.teamSpawnPositions.blue.length}`);
             }
             catch (error) {
-                console.error(`Failed to load map file, falling back to test walls:`, error);
+                console.error(`❌ Failed to load map file '${mapFile}', falling back to test walls:`, error);
+                console.error(`   This is common in Railway deployments due to file system differences`);
+                console.error(`   Error details:`, error instanceof Error ? error.message : String(error));
+                // CRITICAL: Always fall back to test walls to prevent crashes
                 this.initializeTestWalls();
+                // Log environment info for debugging Railway issues
+                console.log(`🔍 Environment info:`);
+                console.log(`   NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
+                console.log(`   Working directory: ${process.cwd()}`);
+                console.log(`   __dirname: ${__dirname}`);
             }
         }
         else {
-            console.log('📍 No map file specified, using test walls');
+            console.log('📍 No map file specified, using test walls (recommended for Railway)');
             this.initializeTestWalls();
         }
     }

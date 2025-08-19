@@ -48,6 +48,18 @@ class GameRoom {
         }
         catch (error) {
             console.error('❌ Failed to initialize GameRoom:', error);
+            // RAILWAY FIX: Set initialized to true even on map loading failure
+            // This prevents the room from being stuck in uninitialized state
+            // The DestructionSystem already falls back to test walls on map loading failure
+            this.initialized = true;
+            console.log('⚠️ GameRoom initialized with fallback configuration (test walls)');
+            this.startGameLoop();
+            // Log error details for Railway debugging
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (errorMessage?.includes('ENOENT') || errorMessage?.includes('map')) {
+                console.error(`   💡 Map loading failed in Railway - this is expected if MAP_FILE is set but maps/ folder not accessible`);
+                console.error(`   💡 Recommendation: Don't set MAP_FILE environment variable in Railway to use test walls`);
+            }
         }
     }
     addPlayer(socket) {
@@ -396,21 +408,50 @@ class GameRoom {
             // console.log(`👋 Player ${socket.id} left the game`);
             this.removePlayer(socket.id);
         });
-        // Manual respawn handler
+        // Manual respawn handler - CRITICAL FIX: Complete rewrite
         socket.on('player:respawn', () => {
             const player = this.gameState.getPlayer(socket.id);
-            if (player && !player.isAlive && player.deathTime) {
-                const now = Date.now();
-                const timeSinceDeath = now - player.deathTime;
-                // Allow respawn after minimum death time
-                if (timeSinceDeath >= constants_1.GAME_CONFIG.DEATH.DEATH_CAM_DURATION) {
-                    console.log(`🔄 Manual respawn requested by ${socket.id.substring(0, 8)}`);
-                    this.gameState.respawnPlayer(socket.id);
+            if (!player || player.isAlive) {
+                console.log(`⚠️ Invalid respawn request from ${socket.id} - player alive or not found`);
+                return;
+            }
+            if (!player.deathTime) {
+                console.log(`⚠️ Invalid respawn request from ${socket.id} - no death time recorded`);
+                return;
+            }
+            const now = Date.now();
+            const timeSinceDeath = now - player.deathTime;
+            // Allow respawn after minimum death time
+            if (timeSinceDeath >= constants_1.GAME_CONFIG.DEATH.DEATH_CAM_DURATION) {
+                console.log(`🔄 Manual respawn requested by ${socket.id.substring(0, 8)}`);
+                // Respawn the player
+                this.gameState.respawnPlayer(socket.id);
+                // CRITICAL FIX: Send respawn event DIRECTLY to client immediately
+                const respawnedPlayer = this.gameState.getPlayer(socket.id);
+                if (respawnedPlayer) {
+                    const respawnEvent = {
+                        playerId: socket.id,
+                        position: respawnedPlayer.transform.position,
+                        health: respawnedPlayer.health,
+                        team: respawnedPlayer.team,
+                        invulnerableUntil: respawnedPlayer.invulnerableUntil,
+                        timestamp: now
+                    };
+                    // Send to requesting client
+                    socket.emit('backend:player:respawned', respawnEvent);
+                    // Broadcast to other players in lobby
+                    socket.broadcast.to(this.id).emit('backend:player:respawned', respawnEvent);
+                    console.log(`✅ Respawn event sent for ${socket.id.substring(0, 8)} at position (${respawnEvent.position.x}, ${respawnEvent.position.y})`);
                 }
-                else {
-                    const remainingTime = constants_1.GAME_CONFIG.DEATH.DEATH_CAM_DURATION - timeSinceDeath;
-                    console.log(`⏰ Respawn denied for ${socket.id.substring(0, 8)} - ${remainingTime}ms remaining`);
-                }
+            }
+            else {
+                const remainingTime = constants_1.GAME_CONFIG.DEATH.DEATH_CAM_DURATION - timeSinceDeath;
+                console.log(`⏰ Respawn denied for ${socket.id.substring(0, 8)} - ${remainingTime}ms remaining`);
+                // CRITICAL FIX: Send denial response to client
+                socket.emit('backend:respawn:denied', {
+                    remainingTime: remainingTime,
+                    timestamp: now
+                });
             }
         });
         // Debug events (for testing)

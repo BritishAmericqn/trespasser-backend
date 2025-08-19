@@ -99,14 +99,28 @@ export class LobbyManager {
           return null;
         }
         
-        const lobbyId = this.generateLobbyId(gameMode);
-        targetLobby = new GameRoom(lobbyId, this.io);
-        this.lobbies.set(lobbyId, targetLobby);
-        
-        console.log(`🆕 Created new lobby ${lobbyId} for gameMode: ${gameMode}, isPrivate: ${isPrivate}`);
-        
-        // Set up lobby-specific event handlers
-        this.setupLobbyEventHandlers(targetLobby);
+        try {
+          const lobbyId = this.generateLobbyId(gameMode);
+          
+          // RAILWAY FIX: Wrap GameRoom creation in proper error handling
+          // to prevent crashes from initialization failures
+          targetLobby = new GameRoom(lobbyId, this.io);
+          this.lobbies.set(lobbyId, targetLobby);
+          
+          console.log(`🆕 Created new lobby ${lobbyId} for gameMode: ${gameMode}, isPrivate: ${isPrivate}`);
+          
+          // Set up lobby-specific event handlers
+          this.setupLobbyEventHandlers(targetLobby);
+          
+        } catch (error) {
+          console.error(`❌ Failed to create GameRoom:`, error);
+          // Provide helpful error message for Railway debugging
+          if (error instanceof Error && (error.message?.includes('ENOENT') || error.message?.includes('map'))) {
+            console.error(`   💡 This is likely a map loading issue in Railway - ensure MAP_FILE is not set or maps are accessible`);
+          }
+          socket.emit('matchmaking_failed', { reason: 'Failed to create game room' });
+          return null;
+        }
       }
       
       // Add player to lobby

@@ -564,6 +564,22 @@ initializeServer().then(() => {
         console.log('💡 SERVER STATUS: READY TO ACCEPT CONNECTIONS (LIMITED MODE)');
     });
 });
+// RAILWAY FIX: Handle unhandled promise rejections to prevent crashes
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('🚨 Unhandled Promise Rejection:', reason);
+    console.error('   Promise:', promise);
+    console.error('   This is likely a GameRoom initialization failure in Railway');
+    // Don't exit the process - this would crash the server
+    // Instead, log the error and continue running
+});
+process.on('uncaughtException', (error) => {
+    console.error('🚨 Uncaught Exception:', error);
+    console.error('   This is a critical error that could crash the server');
+    // For Railway, try to stay alive if possible
+    setTimeout(() => {
+        console.log('🔄 Attempting to continue after uncaught exception...');
+    }, 1000);
+});
 // Graceful shutdown
 process.on('SIGINT', () => {
     console.log('\n🛑 Server shutting down (SIGINT)...');
