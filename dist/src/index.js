@@ -61,7 +61,8 @@ app.use((req, res, next) => {
 // Configuration
 const GAME_PASSWORD = process.env.GAME_PASSWORD || '';
 const REQUIRE_PASSWORD = false; // Disabled global password - use private lobbies instead
-const MAX_PLAYERS = parseInt(process.env.MAX_PLAYERS || '8');
+// Removed global MAX_PLAYERS limit - each lobby has its own limit
+// const MAX_PLAYERS = parseInt(process.env.MAX_PLAYERS || '8');
 // Use Railway's assigned PORT
 const PORT = parseInt(process.env.PORT || '3000');
 // Debug Railway port configuration
@@ -194,13 +195,8 @@ io.on('connection', (socket) => {
             handler(...args);
         });
     };
-    // Check player limit
-    if (authenticatedPlayers.size >= MAX_PLAYERS) {
-        socket.emit('error', 'Server is full');
-        socket.disconnect();
-        console.log(`❌ Server full, rejected ${ip}`);
-        return;
-    }
+    // No global player limit - each lobby manages its own player count
+    // Multi-lobby architecture allows many concurrent matches
     if (REQUIRE_PASSWORD) {
         // Set authentication timeout (increased from 5s to 30s for debugging)
         const timeout = setTimeout(() => {
@@ -513,7 +509,7 @@ initializeServer().then(() => {
         console.log('='.repeat(50));
         console.log(`🚀 Status: ONLINE`);
         console.log(`🔧 Port: ${PORT}`);
-        console.log(`👥 Max Players: ${MAX_PLAYERS}`);
+        console.log(`👥 Max Players: 8 per lobby, unlimited lobbies`);
         console.log(`🔐 Password: ${REQUIRE_PASSWORD ? '✅ Required' : '❌ Not required'}`);
         if (REQUIRE_PASSWORD) {
             console.log(`🔑 Password: "${GAME_PASSWORD}"`);

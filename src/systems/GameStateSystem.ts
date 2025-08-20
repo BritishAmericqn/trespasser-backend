@@ -389,10 +389,10 @@ export class GameStateSystem {
     }
   }
   
-  // Respawn a dead player
-  respawnPlayer(playerId: string): void {
+  // Respawn a dead player - returns respawn data for immediate event emission
+  respawnPlayer(playerId: string): any {
     const player = this.players.get(playerId);
-    if (!player || player.isAlive) return;
+    if (!player || player.isAlive) return null;
     
     const now = Date.now();
     
@@ -409,18 +409,16 @@ export class GameStateSystem {
     
     console.log(`�� Player ${playerId.substring(0, 8)} respawned with ${GAME_CONFIG.DEATH.INVULNERABILITY_TIME}ms invulnerability`);
     
-    // Queue respawn event with correct backend prefix
-    this.pendingDeathEvents.push({
-      type: 'backend:player:respawned', // CRITICAL FIX: Use backend prefix for frontend compatibility
-      data: {
-        playerId: player.id,
-        position: { ...player.transform.position },
-        health: player.health, // CRITICAL FIX: Include health in respawn event
-        team: player.team,
-        invulnerableUntil: player.invulnerableUntil,
-        timestamp: now
-      }
-    });
+    // Return respawn data for immediate emission (GameRoom will send the event)
+    // Don't queue it here to avoid duplicate events
+    return {
+      playerId: player.id,
+      position: { ...player.transform.position },
+      health: player.health,
+      team: player.team,
+      invulnerableUntil: player.invulnerableUntil,
+      timestamp: now
+    };
   }
   
   // Debug method to kill a player for testing
@@ -771,8 +769,9 @@ export class GameStateSystem {
                 events.push({ type: EVENTS.PLAYER_DAMAGED, data: damageEvent });
                 
                 if (damageEvent.isKilled) {
-                  player.kills++;
-                  events.push({ type: EVENTS.PLAYER_KILLED, data: damageEvent });
+                  // ✅ CRITICAL FIX: Don't send PLAYER_KILLED event - backend:player:died is already sent by applyPlayerDamage
+                  // Removing duplicate kill event to prevent double-counting
+                  // events.push({ type: EVENTS.PLAYER_KILLED, data: damageEvent });
                 }
               }
               
@@ -888,8 +887,9 @@ export class GameStateSystem {
                   events.push({ type: EVENTS.PLAYER_DAMAGED, data: damageEvent });
                 
                   if (damageEvent.isKilled) {
-                    player.kills++;
-                    events.push({ type: EVENTS.PLAYER_KILLED, data: damageEvent });
+                    // ✅ CRITICAL FIX: Don't send PLAYER_KILLED event - backend:player:died is already sent by applyPlayerDamage
+                    // Removing duplicate kill event to prevent double-counting
+                    // events.push({ type: EVENTS.PLAYER_KILLED, data: damageEvent });
                   }
                 }
               } else if (hit.targetType === 'wall' && hit.wallSliceIndex !== undefined) {
@@ -1647,6 +1647,7 @@ export class GameStateSystem {
       
       playersObject[id] = {
         id: player.id,
+        name: player.name, // Include player name
         // CRITICAL: Flatten transform for frontend compatibility
         position: player.transform.position,
         rotation: player.transform.rotation,
@@ -1798,6 +1799,7 @@ export class GameStateSystem {
       
       visiblePlayersObject[pid] = {
         id: p.id,
+        name: p.name, // Include player name
         // CRITICAL: Flatten transform for frontend compatibility
         position: p.transform.position,
         rotation: p.transform.rotation,

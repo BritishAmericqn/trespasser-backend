@@ -252,6 +252,16 @@ class GameRoom {
                 console.error(`💥 Still can't find player after creation attempt`);
                 return;
             }
+            // Set player name if provided
+            if (data.playerName) {
+                player.name = data.playerName;
+                console.log(`👤 Player ${socket.id.substring(0, 8)} name set to: ${data.playerName}`);
+            }
+            else {
+                // Generate a default name if none provided
+                player.name = `Player ${socket.id.substring(0, 8)}`;
+                console.log(`👤 Player ${socket.id.substring(0, 8)} using generated name: ${player.name}`);
+            }
             // Set player team
             if (data.loadout.team) {
                 const previousTeam = player.team;
@@ -424,24 +434,15 @@ class GameRoom {
             // Allow respawn after minimum death time
             if (timeSinceDeath >= constants_1.GAME_CONFIG.DEATH.DEATH_CAM_DURATION) {
                 console.log(`🔄 Manual respawn requested by ${socket.id.substring(0, 8)}`);
-                // Respawn the player
-                this.gameState.respawnPlayer(socket.id);
-                // CRITICAL FIX: Send respawn event DIRECTLY to client immediately
-                const respawnedPlayer = this.gameState.getPlayer(socket.id);
-                if (respawnedPlayer) {
-                    const respawnEvent = {
-                        playerId: socket.id,
-                        position: respawnedPlayer.transform.position,
-                        health: respawnedPlayer.health,
-                        team: respawnedPlayer.team,
-                        invulnerableUntil: respawnedPlayer.invulnerableUntil,
-                        timestamp: now
-                    };
+                // Respawn the player and get respawn data
+                const respawnData = this.gameState.respawnPlayer(socket.id);
+                // CRITICAL FIX: Send respawn event immediately
+                if (respawnData) {
                     // Send to requesting client
-                    socket.emit('backend:player:respawned', respawnEvent);
+                    socket.emit('backend:player:respawned', respawnData);
                     // Broadcast to other players in lobby
-                    socket.broadcast.to(this.id).emit('backend:player:respawned', respawnEvent);
-                    console.log(`✅ Respawn event sent for ${socket.id.substring(0, 8)} at position (${respawnEvent.position.x}, ${respawnEvent.position.y})`);
+                    socket.broadcast.to(this.id).emit('backend:player:respawned', respawnData);
+                    console.log(`✅ Respawn event sent for ${socket.id.substring(0, 8)} at position (${respawnData.position.x}, ${respawnData.position.y})`);
                 }
             }
             else {
@@ -530,6 +531,130 @@ class GameRoom {
             else {
                 console.error(`❌ Player ${socket.id} not found for team verification`);
             }
+        });
+        // Add debug match end support
+        socket.on('debug:trigger_match_end', (data) => {
+            console.log(`🧪 [DEBUG] Manual match end triggered by ${socket.id.substring(0, 8)}`, data);
+            if (this.status !== 'playing') {
+                console.log(`⚠️ Cannot trigger match end - lobby status is '${this.status}'`);
+                socket.emit('debug:match_end_failed', { reason: `Lobby status is '${this.status}', must be 'playing'` });
+                return;
+            }
+            // Get current kill counts
+            const players = this.gameState.getPlayers();
+            let redKills = 0;
+            let blueKills = 0;
+            for (const [playerId, playerState] of players) {
+                if (playerState.team === 'red') {
+                    redKills += playerState.kills;
+                }
+                else if (playerState.team === 'blue') {
+                    blueKills += playerState.kills;
+                }
+            }
+            // Force end the match with current scores
+            console.log(`🧪 [DEBUG] Force ending match - Red: ${redKills}, Blue: ${blueKills}`);
+            this.endMatch(redKills, blueKills);
+            socket.emit('debug:match_end_triggered', {
+                redKills,
+                blueKills,
+                reason: 'Debug command'
+            });
+        });
+        // Also listen for variant name (frontend might try multiple)
+        socket.on('debug:triggerMatchEnd', (data) => {
+            console.log(`🧪 [DEBUG] Manual match end triggered (variant) by ${socket.id.substring(0, 8)}`, data);
+            if (this.status !== 'playing') {
+                console.log(`⚠️ Cannot trigger match end - lobby status is '${this.status}'`);
+                socket.emit('debug:match_end_failed', { reason: `Lobby status is '${this.status}', must be 'playing'` });
+                return;
+            }
+            // Force red team to win
+            const players = this.gameState.getPlayers();
+            let redKills = 50;
+            let blueKills = 0;
+            // Force end the match
+            console.log(`🧪 [DEBUG] Force ending match - Red: ${redKills}, Blue: ${blueKills}`);
+            this.endMatch(redKills, blueKills);
+            socket.emit('debug:match_end_triggered', {
+                success: true,
+                winner: 'red',
+                redKills,
+                blueKills,
+                reason: 'Debug command (variant)'
+            });
+        });
+        // Add debug match state support
+        socket.on('debug:request_match_state', (data) => {
+            console.log(`🧪 [DEBUG] Match state requested by ${socket.id.substring(0, 8)}`);
+            const players = this.gameState.getPlayers();
+            let redKills = 0;
+            let blueKills = 0;
+            const playerStats = [];
+            for (const [playerId, playerState] of players) {
+                if (playerState.team === 'red') {
+                    redKills += playerState.kills;
+                }
+                else if (playerState.team === 'blue') {
+                    blueKills += playerState.kills;
+                }
+                playerStats.push({
+                    playerId: playerId,
+                    playerName: playerState.name || `Player ${playerId.substring(0, 8)}`,
+                    team: playerState.team,
+                    kills: playerState.kills,
+                    deaths: playerState.deaths,
+                    isAlive: playerState.isAlive
+                });
+            }
+            socket.emit('debug:match_state', {
+                lobbyId: this.id,
+                status: this.status,
+                playerCount: this.players.size,
+                redKills: redKills,
+                blueKills: blueKills,
+                killTarget: this.killTarget,
+                matchStartTime: this.matchStartTime,
+                currentTime: Date.now(),
+                players: playerStats
+            });
+            console.log(`🧪 [DEBUG] Sent match state - Status: ${this.status}, Red: ${redKills}, Blue: ${blueKills}`);
+        });
+        // Also listen for variant name for match state
+        socket.on('debug:requestMatchState', (data) => {
+            console.log(`🧪 [DEBUG] Match state requested (variant) by ${socket.id.substring(0, 8)}`);
+            const players = this.gameState.getPlayers();
+            let redKills = 0;
+            let blueKills = 0;
+            const playerStats = [];
+            for (const [playerId, playerState] of players) {
+                if (playerState.team === 'red') {
+                    redKills += playerState.kills;
+                }
+                else if (playerState.team === 'blue') {
+                    blueKills += playerState.kills;
+                }
+                playerStats.push({
+                    playerId: playerId,
+                    playerName: playerState.name || `Player ${playerId.substring(0, 8)}`,
+                    team: playerState.team,
+                    kills: playerState.kills,
+                    deaths: playerState.deaths,
+                    isAlive: playerState.isAlive
+                });
+            }
+            socket.emit('debug:match_state', {
+                lobbyId: this.id,
+                status: this.status,
+                playerCount: this.players.size,
+                redKills: redKills,
+                blueKills: blueKills,
+                killTarget: this.killTarget,
+                matchStartTime: this.matchStartTime,
+                currentTime: Date.now(),
+                players: playerStats
+            });
+            console.log(`🧪 [DEBUG] Sent match state (variant) - Status: ${this.status}, Red: ${redKills}, Blue: ${blueKills}`);
         });
         // Listen for any events for debugging
         socket.onAny((eventName, ...args) => {
@@ -769,7 +894,7 @@ class GameRoom {
         for (const [playerId, playerState] of this.gameState.getPlayers()) {
             playerStats.push({
                 playerId: playerId,
-                playerName: `Player ${playerId.substring(0, 8)}`, // TODO: Add player names to PlayerState
+                playerName: playerState.name || `Player ${playerId.substring(0, 8)}`, // Use actual player name
                 team: playerState.team,
                 kills: playerState.kills,
                 deaths: playerState.deaths,
@@ -782,6 +907,7 @@ class GameRoom {
             redKills,
             blueKills,
             duration: matchDuration,
+            killTarget: this.killTarget,
             playerStats
         };
         console.log(`🏁 Match ended in lobby ${this.id} - Winner: ${winnerTeam} (${redKills} vs ${blueKills} kills)`);

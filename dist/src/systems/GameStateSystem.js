@@ -328,11 +328,11 @@ class GameStateSystem {
             }
         }
     }
-    // Respawn a dead player
+    // Respawn a dead player - returns respawn data for immediate event emission
     respawnPlayer(playerId) {
         const player = this.players.get(playerId);
         if (!player || player.isAlive)
-            return;
+            return null;
         const now = Date.now();
         // Reset player state
         player.isAlive = true;
@@ -344,18 +344,16 @@ class GameStateSystem {
         // Respawn at team spawn
         this.respawnPlayerAtTeamSpawn(playerId);
         console.log(`�� Player ${playerId.substring(0, 8)} respawned with ${constants_1.GAME_CONFIG.DEATH.INVULNERABILITY_TIME}ms invulnerability`);
-        // Queue respawn event with correct backend prefix
-        this.pendingDeathEvents.push({
-            type: 'backend:player:respawned', // CRITICAL FIX: Use backend prefix for frontend compatibility
-            data: {
-                playerId: player.id,
-                position: { ...player.transform.position },
-                health: player.health, // CRITICAL FIX: Include health in respawn event
-                team: player.team,
-                invulnerableUntil: player.invulnerableUntil,
-                timestamp: now
-            }
-        });
+        // Return respawn data for immediate emission (GameRoom will send the event)
+        // Don't queue it here to avoid duplicate events
+        return {
+            playerId: player.id,
+            position: { ...player.transform.position },
+            health: player.health,
+            team: player.team,
+            invulnerableUntil: player.invulnerableUntil,
+            timestamp: now
+        };
     }
     // Debug method to kill a player for testing
     debugKillPlayer(playerId) {
@@ -642,8 +640,9 @@ class GameStateSystem {
                                 const damageEvent = this.applyPlayerDamage(targetPlayer, damagePerPellet, 'bullet', event.playerId, hit.hitPoint);
                                 events.push({ type: constants_1.EVENTS.PLAYER_DAMAGED, data: damageEvent });
                                 if (damageEvent.isKilled) {
-                                    player.kills++;
-                                    events.push({ type: constants_1.EVENTS.PLAYER_KILLED, data: damageEvent });
+                                    // ✅ CRITICAL FIX: Don't send PLAYER_KILLED event - backend:player:died is already sent by applyPlayerDamage
+                                    // Removing duplicate kill event to prevent double-counting
+                                    // events.push({ type: EVENTS.PLAYER_KILLED, data: damageEvent });
                                 }
                             }
                             // Send weapon:hit event for frontend trail
@@ -740,8 +739,9 @@ class GameStateSystem {
                                 const damageEvent = this.applyPlayerDamage(targetPlayer, hit.damage, 'bullet', event.playerId, hit.hitPoint);
                                 events.push({ type: constants_1.EVENTS.PLAYER_DAMAGED, data: damageEvent });
                                 if (damageEvent.isKilled) {
-                                    player.kills++;
-                                    events.push({ type: constants_1.EVENTS.PLAYER_KILLED, data: damageEvent });
+                                    // ✅ CRITICAL FIX: Don't send PLAYER_KILLED event - backend:player:died is already sent by applyPlayerDamage
+                                    // Removing duplicate kill event to prevent double-counting
+                                    // events.push({ type: EVENTS.PLAYER_KILLED, data: damageEvent });
                                 }
                             }
                         }
@@ -1352,6 +1352,7 @@ class GameStateSystem {
             }
             playersObject[id] = {
                 id: player.id,
+                name: player.name, // Include player name
                 // CRITICAL: Flatten transform for frontend compatibility
                 position: player.transform.position,
                 rotation: player.transform.rotation,
@@ -1478,6 +1479,7 @@ class GameStateSystem {
             }
             visiblePlayersObject[pid] = {
                 id: p.id,
+                name: p.name, // Include player name
                 // CRITICAL: Flatten transform for frontend compatibility
                 position: p.transform.position,
                 rotation: p.transform.rotation,

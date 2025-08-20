@@ -53,6 +53,7 @@ export interface WeaponState {
 
 export interface PlayerState {
   id: string;
+  name?: string; // Player display name
   transform: Transform;
   velocity: Vector2;
   health: number;
