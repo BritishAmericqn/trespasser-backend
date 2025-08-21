@@ -280,6 +280,12 @@ export class GameRoom {
           console.log(`✅ Created player in game state: ${player.id}`);
         } else {
           console.error(`💥 Player not in room either - this shouldn't happen!`);
+          socket.emit('player:join:failed', {
+            reason: 'Player not in game room',
+            gameStatus: this.status,
+            timestamp: Date.now()
+          });
+          (socket as any)._processingJoin = false;
           return;
         }
       }
@@ -287,6 +293,12 @@ export class GameRoom {
       // Player should exist now
       if (!player) {
         console.error(`💥 Still can't find player after creation attempt`);
+        socket.emit('player:join:failed', {
+          reason: 'Could not create player in game state',
+          gameStatus: this.status,
+          timestamp: Date.now()
+        });
+        (socket as any)._processingJoin = false;
         return;
       }
       
@@ -378,6 +390,16 @@ export class GameRoom {
         weapons: Array.from(player.weapons.keys()),
         currentWeapon: player.weaponId
       });
+      
+      // CRITICAL: Send explicit join success confirmation
+      socket.emit('player:join:success', {
+        playerId: socket.id,
+        team: player.team,
+        isActive: true,
+        gameStatus: this.status,
+        timestamp: Date.now()
+      });
+      console.log(`✅ Sent player:join:success confirmation to ${socket.id}`);
       
       // CRITICAL: Send updated game state with vision data
       console.log(`📤 Sending updated game state with vision to ${socket.id}`);
