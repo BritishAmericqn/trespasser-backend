@@ -476,7 +476,14 @@ class GameStateSystem {
                     chargeLevel: chargeLevel,
                     timestamp: Date.now()
                 };
-                this.handleGrenadeThrow(grenadeThrowEvent);
+                // CRITICAL FIX: Actually use the events returned from handleGrenadeThrow!
+                const throwResult = this.handleGrenadeThrow(grenadeThrowEvent);
+                if (throwResult.success) {
+                    // Queue the events to be broadcast (including PROJECTILE_CREATED)
+                    for (const event of throwResult.events) {
+                        this.pendingProjectileEvents.push(event);
+                    }
+                }
             }
         }
     }
