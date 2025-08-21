@@ -74,24 +74,13 @@ export class ProjectileSystem {
     // Debug grenade creation
     if (type === 'grenade' || type === 'smokegrenade' || type === 'flashbang') {
       const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
-      console.log(`💣 ${type.toUpperCase()} CREATED:`);
-      console.log(`   ID: ${projectileId}`);
-      console.log(`   Position: (${position.x.toFixed(1)}, ${position.y.toFixed(1)})`);
-      console.log(`   Velocity: (${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}) = ${speed.toFixed(1)} px/s`);
-      console.log(`   Fuse Time: ${options.fuseTime}ms`);
-      console.log(`   Explosion Radius: ${options.explosionRadius}`);
+      // Grenade created
     }
     
     // Debug rocket creation
     if (type === 'rocket') {
       const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
-      console.log(`🚀 ROCKET CREATED:`);
-      console.log(`   ID: ${projectileId}`);
-      console.log(`   Position: (${position.x.toFixed(1)}, ${position.y.toFixed(1)})`);
-      console.log(`   Velocity: (${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}) = ${speed.toFixed(1)} px/s`);
-      console.log(`   Range: ${projectile.range}`);
-      console.log(`   Damage: ${damage}`);
-      console.log(`   Explosion Radius: ${options.explosionRadius || 50}`);
+      // Rocket created
     }
     
     this.projectiles.set(projectileId, projectile);
@@ -212,19 +201,16 @@ export class ProjectileSystem {
           projectile.type === 'smokegrenade' || projectile.type === 'flashbang')) {
         const timeAlive = Date.now() - projectile.timestamp;
         
-        // Debug log for grenades approaching explosion
-        if (projectile.type === 'grenade' && timeAlive > projectile.fuseTime - 500 && timeAlive < projectile.fuseTime) {
-          console.log(`💣 Grenade ${projectile.id} about to explode: ${timeAlive}ms / ${projectile.fuseTime}ms`);
-        }
+        // Grenade approaching explosion
         
         if (timeAlive >= projectile.fuseTime) {
-          console.log(`💥 ${projectile.type} ${projectile.id} exploding! Time alive: ${timeAlive}ms, Fuse time: ${projectile.fuseTime}ms`);
+          // Projectile exploding
           this.explodeProjectile(projectile);
           
           // Different explosion events based on type
           if (projectile.type === 'smokegrenade') {
             // Smoke grenades create smoke zones instead of damage explosions
-            console.log(`💨 Smoke grenade ${projectile.id} exploded at (${projectile.position.x.toFixed(1)}, ${projectile.position.y.toFixed(1)})`);
+            // Smoke grenade exploded
             explodeEvents.push({
               id: projectile.id,
               type: 'smoke',
@@ -731,7 +717,7 @@ export class ProjectileSystem {
         if (collision.hit) {
           // Debug: Log collision detection
           if (projectile.type === 'rocket') {
-            console.log(`🚀 Rocket hit wall ${wallId} at step ${step}/${steps}, slice ${collision.sliceIndex}`);
+            // Rocket hit wall
           }
           return {
             hit: true,
@@ -1035,13 +1021,13 @@ export class ProjectileSystem {
     const explosions: ExplosionEvent[] = [...this.explosionQueue];
     
     if (this.explosionQueue.length > 0) {
-      console.log(`💥 Processing ${this.explosionQueue.length} explosions`);
+      // Processing explosions
     }
     
     for (const explosion of this.explosionQueue) {
       // Add null check for explosion
       if (!explosion || !explosion.position) {
-        console.error('Invalid explosion in queue:', explosion);
+        // Invalid explosion in queue
         continue;
       }
       
@@ -1058,7 +1044,7 @@ export class ProjectileSystem {
           const damageMultiplier = 1 - (distance / explosion.radius);
           const damage = Math.floor(explosion.damage * damageMultiplier);
           
-          console.log(`💥 Explosion damages player ${playerId}: ${damage} damage at distance ${distance.toFixed(1)}`);
+          // Explosion damages player
           
           playerDamageEvents.push({
             playerId,
