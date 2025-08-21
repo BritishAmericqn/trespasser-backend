@@ -493,18 +493,29 @@ export class GameStateSystem {
     
     // Handle weapon firing - check both leftPressed and buttons field
     if (input.mouse.leftPressed || (input.mouse.buttons & 1)) {
-      const weaponFireEvent: WeaponFireEvent = {
-        playerId,
-        weaponType: player.weaponId as WeaponType,
-        position: { ...player.transform.position },
-        direction: player.transform.rotation,
-        isADS: player.isADS,
-        timestamp: Date.now(),
-        sequence: input.sequence,
-        pelletCount: player.weaponId === 'shotgun' ? 8 : undefined
-      };
-      
-      this.handleWeaponFire(weaponFireEvent);
+      // OPTIMIZATION: Check fire rate BEFORE creating event
+      const weapon = player.weapons.get(player.weaponId);
+      if (weapon) {
+        const now = Date.now();
+        const fireInterval = (60 / weapon.fireRate) * 1000;
+        
+        // Only process fire event if enough time has passed
+        if (now - weapon.lastFireTime >= fireInterval) {
+          const weaponFireEvent: WeaponFireEvent = {
+            playerId,
+            weaponType: player.weaponId as WeaponType,
+            position: { ...player.transform.position },
+            direction: player.transform.rotation,
+            isADS: player.isADS,
+            timestamp: now,
+            sequence: input.sequence,
+            pelletCount: player.weaponId === 'shotgun' ? 8 : undefined
+          };
+          
+          this.handleWeaponFire(weaponFireEvent);
+        }
+        // Else: Rate limited, don't even create the event
+      }
     }
     
     // Handle weapon switching
@@ -663,6 +674,7 @@ export class GameStateSystem {
     
     const fireResult = this.weaponSystem.handleWeaponFire(event, player);
     if (!fireResult.canFire) {
+      // Rate limited - don't send events for rejected shots
       return { success: false, events: [] };
     }
     
