@@ -1216,12 +1216,24 @@ export class GameStateSystem {
   }
   
   private validateInput(playerId: string, input: InputState): boolean {
+    // Debug log the input structure
+    if (!input || !input.mouse || input.sequence === undefined || input.timestamp === undefined) {
+      console.error(`❌ Malformed input from ${playerId.substring(0, 8)}:`, {
+        hasInput: !!input,
+        hasMouse: !!(input?.mouse),
+        hasSequence: input?.sequence !== undefined,
+        hasTimestamp: input?.timestamp !== undefined,
+        inputKeys: input ? Object.keys(input) : []
+      });
+      return false;
+    }
+    
     // Check timestamp (prevent old/future inputs)
     const now = Date.now();
     const timeDiff = Math.abs(now - input.timestamp);
     
     if (timeDiff > 1000) { // 1 second tolerance
-      // console.warn(`⏰ Input rejected for ${playerId.substring(0, 8)}: timestamp diff ${timeDiff}ms`);
+      console.warn(`⏰ Input rejected for ${playerId.substring(0, 8)}: timestamp diff ${timeDiff}ms`);
       return false;
     }
     
@@ -1230,7 +1242,7 @@ export class GameStateSystem {
     if (input.sequence <= lastSequence) {
       // Be more lenient - allow some out-of-order packets
       if (input.sequence < lastSequence - 10) {
-        // console.warn(`🔢 Input rejected for ${playerId.substring(0, 8)}: sequence ${input.sequence} <= ${lastSequence}`);
+        console.warn(`🔢 Input rejected for ${playerId.substring(0, 8)}: sequence ${input.sequence} <= ${lastSequence}`);
         return false;
       }
     }
@@ -1241,12 +1253,12 @@ export class GameStateSystem {
                           input.mouse.y <= GAME_CONFIG.GAME_HEIGHT * GAME_CONFIG.SCALE_FACTOR;
     
     if (!isGameSpace && !isScreenSpace) {
-      // console.warn(`🖱️ Input rejected for ${playerId.substring(0, 8)}: mouse out of bounds (${input.mouse.x}, ${input.mouse.y})`);
+      console.warn(`🖱️ Input rejected for ${playerId.substring(0, 8)}: mouse out of bounds (${input.mouse.x}, ${input.mouse.y})`);
       return false;
     }
     
     if (input.mouse.buttons < 0 || input.mouse.buttons > 7) { // 3 bits for mouse buttons
-      // console.warn(`🖱️ Input rejected for ${playerId.substring(0, 8)}: invalid button state ${input.mouse.buttons}`);
+      console.warn(`🖱️ Input rejected for ${playerId.substring(0, 8)}: invalid button state ${input.mouse.buttons}`);
       return false;
     }
     
