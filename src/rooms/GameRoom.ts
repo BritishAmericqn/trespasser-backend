@@ -89,14 +89,6 @@ export class GameRoom {
     if (this.status === 'playing') {
       console.log(`⚡ Player ${socket.id} joining game in progress`);
       
-      // CRITICAL: Debug late joiner registration
-      console.log(`🔍 Late joiner status:`, {
-        socketId: socket.id,
-        hasPlayer: !!this.gameState.getPlayer(socket.id),
-        isInPlayersMap: this.players.has(socket.id),
-        gameStatus: this.status
-      });
-      
       // Send match_started event so they know game is active
       socket.emit('match_started', {
         lobbyId: this.id,
@@ -394,11 +386,6 @@ export class GameRoom {
       }
       
       // Send confirmation
-      console.log(`🔫 Weapons equipped for ${socket.id.substring(0, 8)}:`, {
-        weapons: Array.from(player.weapons.keys()),
-        currentWeapon: player.weaponId,
-        weaponCount: player.weapons.size
-      });
       socket.emit('weapon:equipped', {
         weapons: Array.from(player.weapons.keys()),
         currentWeapon: player.weaponId

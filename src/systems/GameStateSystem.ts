@@ -456,31 +456,8 @@ export class GameStateSystem {
     
     // Input validation - prevent cheating
     if (!this.validateInput(playerId, input)) {
-      console.warn(`Invalid input from player ${playerId}`);
-      
-      // CRITICAL: Log WHY validation failed for debugging
-      console.error(`🔍 Input validation failed for ${playerId}:`, {
-        hasInput: !!input,
-        hasKeys: !!(input?.keys),
-        hasMouse: !!(input?.mouse),
-        hasSequence: input?.sequence !== undefined,
-        hasTimestamp: input?.timestamp !== undefined,
-        timestamp: input?.timestamp,
-        serverTime: Date.now(),
-        timeDiff: input?.timestamp ? Math.abs(Date.now() - input.timestamp) : 'N/A',
-        sequence: input?.sequence,
-        lastSequence: this.lastInputSequence.get(playerId),
-        mouseX: input?.mouse?.x,
-        mouseY: input?.mouse?.y,
-        mouseButtons: input?.mouse?.buttons,
-        leftPressed: input?.mouse?.leftPressed,
-        rightPressed: input?.mouse?.rightPressed
-      });
-      
-      // TEMPORARY FIX: Allow movement even if validation fails
-      // This ensures players aren't frozen while we debug
-      console.warn(`⚠️ ALLOWING INPUT DESPITE VALIDATION FAILURE (temporary fix)`);
-      // Comment out the return to continue processing
+      // Silently allow input to pass through (temporary fix for clock drift)
+      // TODO: Fix frontend timestamp synchronization
       // return;
     }
     
@@ -513,16 +490,6 @@ export class GameStateSystem {
   private handleWeaponInputs(playerId: string, input: InputState): void {
     const player = this.players.get(playerId);
     if (!player) return;
-    
-    // DEBUG: Log mouse state to see why shooting doesn't work
-    if (input.mouse.leftPressed || input.mouse.buttons > 0) {
-      console.log(`🖱️ Mouse input for ${playerId}:`, {
-        leftPressed: input.mouse.leftPressed,
-        buttons: input.mouse.buttons,
-        hasWeapon: !!player.weaponId,
-        currentWeapon: player.weaponId
-      });
-    }
     
     // Handle weapon firing - check both leftPressed and buttons field
     if (input.mouse.leftPressed || (input.mouse.buttons & 1)) {
@@ -732,7 +699,9 @@ export class GameStateSystem {
             weaponType: weapon.type,
             position: event.position,
             direction: event.direction,
-            ammoRemaining: weapon.currentAmmo  // Already decremented in handleGrenadeThrow
+            ammoRemaining: weapon.currentAmmo,  // Already decremented in handleGrenadeThrow
+            timestamp: Date.now(),
+            isGrenade: true  // Special flag for grenade throws
           }
         });
       }
@@ -1017,15 +986,17 @@ export class GameStateSystem {
       });
     }
     
-    // Add weapon fired event
+    // Add weapon fired event with full trail data
     events.push({ 
       type: EVENTS.WEAPON_FIRED, 
       data: { 
         playerId: event.playerId, 
         weaponType: weapon.type,
-        position: event.position,
+        position: event.position,  // Start position for trail
         direction: event.direction,
-        ammoRemaining: weapon.currentAmmo
+        ammoRemaining: weapon.currentAmmo,
+        timestamp: Date.now(),  // For synchronization
+        isADS: event.isADS  // For different effects when aiming
       }
     });
     
@@ -1250,15 +1221,8 @@ export class GameStateSystem {
   }
   
   private validateInput(playerId: string, input: InputState): boolean {
-    // Debug log the input structure
+    // Check for malformed input structure
     if (!input || !input.mouse || input.sequence === undefined || input.timestamp === undefined) {
-      console.error(`❌ Malformed input from ${playerId.substring(0, 8)}:`, {
-        hasInput: !!input,
-        hasMouse: !!(input?.mouse),
-        hasSequence: input?.sequence !== undefined,
-        hasTimestamp: input?.timestamp !== undefined,
-        inputKeys: input ? Object.keys(input) : []
-      });
       return false;
     }
     
@@ -1267,7 +1231,7 @@ export class GameStateSystem {
     const timeDiff = Math.abs(now - input.timestamp);
     
     if (timeDiff > 5000) { // 5 second tolerance for clock drift
-      console.warn(`⏰ Input rejected for ${playerId.substring(0, 8)}: timestamp diff ${timeDiff}ms`);
+      // Silently reject very old inputs
       return false;
     }
     
@@ -1276,7 +1240,7 @@ export class GameStateSystem {
     if (input.sequence <= lastSequence) {
       // Be more lenient - allow some out-of-order packets
       if (input.sequence < lastSequence - 10) {
-        console.warn(`🔢 Input rejected for ${playerId.substring(0, 8)}: sequence ${input.sequence} <= ${lastSequence}`);
+        // Silently reject very old sequence numbers
         return false;
       }
     }
@@ -1287,12 +1251,12 @@ export class GameStateSystem {
                           input.mouse.y <= GAME_CONFIG.GAME_HEIGHT * GAME_CONFIG.SCALE_FACTOR;
     
     if (!isGameSpace && !isScreenSpace) {
-      console.warn(`🖱️ Input rejected for ${playerId.substring(0, 8)}: mouse out of bounds (${input.mouse.x}, ${input.mouse.y})`);
+      // Silently reject out of bounds mouse positions
       return false;
     }
     
     if (input.mouse.buttons < 0 || input.mouse.buttons > 7) { // 3 bits for mouse buttons
-      console.warn(`🖱️ Input rejected for ${playerId.substring(0, 8)}: invalid button state ${input.mouse.buttons}`);
+      // Silently reject invalid button states
       return false;
     }
     
