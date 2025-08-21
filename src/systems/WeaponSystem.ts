@@ -163,9 +163,8 @@ export class WeaponSystem {
     const now = Date.now();
     const fireInterval = (60 / weapon.fireRate) * 1000; // Convert RPM to milliseconds
     if (now - weapon.lastFireTime < fireInterval) {
-      const error = 'Fire rate exceeded';
-      WeaponDiagnostics.logWeaponFire(weapon, player, false, error);
-      return { canFire: false, error };
+      // Silently reject - fire rate exceeded
+      return { canFire: false, error: 'Fire rate exceeded' };
     }
     
     // Validate event timestamp

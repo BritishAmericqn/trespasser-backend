@@ -493,9 +493,6 @@ export class GameStateSystem {
     
     // Handle weapon firing - check both leftPressed and buttons field
     if (input.mouse.leftPressed || (input.mouse.buttons & 1)) {
-      // Debug current weapon state before firing
-      WeaponDiagnostics.logWeaponState(player);
-      
       const weaponFireEvent: WeaponFireEvent = {
         playerId,
         weaponType: player.weaponId as WeaponType,
@@ -663,8 +660,6 @@ export class GameStateSystem {
       WeaponDiagnostics.logError('handleWeaponFire', `Player not found: ${event.playerId}`);
       return { success: false, events: [] };
     }
-    
-    WeaponDiagnostics.logEventSent('weapon:fire request', event);
     
     const fireResult = this.weaponSystem.handleWeaponFire(event, player);
     if (!fireResult.canFire) {
@@ -999,6 +994,12 @@ export class GameStateSystem {
         isADS: event.isADS  // For different effects when aiming
       }
     });
+    
+    // Debug automatic weapons
+    const automaticWeapons = ['rifle', 'smg', 'machinegun'];
+    if (automaticWeapons.includes(weapon.type)) {
+      console.log(`🔫 AUTO FIRE: ${weapon.type} - Events generated: ${events.length} (fired:1, hit/miss:${events.length - 1})`);
+    }
     
     return { success: true, events };
   }
