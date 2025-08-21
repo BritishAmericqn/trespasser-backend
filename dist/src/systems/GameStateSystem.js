@@ -431,7 +431,28 @@ class GameStateSystem {
                         sequence: input.sequence,
                         pelletCount: player.weaponId === 'shotgun' ? 8 : undefined
                     };
-                    this.handleWeaponFire(weaponFireEvent);
+                    // CRITICAL FIX: Actually use the events returned from handleWeaponFire!
+                    const fireResult = this.handleWeaponFire(weaponFireEvent);
+                    if (fireResult.success) {
+                        // Queue all events for broadcast (including PROJECTILE_CREATED for grenades)
+                        for (const event of fireResult.events) {
+                            // Determine which queue to use based on event type
+                            if (event.type === constants_1.EVENTS.PROJECTILE_CREATED ||
+                                event.type === constants_1.EVENTS.PROJECTILE_UPDATED ||
+                                event.type === constants_1.EVENTS.PROJECTILE_EXPLODED ||
+                                event.type === constants_1.EVENTS.GRENADE_THROWN) {
+                                this.pendingProjectileEvents.push(event);
+                            }
+                            else if (event.type === constants_1.EVENTS.WALL_DAMAGED ||
+                                event.type === constants_1.EVENTS.WALL_DESTROYED) {
+                                this.pendingWallDamageEvents.push(event);
+                            }
+                            else {
+                                // Default to projectile events for other weapon events
+                                this.pendingProjectileEvents.push(event);
+                            }
+                        }
+                    }
                 }
                 // Else: Rate limited, don't even create the event
             }
