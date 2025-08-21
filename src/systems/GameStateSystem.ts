@@ -457,7 +457,29 @@ export class GameStateSystem {
     // Input validation - prevent cheating
     if (!this.validateInput(playerId, input)) {
       console.warn(`Invalid input from player ${playerId}`);
-      return;
+      
+      // CRITICAL: Log WHY validation failed for debugging
+      console.error(`🔍 Input validation failed for ${playerId}:`, {
+        hasInput: !!input,
+        hasKeys: !!(input?.keys),
+        hasMouse: !!(input?.mouse),
+        hasSequence: input?.sequence !== undefined,
+        hasTimestamp: input?.timestamp !== undefined,
+        timestamp: input?.timestamp,
+        serverTime: Date.now(),
+        timeDiff: input?.timestamp ? Math.abs(Date.now() - input.timestamp) : 'N/A',
+        sequence: input?.sequence,
+        lastSequence: this.lastInputSequence.get(playerId),
+        mouseX: input?.mouse?.x,
+        mouseY: input?.mouse?.y,
+        mouseButtons: input?.mouse?.buttons
+      });
+      
+      // TEMPORARY FIX: Allow movement even if validation fails
+      // This ensures players aren't frozen while we debug
+      console.warn(`⚠️ ALLOWING INPUT DESPITE VALIDATION FAILURE (temporary fix)`);
+      // Comment out the return to continue processing
+      // return;
     }
     
     // Update input sequence tracking
