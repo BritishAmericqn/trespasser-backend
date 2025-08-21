@@ -400,7 +400,9 @@ class GameStateSystem {
                 lastSequence: this.lastInputSequence.get(playerId),
                 mouseX: input?.mouse?.x,
                 mouseY: input?.mouse?.y,
-                mouseButtons: input?.mouse?.buttons
+                mouseButtons: input?.mouse?.buttons,
+                leftPressed: input?.mouse?.leftPressed,
+                rightPressed: input?.mouse?.rightPressed
             });
             // TEMPORARY FIX: Allow movement even if validation fails
             // This ensures players aren't frozen while we debug
@@ -431,6 +433,15 @@ class GameStateSystem {
         const player = this.players.get(playerId);
         if (!player)
             return;
+        // DEBUG: Log mouse state to see why shooting doesn't work
+        if (input.mouse.leftPressed || input.mouse.buttons > 0) {
+            console.log(`🖱️ Mouse input for ${playerId}:`, {
+                leftPressed: input.mouse.leftPressed,
+                buttons: input.mouse.buttons,
+                hasWeapon: !!player.weaponId,
+                currentWeapon: player.weaponId
+            });
+        }
         // Handle weapon firing
         if (input.mouse.leftPressed) {
             // Debug current weapon state before firing
@@ -1049,7 +1060,7 @@ class GameStateSystem {
         // Check timestamp (prevent old/future inputs)
         const now = Date.now();
         const timeDiff = Math.abs(now - input.timestamp);
-        if (timeDiff > 1000) { // 1 second tolerance
+        if (timeDiff > 5000) { // 5 second tolerance for clock drift
             console.warn(`⏰ Input rejected for ${playerId.substring(0, 8)}: timestamp diff ${timeDiff}ms`);
             return false;
         }

@@ -394,6 +394,11 @@ export class GameRoom {
       }
       
       // Send confirmation
+      console.log(`🔫 Weapons equipped for ${socket.id.substring(0, 8)}:`, {
+        weapons: Array.from(player.weapons.keys()),
+        currentWeapon: player.weaponId,
+        weaponCount: player.weapons.size
+      });
       socket.emit('weapon:equipped', {
         weapons: Array.from(player.weapons.keys()),
         currentWeapon: player.weaponId
