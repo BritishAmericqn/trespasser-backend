@@ -685,7 +685,7 @@ export class GameStateSystem {
     // Check if this is a throwable weapon that should be converted to a throw event
     const throwableWeapons = ['grenade', 'smokegrenade', 'flashbang'];
     if (throwableWeapons.includes(weapon.type)) {
-      console.log(`🔄 Converting fire event to throw event for ${weapon.type}`);
+      // Converting fire event to throw event
       // Convert to a grenade throw event with default charge level
       const grenadeThrowEvent: GrenadeThrowEvent = {
         playerId: event.playerId,
@@ -732,11 +732,7 @@ export class GameStateSystem {
           y: event.position.y + Math.sin(event.direction) * offsetDistance
         };
         
-        console.log(`🔫 SHOTGUN DEBUG: Player ${event.playerId.substring(0, 8)}`);
-        console.log(`   Player position: (${event.position.x.toFixed(2)}, ${event.position.y.toFixed(2)})`);
-        console.log(`   Offset position: (${offsetPosition.x.toFixed(2)}, ${offsetPosition.y.toFixed(2)})`);
-        console.log(`   Direction: ${event.direction.toFixed(3)} rad`);
-        console.log(`   Offset distance: ${offsetDistance} pixels`);
+        // Shotgun firing from offset position
         
         // Track all pellet hits for the event
         const allPelletHits: any[] = [];
@@ -754,7 +750,7 @@ export class GameStateSystem {
             this.players
           );
           
-          console.log(`  🎯 Pellet ${pelletIndex}: Direction ${pelletDirection.toFixed(3)}, ${pelletHits.length} hits`);
+          // Processing pellet hits
           
           // Track if this pellet hit anything at all
           let pelletHitSomething = false;
@@ -767,7 +763,7 @@ export class GameStateSystem {
             // Check for self-hit (debugging)
             if (hit.targetType === 'player' && hit.targetId === event.playerId) {
               selfHitCount++;
-              console.log(`🚨 SELF-HIT DETECTED! Pellet ${pelletIndex}, hit point: (${hit.hitPoint.x.toFixed(1)}, ${hit.hitPoint.y.toFixed(1)})`);
+              // Self-hit detected
             }
             
             // Send individual pellet event based on hit type
@@ -863,17 +859,14 @@ export class GameStateSystem {
               }
             });
             
-            console.log(`  🎯 Pellet ${pelletIndex}: MISS - ended at (${missPosition.x.toFixed(1)}, ${missPosition.y.toFixed(1)})`);
+            // Pellet missed
           }
         }
         
-        console.log(`🔫 SHOTGUN SUMMARY: ${allPelletHits.length} total hits, ${selfHitCount} self-hits`);
-        if (selfHitCount > 0) {
-          console.log(`🚨 WARNING: Shotgun self-hit detected despite offset position!`);
-        }
+        // Shotgun fire complete
         
         // Individual pellet events are now sent above - no need for summary event
-        console.log(`📤 SENT ${pelletCount} INDIVIDUAL PELLET EVENTS instead of summary event`);
+        // Sent individual pellet events
       } else {
         // Regular hitscan handling for other weapons
         const penetrationHits = this.weaponSystem.performHitscanWithPenetration(
@@ -968,7 +961,7 @@ export class GameStateSystem {
       } else {
         // Regular projectile (rocket)
         velocity = this.calculateProjectileVelocity(event.direction, weaponConfig.PROJECTILE_SPEED);
-        console.log(`🚀 Creating rocket projectile - speed: ${weaponConfig.PROJECTILE_SPEED}, damage: ${weapon.damage}`);
+        // Creating rocket projectile
       }
       
       const projectile = this.projectileSystem.createProjectile(
@@ -1010,7 +1003,7 @@ export class GameStateSystem {
     // Debug automatic weapons
     const automaticWeapons = ['rifle', 'smg', 'machinegun'];
     if (automaticWeapons.includes(weapon.type)) {
-      console.log(`🔫 AUTO FIRE: ${weapon.type} - Events generated: ${events.length} (fired:1, hit/miss:${events.length - 1})`);
+      // Auto fire event generated
     }
     
     return { success: true, events };
@@ -1050,8 +1043,7 @@ export class GameStateSystem {
       return { success: false, events: [] };
     }
     
-    console.log(`🔄 Weapon switch attempt - player: ${playerId.substring(0, 8)}, from: ${player.weaponId}, to: ${weaponType}`);
-    console.log(`   Available weapons: [${Array.from(player.weapons.keys()).join(', ')}]`);
+    // Weapon switch attempt
     
     const switchEvent: WeaponSwitchEvent = {
       playerId,
@@ -1062,11 +1054,11 @@ export class GameStateSystem {
     
     const switchResult = this.weaponSystem.handleWeaponSwitch(switchEvent, player);
     if (!switchResult.canSwitch) {
-      console.log(`❌ Switch failed for ${playerId}: ${switchResult.error}`);
+      // Switch failed
       return { success: false, events: [] };
     }
     
-    console.log(`✅ Weapon switched successfully to ${weaponType}`);
+    // Weapon switched successfully
     
     const events = [
       { type: EVENTS.WEAPON_SWITCHED, data: { playerId, fromWeapon: switchEvent.fromWeapon, toWeapon: switchEvent.toWeapon } }
@@ -1127,7 +1119,7 @@ export class GameStateSystem {
     
     // Debug log for grenades
     if (weapon.type === 'grenade') {
-      console.log(`💣 Grenade created with fuseTime: ${projectileOptions.fuseTime}ms, range: ${projectileOptions.range}, damage: ${weapon.damage}`);
+      // Grenade created
     }
     
     const events = [
@@ -1155,7 +1147,7 @@ export class GameStateSystem {
     // Check invulnerability after respawn
     const now = Date.now();
     if (player.invulnerableUntil && now < player.invulnerableUntil) {
-      console.log(`🛡️ Player ${player.id.substring(0, 8)} is invulnerable (${player.invulnerableUntil - now}ms remaining)`);
+      // Player is invulnerable
       return {
         playerId: player.id,
         damage: 0,
@@ -1182,7 +1174,7 @@ export class GameStateSystem {
       player.killerId = sourcePlayerId;
       player.respawnTime = now + GAME_CONFIG.DEATH.RESPAWN_DELAY;
       
-      console.log(`💀 Player ${player.id.substring(0, 8)} killed by ${sourcePlayerId.substring(0, 8)} - respawn in ${GAME_CONFIG.DEATH.RESPAWN_DELAY}ms`);
+      // Player killed
       
       // Queue enhanced death event with kill attribution details
       const killer = this.players.get(sourcePlayerId);
@@ -1206,9 +1198,9 @@ export class GameStateSystem {
         // ✅ CRITICAL FIX: Only count kills against opposing team
         if (killer.team !== player.team) {
           killer.kills++;
-          console.log(`🎯 Kill credit: ${killer.team} player ${sourcePlayerId.substring(0, 8)} eliminated ${player.team} player ${player.id.substring(0, 8)} - Kills: ${killer.kills}`);
+          // Kill credited
         } else {
-          console.log(`⚠️ Team kill ignored: ${killer.team} player ${sourcePlayerId.substring(0, 8)} killed teammate ${player.id.substring(0, 8)}`);
+          // Team kill ignored
         }
       }
     }
@@ -1450,12 +1442,11 @@ export class GameStateSystem {
       this.pendingProjectileEvents.push({ type: EVENTS.PROJECTILE_EXPLODED, data: explodeEvent });
       
       // Handle special explosion types
-      console.log(`💥 Processing explosion event: type=${explodeEvent.type}, id=${explodeEvent.id}`);
+      // Processing explosion event
       if (explodeEvent.type === 'smoke') {
         // Create smoke zone
         this.smokeZoneSystem.createSmokeZone(explodeEvent.id, explodeEvent.position);
-        console.log(`💨 Smoke grenade deployed at (${explodeEvent.position.x.toFixed(1)}, ${explodeEvent.position.y.toFixed(1)})`);
-        console.log(`💨 Active smoke zones: ${this.smokeZoneSystem.getZoneCount()}`);
+        // Smoke grenade deployed
       } else if (explodeEvent.type === 'flash') {
         // Calculate flashbang effects on all players
         const flashEffect = this.flashbangEffectSystem.calculateFlashbangEffects(
@@ -1474,7 +1465,7 @@ export class GameStateSystem {
         
         // Queue flashbang effect event for frontend
         this.pendingProjectileEvents.push({ type: 'FLASHBANG_EFFECT', data: flashEffect });
-        console.log(`⚡ Flashbang detonated, affected ${flashEffect.affectedPlayers.length} players`);
+        // Flashbang detonated
       }
     }
     
@@ -1596,7 +1587,7 @@ export class GameStateSystem {
     
     // Queue player damage events
     for (const damageEvent of explosionResults.playerDamageEvents) {
-      console.log(`🎯 Applying explosion damage to player ${damageEvent.playerId}: ${damageEvent.damage} damage`);
+      // Applying explosion damage
       this.applyPlayerDamage(
         this.players.get(damageEvent.playerId)!,
         damageEvent.damage,
@@ -1785,7 +1776,7 @@ export class GameStateSystem {
       }
     }
     
-    console.log(`🎯 Found safe spawn for ${team} team: ${bestSpawn.x}, ${bestSpawn.y} (min distance from enemies: ${maxMinDistance.toFixed(0)})`);
+    // Found safe spawn
     return bestSpawn;
   }
   
@@ -1855,7 +1846,7 @@ export class GameStateSystem {
     
     // 🎨 DEBUG: Log team data every 100th update to avoid spam
     if (Math.random() < 0.01) { // 1% chance to log
-      console.log(teamDataDebugLog);
+      // Team data logged
     }
     
     // Return all projectiles (vision filtering disabled or not implemented)
@@ -1874,7 +1865,7 @@ export class GameStateSystem {
     // Debug smoke zones
     const smokeZones = this.smokeZoneSystem.getSmokeZones();
     if (smokeZones.length > 0) {
-      console.log(`💨 Including ${smokeZones.length} smoke zone(s) in game state for ${playerId.substring(0, 8)}`);
+      // Including smoke zones in game state
     }
     
     return {

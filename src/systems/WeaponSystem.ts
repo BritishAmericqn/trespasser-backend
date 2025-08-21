@@ -26,7 +26,7 @@ export class WeaponSystem {
   private projectileId: number = 0;
   
   constructor() {
-    // console.log('WeaponSystem initialized');
+    // WeaponSystem initialized
   }
   
   // Initialize player weapons based on loadout
@@ -128,14 +128,7 @@ export class WeaponSystem {
   
   // Handle weapon fire event
   handleWeaponFire(event: WeaponFireEvent, player: PlayerState): { canFire: boolean; weapon?: WeaponState; error?: string } {
-    // Debug exactly what's being requested vs what's available
-    console.log(`\n🔍 [WEAPON LOOKUP] Searching for weapon...`);
-    console.log(`   Requested Type: "${event.weaponType}"`);
-    console.log(`   Player Weapon ID: "${player.weaponId}"`);
-    console.log(`   Available Weapons:`);
-    for (const [type, weapon] of player.weapons) {
-      console.log(`     - "${type}" (${weapon.currentAmmo}/${weapon.maxAmmo})`);
-    }
+    // Weapon lookup - logs removed for performance
     
     const weapon = player.weapons.get(event.weaponType);
     if (!weapon) {
@@ -670,7 +663,7 @@ export class WeaponSystem {
         
         // Check if it's a hard wall
         if (isHardWall(wall.material)) {
-          // console.log(`🛑 Bullet hit hard wall ${wall.material}, stopping`);
+          // Bullet hit hard wall, stopping
           // Hard wall - bullet stops here
           hits.push({
             targetType: 'wall',
@@ -694,7 +687,7 @@ export class WeaponSystem {
             // Bullet penetrates
             const damageToWall = actualPenetrationCost;
             const remainingDamage = currentDamage - damageToWall;
-            // console.log(`🔫 Bullet penetrates soft wall ${wall.material}, wall health: ${sliceHealth}, penetration cost: ${actualPenetrationCost}, bullet: ${currentDamage} -> ${remainingDamage}`);
+            // Bullet penetrates soft wall
             
             hits.push({
               targetType: 'wall',
