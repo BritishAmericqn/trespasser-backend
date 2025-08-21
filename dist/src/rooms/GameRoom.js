@@ -152,6 +152,21 @@ class GameRoom {
             if (!player) {
                 return;
             }
+            // CRITICAL FIX: Check fire rate BEFORE processing (same as in handleWeaponInputs)
+            const weapon = player.weapons.get(player.weaponId);
+            if (weapon) {
+                const now = Date.now();
+                const fireInterval = (60 / weapon.fireRate) * 1000;
+                // Only process if enough time has passed since last shot
+                if (now - weapon.lastFireTime < fireInterval) {
+                    // Rate limited - send explicit rate limit event so frontend knows
+                    socket.emit('weapon:rate_limited', {
+                        weaponType: player.weaponId,
+                        nextFireTime: weapon.lastFireTime + fireInterval
+                    });
+                    return;
+                }
+            }
             // Use server position and rotation, not client position
             const weaponFireEvent = {
                 playerId: socket.id,

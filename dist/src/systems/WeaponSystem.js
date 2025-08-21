@@ -119,14 +119,9 @@ class WeaponSystem {
             WeaponDiagnostics_1.WeaponDiagnostics.logWeaponFire(weapon, player, false, error);
             return { canFire: false, error };
         }
-        // Check fire rate (safety check - also checked in GameStateSystem)
+        // Fire rate is now checked BEFORE this function is called
+        // Both in GameStateSystem.handleWeaponInputs and GameRoom weapon:fire handler
         const now = Date.now();
-        const fireInterval = (60 / weapon.fireRate) * 1000; // Convert RPM to milliseconds
-        if (now - weapon.lastFireTime < fireInterval) {
-            // Rate limited - this shouldn't happen if GameStateSystem is working correctly
-            console.warn(`⚠️ Fire rate check failed in WeaponSystem - this shouldn't happen!`);
-            return { canFire: false, error: 'Fire rate exceeded' };
-        }
         // Validate event timestamp
         if (Math.abs(now - event.timestamp) > 1000) {
             const error = 'Invalid timestamp';
