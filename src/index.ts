@@ -163,6 +163,10 @@ io.on('connection', (socket) => {
         console.log(`🎮 Setting up matchmaking handlers for ${socket.id}`);
         setupMatchmakingHandlers(socket);
         console.log(`🎮 Finished setting up matchmaking for ${socket.id}`);
+        
+        // CRITICAL FIX: Set up game event handlers AFTER authentication
+        console.log(`🎮 Setting up game event handlers for authenticated ${socket.id}`);
+        setupGameEventHandlers(socket);
       } else {
         socket.emit('auth-failed', 'Invalid password');
         socket.disconnect();
@@ -202,6 +206,7 @@ io.on('connection', (socket) => {
     // No password required, add to authenticated players and set up matchmaking
     authenticatedPlayers.add(socket.id);
     setupMatchmakingHandlers(socket);
+    setupGameEventHandlers(socket); // CRITICAL FIX: Set up game handlers after auth
     console.log(`✅ Player joined: ${socket.id} from ${ip} (no password)`);
   }
   
@@ -209,8 +214,8 @@ io.on('connection', (socket) => {
     handleDisconnect(socket, reason);
   });
   
-  // Rate limit game events for authenticated players only
-  setupGameEventHandlers(socket);
+  // MOVED: setupGameEventHandlers is now called AFTER authentication
+  // to prevent input dropping for authenticated players
 });
 
 function setupMatchmakingHandlers(socket: any) {
@@ -496,6 +501,8 @@ function setupGameEventHandlers(socket: any) {
     if (event.startsWith('player:') || event.startsWith('weapon:') || event.startsWith('grenade:')) {
       return originalOn(event, (...args: any[]) => {
         if (!authenticatedPlayers.has(socket.id)) {
+          console.error(`❌ DROPPING ${event} from ${socket.id} - NOT AUTHENTICATED!`);
+          console.error(`   Current auth set: [${Array.from(authenticatedPlayers).join(', ')}]`);
           return; // Ignore events from unauthenticated players
         }
         
