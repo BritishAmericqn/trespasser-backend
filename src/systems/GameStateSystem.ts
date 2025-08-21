@@ -524,8 +524,8 @@ export class GameStateSystem {
       });
     }
     
-    // Handle weapon firing
-    if (input.mouse.leftPressed) {
+    // Handle weapon firing - check both leftPressed and buttons field
+    if (input.mouse.leftPressed || (input.mouse.buttons & 1)) {
       // Debug current weapon state before firing
       WeaponDiagnostics.logWeaponState(player);
       

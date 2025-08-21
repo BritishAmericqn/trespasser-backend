@@ -442,8 +442,8 @@ class GameStateSystem {
                 currentWeapon: player.weaponId
             });
         }
-        // Handle weapon firing
-        if (input.mouse.leftPressed) {
+        // Handle weapon firing - check both leftPressed and buttons field
+        if (input.mouse.leftPressed || (input.mouse.buttons & 1)) {
             // Debug current weapon state before firing
             WeaponDiagnostics_1.WeaponDiagnostics.logWeaponState(player);
             const weaponFireEvent = {
